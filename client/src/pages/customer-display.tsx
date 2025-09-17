@@ -50,7 +50,7 @@ export default function CustomerDisplayPage() {
         console.log("Customer Display: Fetching initial data...");
 
         // Fetch store info
-        const storeResponse = await fetch('https://66622521-d7f0-4a33-aadd-c50d66665c71-00-wqfql649629t.pike.replit.dev/api/store-settings');
+        const storeResponse = await fetch('https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings');
         if (storeResponse.ok) {
           const storeData = await storeResponse.json();
           console.log("Customer Display: Store info loaded:", storeData);
@@ -60,7 +60,7 @@ export default function CustomerDisplayPage() {
         }
 
         // Try to fetch current cart state if available
-        const cartResponse = await fetch('https://66622521-d7f0-4a33-aadd-c50d66665c71-00-wqfql649629t.pike.replit.dev/api/current-cart');
+        const cartResponse = await fetch('https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/current-cart');
         if (cartResponse.ok) {
           const cartData = await cartResponse.json();
           console.log("Customer Display: Initial cart loaded:", cartData);
@@ -87,7 +87,7 @@ export default function CustomerDisplayPage() {
   useEffect(() => {
     console.log("Customer Display: Initializing WebSocket connection");
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `https://66622521-d7f0-4a33-aadd-c50d66665c71-00-wqfql649629t.pike.replit.dev/ws`;
+    const wsUrl = `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/ws`;
 
     let ws: WebSocket;
     let reconnectTimer: NodeJS.Timeout;

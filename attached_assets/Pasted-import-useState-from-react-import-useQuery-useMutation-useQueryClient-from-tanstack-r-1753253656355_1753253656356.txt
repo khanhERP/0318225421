@@ -38,11 +38,11 @@ export default function InventoryPage() {
   const queryClient = useQueryClient();
 
   const { data: products = [], isLoading: productsLoading } = useQuery<Product[]>({
-    queryKey: ["https://66622521-d7f0-4a33-aadd-c50d66665c71-00-wqfql649629t.pike.replit.dev/api/products"],
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"],
   });
 
   const { data: categories = [] } = useQuery<Category[]>({
-    queryKey: ["https://66622521-d7f0-4a33-aadd-c50d66665c71-00-wqfql649629t.pike.replit.dev/api/categories"],
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories"],
   });
 
   const stockUpdateForm = useForm<StockUpdateForm>({
@@ -55,10 +55,10 @@ export default function InventoryPage() {
 
   const updateStockMutation = useMutation({
     mutationFn: async (data: StockUpdateForm) => {
-      return await apiRequest('https://66622521-d7f0-4a33-aadd-c50d66665c71-00-wqfql649629t.pike.replit.dev/api/inventory/update-stock', 'POST', data);
+      return await apiRequest('https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/inventory/update-stock', 'POST', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://66622521-d7f0-4a33-aadd-c50d66665c71-00-wqfql649629t.pike.replit.dev/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
       setShowStockDialog(false);
       stockUpdateForm.reset();
     },

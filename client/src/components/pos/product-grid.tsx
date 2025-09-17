@@ -43,14 +43,14 @@ export function ProductGrid({ selectedCategory, searchQuery, onAddToCart }: Prod
   };
 
   const { data: products = [], isLoading } = useQuery<Product[]>({
-    queryKey: ["https://66622521-d7f0-4a33-aadd-c50d66665c71-00-wqfql649629t.pike.replit.dev/api/products", { category: selectedCategory, search: searchQuery }],
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products", { category: selectedCategory, search: searchQuery }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) {
         params.append("search", searchQuery);
       }
 
-      const response = await fetch(`https://66622521-d7f0-4a33-aadd-c50d66665c71-00-wqfql649629t.pike.replit.dev/api/products?${params}`);
+      const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products?${params}`);
       if (!response.ok) throw new Error('Failed to fetch products');
       const allProducts = await response.json();
 

@@ -44,16 +44,16 @@ export function SupplierReport() {
   const [debtTo, setDebtTo] = useState<string>("");
 
   const { data: suppliers } = useQuery({
-    queryKey: ["https://66622521-d7f0-4a33-aadd-c50d66665c71-00-wqfql649629t.pike.replit.dev/api/suppliers"],
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/suppliers"],
   });
 
   const { data: supplierDebts } = useQuery({
-    queryKey: ["https://66622521-d7f0-4a33-aadd-c50d66665c71-00-wqfql649629t.pike.replit.dev/api/supplier-debts"],
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/supplier-debts"],
     enabled: concernType === "debt",
   });
 
   const { data: supplierPurchases } = useQuery({
-    queryKey: ["https://66622521-d7f0-4a33-aadd-c50d66665c71-00-wqfql649629t.pike.replit.dev/api/supplier-purchases"],
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/supplier-purchases"],
     enabled: concernType === "purchase" || concernType === "purchaseBySupplier",
   });
 
