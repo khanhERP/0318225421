@@ -24,7 +24,7 @@ export default defineConfig({
   },
   server: {
   proxy: {
-    "/api": {
+    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api": {
       target: "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev",
       changeOrigin: true,
       rewrite: (path) => path.replace(/^\/api/, ""),

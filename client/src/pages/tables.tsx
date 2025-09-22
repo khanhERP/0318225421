@@ -11,7 +11,11 @@ import { Link } from "wouter";
 import { useTranslation } from "@/lib/i18n";
 import { useQueryClient } from "@tanstack/react-query";
 
-export default function TablesPage() {
+interface TablesPageProps {
+  onLogout: () => void;
+}
+
+export default function TablesPage({ onLogout }: TablesPageProps) {
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -23,7 +27,7 @@ export default function TablesPage() {
     const connectWebSocket = () => {
       try {
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsUrl = `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/ws`;
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
@@ -120,9 +124,9 @@ export default function TablesPage() {
     };
 
     // Listen for e-invoice related events
-    window.addEventListener("einvoicePublished", handleEInvoiceEvents);
-    window.addEventListener("einvoiceSavedForLater", handleEInvoiceEvents);
-    window.addEventListener("forceDataRefresh", handleEInvoiceEvents);
+    window.addEventListener("einvoicePublished", handleEInvoiceEvents as EventListener);
+    window.addEventListener("einvoiceSavedForLater", handleEInvoiceEvents as EventListener);
+    window.addEventListener("forceDataRefresh", handleEInvoiceEvents as EventListener);
 
     connectWebSocket();
 
@@ -131,9 +135,9 @@ export default function TablesPage() {
         ws.close();
       }
       // Clean up event listeners
-      window.removeEventListener("einvoicePublished", handleEInvoiceEvents);
-      window.removeEventListener("einvoiceSavedForLater", handleEInvoiceEvents);
-      window.removeEventListener("forceDataRefresh", handleEInvoiceEvents);
+      window.removeEventListener("einvoicePublished", handleEInvoiceEvents as EventListener);
+      window.removeEventListener("einvoiceSavedForLater", handleEInvoiceEvents as EventListener);
+      window.removeEventListener("forceDataRefresh", handleEInvoiceEvents as EventListener);
     };
   }, [queryClient]);
 
@@ -154,14 +158,6 @@ export default function TablesPage() {
                 {t("tables.title")}
               </h1>
               <p className="mt-2 text-gray-600">{t("tables.description")}</p>
-            </div>
-            <div className="flex gap-4">
-              <Link href="/">
-                <Button variant="outline">
-                  <ShoppingCart className="w-4 h-4 mr-2" />
-                  {t('nav.pos')}
-                </Button>
-              </Link>
             </div>
           </div>
 

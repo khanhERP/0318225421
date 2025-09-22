@@ -110,7 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerTenantRoutes(app);
 
   // Apply tenant middleware to all API routes
-  app.use("/api", tenantMiddleware);
+  app.use("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api", tenantMiddleware);
 
   // Initialize sample data
   await initializeSampleData();
