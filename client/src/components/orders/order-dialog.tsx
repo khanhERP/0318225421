@@ -626,8 +626,17 @@ export function OrderDialog({
   const priceIncludesTax = storeSettings?.priceIncludesTax || false;
 
   const calculateTax = () => {
-    return cart.reduce((sum, item, index) => {
-      if (item.product.taxRate && parseFloat(item.product.taxRate) > 0) {
+    const existingItemsOld = existingItems.map((item) => {
+      return {
+        ...item,
+        product: products?.find((p: Product) => p.id === item.productId),
+      };
+    });
+
+    let cartOrder = [...cart, ...existingItemsOld];
+
+    return cartOrder.reduce((sum, item, index) => {
+      if (item?.product?.taxRate && parseFloat(item?.product?.taxRate) > 0) {
         const originalPrice = parseFloat(item.product.price);
         const quantity = item.quantity;
         const taxRate = parseFloat(item.product.taxRate) / 100;
@@ -636,13 +645,13 @@ export function OrderDialog({
         // Calculate discount for this item
         let itemDiscountAmount = 0;
         if (orderDiscount > 0) {
-          const totalBeforeDiscount = cart.reduce((total, cartItem) => {
+          const totalBeforeDiscount = cartOrder.reduce((total, cartItem) => {
             return (
               total + parseFloat(cartItem.product.price) * cartItem.quantity
             );
           }, 0);
 
-          const currentIndex = cart.findIndex(
+          const currentIndex = cartOrder.findIndex(
             (cartItem) => cartItem.product.id === item.product.id,
           );
           const isLastItem = currentIndex === cart.length - 1;
@@ -1141,8 +1150,7 @@ export function OrderDialog({
                   <Card
                     key={product.id}
                     className={`transition-shadow ${
-                      product.trackInventory !== false &&
-                      product.stock <= 0
+                      product.trackInventory !== false && product.stock <= 0
                         ? "cursor-not-allowed opacity-60"
                         : "cursor-pointer hover:shadow-md"
                     }`}
@@ -1161,9 +1169,16 @@ export function OrderDialog({
                           {product.sku}
                         </p>
                         <div className="flex justify-between items-center">
-                          <span className="text-lg font-bold text-green-600">{Math.round(parseFloat(product.price)).toLocaleString("vi-VN")} ₫</span>
+                          <span className="text-lg font-bold text-green-600">
+                            {Math.round(
+                              parseFloat(product.price),
+                            ).toLocaleString("vi-VN")}{" "}
+                            ₫
+                          </span>
                           {product.trackInventory !== false && (
-                            <span className={`text-xs font-medium ${stockStatus.color}`}>
+                            <span
+                              className={`text-xs font-medium ${stockStatus.color}`}
+                            >
                               {stockStatus.text}
                             </span>
                           )}
