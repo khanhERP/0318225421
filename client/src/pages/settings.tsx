@@ -99,7 +99,7 @@ interface SettingsPageProps {
 }
 
 export default function SettingsPage({ onLogout }: SettingsPageProps) {
-  const { t } = useTranslation();
+  const { t, currentLanguage } = useTranslation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("store");
@@ -241,14 +241,11 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     price: "",
     stock: 0,
     categoryId: "",
-    productType: 1,
-    taxRate: "8.00",
     imageUrl: "",
     floor: "1층",
-    zone: "A구역",
+    zone: "전체구역",
     imageInputMethod: "url" as "url" | "file",
     selectedImageFile: null as File | null,
-    trackInventory: true,
   });
 
   // Fetch store settings
@@ -616,14 +613,11 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       price: "",
       stock: 0,
       categoryId: "",
-      productType: 1,
-      taxRate: "8.00",
       imageUrl: "",
       floor: "1층",
-      zone: "A구역",
+      zone: "전체구역",
       imageInputMethod: "url",
       selectedImageFile: null,
-      trackInventory: true,
     });
   };
 
@@ -807,41 +801,22 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     });
   };
 
+  // Function to generate unique SKU
+  const generateProductSKU = () => {
+    const randomChars = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const sku = `ITEM-${randomChars.padEnd(6, '0')}`;
+    setProductForm(prev => ({ ...prev, sku }));
+  };
+
   const handleCreateProduct = async () => {
     try {
-      // Validate required fields
-      if (!productForm.name || !productForm.sku || !productForm.price || !productForm.categoryId || !productForm.taxRate) {
-        toast({
-          title: t("common.error"),
-          description: "Please fill in all required fields: Name, SKU, Price, Category, and Tax Rate",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Validate price limit
-      const priceNum = parseFloat(productForm.price);
-      if (priceNum >= 100000000) {
-        toast({
-          title: t("common.error"),
-          description: "Price cannot exceed 99,999,999 VND",
-          variant: "destructive",
-        });
-        return;
-      }
-
       let finalProductData = {
-        name: productForm.name.trim(),
-        sku: productForm.sku.trim().toUpperCase(),
-        price: productForm.price.toString(),
-        stock: Number(productForm.stock) || 0,
+        ...productForm,
         categoryId: parseInt(productForm.categoryId),
-        productType: Number(productForm.productType) || 1,
-        trackInventory: productForm.trackInventory !== false,
-        imageUrl: productForm.imageUrl?.trim() || null,
-        taxRate: productForm.taxRate.toString(),
-        floor: productForm.floor || "1층",
-        zone: productForm.zone || "A구역",
+        price: productForm.price.toString(),
+        stock: Number(productForm.stock),
+        floor: productForm.floor, // Add floor
+        zone: productForm.zone,   // Add zone
       };
 
       // Handle file upload if file method is selected
@@ -859,8 +834,10 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
           return;
         }
       } else if (productForm.imageInputMethod === "url") {
+        // Ensure imageUrl is set if URL method is selected
         finalProductData.imageUrl = productForm.imageUrl;
       }
+
 
       const response = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products", {
         method: "POST",
@@ -894,39 +871,13 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     if (!editingProduct) return;
 
     try {
-      // Validate required fields
-      if (!productForm.name || !productForm.sku || !productForm.price || !productForm.categoryId || !productForm.taxRate) {
-        toast({
-          title: t("common.error"),
-          description: "Please fill in all required fields: Name, SKU, Price, Category, and Tax Rate",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Validate price limit
-      const priceNum = parseFloat(productForm.price);
-      if (priceNum >= 100000000) {
-        toast({
-          title: t("common.error"),
-          description: "Price cannot exceed 99,999,999 VND",
-          variant: "destructive",
-        });
-        return;
-      }
-
       let finalProductData = {
-        name: productForm.name.trim(),
-        sku: productForm.sku.trim().toUpperCase(),
-        price: productForm.price.toString(),
-        stock: Number(productForm.stock) || 0,
+        ...productForm,
         categoryId: parseInt(productForm.categoryId),
-        productType: Number(productForm.productType) || 1,
-        trackInventory: productForm.trackInventory !== false,
-        imageUrl: productForm.imageUrl?.trim() || null,
-        taxRate: productForm.taxRate.toString(),
-        floor: productForm.floor || "1층",
-        zone: productForm.zone || "A구역",
+        price: productForm.price.toString(),
+        stock: Number(productForm.stock),
+        floor: productForm.floor, // Add floor
+        zone: productForm.zone,   // Add zone
       };
 
       // Handle file upload if file method is selected
@@ -944,8 +895,10 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
           return;
         }
       } else if (productForm.imageInputMethod === "url") {
+        // Ensure imageUrl is set if URL method is selected
         finalProductData.imageUrl = productForm.imageUrl;
       }
+
 
       const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/${editingProduct.id}`, {
         method: "PUT",
@@ -1026,14 +979,11 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       price: product.price.toString(),
       stock: product.stock,
       categoryId: product.categoryId.toString(),
-      productType: product.productType || 1,
-      taxRate: product.taxRate || "8.00",
       imageUrl: product.imageUrl || "",
       floor: product.floor || "1층",
       zone: product.zone || "A구역",
       imageInputMethod: (product.imageUrl && product.imageUrl.trim() !== "") ? "url" : "url",
       selectedImageFile: null,
-      trackInventory: product.trackInventory !== false,
     });
     setShowProductForm(true);
   };
@@ -1358,68 +1308,6 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       toast({
         title: t("common.error"),
         description: t("settings.einvoiceTemplateUpdateError"),
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Create product mutation
-  const createProductMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: "Unknown error" }));
-        throw new Error(errorData.message || "Failed to create product");
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
-      toast({
-        title: t("common.success"),
-        description: t("settings.productCreatedSuccess"),
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: t("common.error"),
-        description: error.message || t("settings.productCreatedError"),
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Update product mutation
-  const updateProductMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: "Unknown error" }));
-        throw new Error(errorData.message || "Failed to update product");
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
-      toast({
-        title: t("common.success"),
-        description: t("settings.productUpdatedSuccess"),
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: t("common.error"),
-        description: error.message || t("settings.productUpdatedError"),
         variant: "destructive",
       });
     },
@@ -2459,11 +2347,11 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                               <SelectValue placeholder={t("settings.selectDefaultZone")} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="A">{t("settings.zoneLabel")} A</SelectItem>
-                              <SelectItem value="B">{t("settings.zoneLabel")} B</SelectItem>
-                              <SelectItem value="C">{t("settings.zoneLabel")} C</SelectItem>
-                              <SelectItem value="D">{t("settings.zoneLabel")} D</SelectItem>
-                              <SelectItem value="E">{t("settings.zoneLabel")} E</SelectItem>
+                              <SelectItem value="A">{t("settings.zoneA")}</SelectItem>
+                              <SelectItem value="B">{t("settings.zoneB")}</SelectItem>
+                              <SelectItem value="C">{t("settings.zoneC")}</SelectItem>
+                              <SelectItem value="D">{t("settings.zoneD")}</SelectItem>
+                              <SelectItem value="E">{t("settings.zoneE")}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -3075,15 +2963,14 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                         </Button>
                       </div>
                       <Button
+                        className="bg-green-600 hover:bg-green-700"
                         onClick={() => {
-                          setEditingProduct(null); // Ensure we're not in edit mode
-                          resetProductForm(); // Reset form completely
+                          resetProductForm();
                           setShowProductForm(true);
                         }}
-                        className="bg-green-600 hover:bg-green-700"
                       >
                         <Plus className="w-4 h-4 mr-2" />
-                        {t("settings.createProduct")}
+                        {t("settings.addProduct")}
                       </Button>
                     </div>
 
@@ -3706,7 +3593,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
 
       {/* Product Form Modal */}
       <Dialog open={showProductForm} onOpenChange={setShowProductForm}>
-        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>
               {editingProduct
@@ -3720,212 +3607,226 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            {/* Basic Info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="product-name">{t("settings.productName")}</Label>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="productName" className="text-right">
+                {t("settings.productName")}
+              </Label>
+              <Input
+                id="productName"
+                value={productForm.name}
+                onChange={(e) =>
+                  setProductForm((prev) => ({ ...prev, name: e.target.value }))
+                }
+                className="col-span-3"
+                placeholder={t("settings.productNamePlaceholder")}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="productSku" className="text-right">
+                SKU (Tự động tạo nếu để trống)
+              </Label>
+              <div className="col-span-3 flex gap-2">
                 <Input
-                  id="product-name"
-                  value={productForm.name}
-                  onChange={(e) =>
-                    setProductForm({ ...productForm, name: e.target.value })
-                  }
-                  placeholder={t("settings.productNamePlaceholder")}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="product-sku">{t("settings.productSku")}</Label>
-                <Input
-                  id="product-sku"
+                  id="productSku"
                   value={productForm.sku}
                   onChange={(e) =>
-                    setProductForm({ ...productForm, sku: e.target.value.toUpperCase() })
+                    setProductForm({ ...productForm, sku: e.target.value })
                   }
-                  placeholder={t("settings.skuPlaceholder")}
+                  placeholder="ITEM-xxxxxx (tự động tạo)"
+                  disabled={!!editingProduct}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={generateProductSKU}
+                  disabled={!!editingProduct}
+                  className="whitespace-nowrap"
+                >
+                  Tạo SKU
+                </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="trackInventory" className="text-right">
+                {t("settings.trackInventory")}
+              </Label>
+              <div className="col-span-3 flex items-center space-x-2">
+                <Checkbox
+                  id="trackInventory"
+                  checked={productForm.trackInventory !== false}
+                  onCheckedChange={(checked) =>
+                    setProductForm({
+                      ...productForm,
+                      trackInventory: checked as boolean,
+                    })
+                  }
+                />
+                <Label htmlFor="trackInventory" className="text-sm">
+                  {t("settings.enableInventoryTracking")}
+                </Label>
               </div>
             </div>
 
-            {/* Price, Tax, Stock, Category, Type */}
-            <div className="grid grid-cols-5 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="product-price">{t("settings.productPrice")}</Label>
-                <Input
-                  id="product-price"
-                  type="text"
-                  value={productForm.price ? parseInt(productForm.price).toLocaleString('vi-VN') : ''}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    const sanitized = value.replace(/[^0-9]/g, '');
-
-                    const num = parseInt(sanitized);
-                    if (!isNaN(num) && num >= 100000000) {
-                      return;
-                    }
-
-                    setProductForm({ ...productForm, price: sanitized });
-                  }}
-                  placeholder={t("settings.productPricePlaceholder")}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="product-tax-rate">{t("settings.taxRatePercent")}</Label>
-                <Input
-                  id="product-tax-rate"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={productForm.taxRate}
-                  onChange={(e) =>
-                    setProductForm({ ...productForm, taxRate: e.target.value })
-                  }
-                  placeholder={t("settings.taxRatePlaceholder")}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="product-stock">{t("settings.productStock")}</Label>
-                <Input
-                  id="product-stock"
-                  type="number"
-                  value={productForm.stock}
-                  onChange={(e) =>
-                    setProductForm({ ...productForm, stock: parseInt(e.target.value) || 0 })
-                  }
-                  placeholder={t("settings.productStockPlaceholder")}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="product-category">{t("settings.productCategory")}</Label>
-                <Select
-                  value={productForm.categoryId}
-                  onValueChange={(value) =>
-                    setProductForm({ ...productForm, categoryId: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("settings.selectCategory")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categoriesData?.map((category: any) => (
-                      <SelectItem key={category.id} value={category.id.toString()}>
-                        {category.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="product-type">{t("tables.productType")}</Label>
-                <Select
-                  value={productForm.productType.toString()}
-                  onValueChange={(value) =>
-                    setProductForm({ ...productForm, productType: parseInt(value) })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("tables.selectProductType")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">{t("tables.goodsType")}</SelectItem>
-                    <SelectItem value="2">{t("tables.materialType")}</SelectItem>
-                    <SelectItem value="3">{t("tables.finishedProductType")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* Price, Stock, Category, Floor, Zone, Image Upload */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="productPrice" className="text-right">
+                {t("settings.productPrice")}
+              </Label>
+              <Input
+                id="productPrice"
+                type="number"
+                step="0.01"
+                value={productForm.price}
+                onChange={(e) =>
+                  setProductForm((prev) => ({ ...prev, price: e.target.value }))
+                }
+                className="col-span-3"
+                placeholder={t("settings.productPricePlaceholder")}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="productStock" className="text-right">
+                {t("settings.productStock")}
+              </Label>
+              <Input
+                id="productStock"
+                type="number"
+                value={productForm.stock}
+                onChange={(e) =>
+                  setProductForm((prev) => ({
+                    ...prev,
+                    stock: parseInt(e.target.value) || 0,
+                  }))
+                }
+                className="col-span-3"
+                placeholder={t("settings.productStockPlaceholder")}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="productCategory" className="text-right">
+                {t("settings.productCategory")}
+              </Label>
+              <Select
+                value={productForm.categoryId?.toString() || ""}
+                onValueChange={(value) =>
+                  setProductForm((prev) => ({ ...prev, categoryId: value }))
+                }
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder={t("settings.selectCategory")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {categoriesData?.map((category: any) => (
+                    <SelectItem
+                      key={category.id}
+                      value={category.id.toString()}
+                    >
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Floor and Zone */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="product-floor">{t("tables.floorLabel")}</Label>
-                <Select
-                  value={productForm.floor}
-                  onValueChange={(value) =>
-                    setProductForm({ ...productForm, floor: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("tables.floorPlaceholder")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1층">1층</SelectItem>
-                    <SelectItem value="2층">2층</SelectItem>
-                    <SelectItem value="3층">3층</SelectItem>
-                    <SelectItem value="4층">4층</SelectItem>
-                    <SelectItem value="5층">5층</SelectItem>
-                    <SelectItem value="6층">6층</SelectItem>
-                    <SelectItem value="7층">7층</SelectItem>
-                    <SelectItem value="8층">8층</SelectItem>
-                    <SelectItem value="9층">9층</SelectItem>
-                    <SelectItem value="10층">10층</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="product-zone">{t("tables.zoneLabel")}</Label>
-                <Select
-                  value={productForm.zone}
-                  onValueChange={(value) =>
-                    setProductForm({ ...productForm, zone: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("tables.zonePlaceholder")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="전체구역">전체구역</SelectItem>
-                    <SelectItem value="A구역">A구역</SelectItem>
-                    <SelectItem value="B구역">B구역</SelectItem>
-                    <SelectItem value="C구역">C구역</SelectItem>
-                    <SelectItem value="D구역">D구역</SelectItem>
-                    <SelectItem value="E구역">E구역</SelectItem>
-                    <SelectItem value="F구역">F구역</SelectItem>
-                    <SelectItem value="VIP구역">VIP구역</SelectItem>
-                    <SelectItem value="테라스구역">테라스구역</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            {/* 층과 구역 선택 */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="productFloor" className="text-right">
+                {t("tables.floorLabel")}
+              </Label>
+              <Select
+                value={productForm.floor || "1층"}
+                onValueChange={(value) =>
+                  setProductForm((prev) => ({ ...prev, floor: value }))
+                }
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder={t("tables.floorPlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1층">1층</SelectItem>
+                  <SelectItem value="2층">2층</SelectItem>
+                  <SelectItem value="3층">3층</SelectItem>
+                  <SelectItem value="4층">4층</SelectItem>
+                  <SelectItem value="5층">5층</SelectItem>
+                  <SelectItem value="6층">6층</SelectItem>
+                  <SelectItem value="7층">7층</SelectItem>
+                  <SelectItem value="8층">8층</SelectItem>
+                  <SelectItem value="9층">9층</SelectItem>
+                  <SelectItem value="10층">10층</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Image Upload Section */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="productZone" className="text-right">
+                {t("tables.zoneLabel")}
+              </Label>
+              <Select
+                value={productForm.zone || "전체구역"}
+                onValueChange={(value) =>
+                  setProductForm((prev) => ({ ...prev, zone: value }))
+                }
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder={t("tables.zonePlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="전체구역">
+                                {currentLanguage === "ko" ? "전체구역" : 
+                                 currentLanguage === "en" ? "All Zones" :
+                                 "Tất cả khu vực"}
+                              </SelectItem>
+                  <SelectItem value="A구역">A구역</SelectItem>
+                  <SelectItem value="B구역">B구역</SelectItem>
+                  <SelectItem value="C구역">C구역</SelectItem>
+                  <SelectItem value="D구역">D구역</SelectItem>
+                  <SelectItem value="E구역">E구역</SelectItem>
+                  <SelectItem value="F구역">F구역</SelectItem>
+                  <SelectItem value="VIP구역">VIP구역</SelectItem>
+                  <SelectItem value="테라스구역">테라스구역</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* 이미지 입력 방식 선택 */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">
                 {t("tables.imageUrlOptional")}
               </Label>
-              <Tabs
-                value={productForm.imageInputMethod}
-                onValueChange={(value) => setProductForm({ ...productForm, imageInputMethod: value as "url" | "file" })}
-                className="w-full"
-              >
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="url" className="flex items-center gap-2">
+              <div className="col-span-3 space-y-3">
+                <div className="flex space-x-2">
+                  <Button
+                    type="button"
+                    variant={productForm.imageInputMethod === "url" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setProductForm(prev => ({ ...prev, imageInputMethod: "url", selectedImageFile: null }))}
+                    className="flex items-center gap-2"
+                  >
                     <Link className="w-4 h-4" />
                     URL 입력
-                  </TabsTrigger>
-                  <TabsTrigger value="file" className="flex items-center gap-2">
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={productForm.imageInputMethod === "file" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setProductForm(prev => ({ ...prev, imageInputMethod: "file", imageUrl: "" }))}
+                    className="flex items-center gap-2"
+                  >
                     <FileImage className="w-4 h-4" />
                     파일 업로드
-                  </TabsTrigger>
-                </TabsList>
+                  </Button>
+                </div>
 
-                <TabsContent value="url" className="mt-3">
+                {productForm.imageInputMethod === "url" ? (
                   <Input
-                    value={productForm.imageUrl || ''}
-                    onChange={(e) =>
-                      setProductForm({ ...productForm, imageUrl: e.target.value })
-                    }
                     placeholder={t("tables.imageUrl")}
+                    value={productForm.imageUrl || ""}
+                    onChange={(e) =>
+                      setProductForm((prev) => ({ ...prev, imageUrl: e.target.value }))
+                    }
                   />
-                </TabsContent>
-
-                <TabsContent value="file" className="mt-3">
+                ) : (
                   <div className="space-y-2">
                     <div className="flex items-center justify-center w-full">
                       <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
@@ -3965,7 +3866,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                 });
                                 return;
                               }
-                              setProductForm({ ...productForm, selectedImageFile: file, imageUrl: "" });
+                              setProductForm(prev => ({ ...prev, selectedImageFile: file, imageUrl: "" }));
                             }
                           }}
                         />
@@ -3976,7 +3877,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => setProductForm({ ...productForm, selectedImageFile: null })}
+                        onClick={() => setProductForm(prev => ({ ...prev, selectedImageFile: null }))}
                         className="w-full"
                       >
                         <X className="w-4 h-4 mr-2" />
@@ -3984,68 +3885,23 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                       </Button>
                     )}
                   </div>
-                </TabsContent>
-              </Tabs>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex flex-row items-start space-x-3 space-y-0">
-                <Checkbox
-                  id="track-inventory"
-                  checked={productForm.trackInventory !== false}
-                  onCheckedChange={(checked) =>
-                    setProductForm({ ...productForm, trackInventory: Boolean(checked) })
-                  }
-                />
-                <div className="space-y-1 leading-none">
-                  <Label htmlFor="track-inventory">
-                    {t("inventory.trackInventory")}
-                  </Label>
-                  <p className="text-xs text-gray-500">
-                    {t("settings.enableInventoryTracking")}
-                  </p>
-                </div>
+                )}
               </div>
             </div>
-
-            <div className="flex justify-end space-x-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  console.log("=== PRODUCT CANCEL BUTTON CLICKED ===");
-                  console.log("Closing product form and resetting state");
-                  
-                  // Close the modal first
-                  setShowProductForm(false);
-                  
-                  // Reset all form state
-                  setEditingProduct(null);
-                  resetProductForm();
-                }}
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button
-                onClick={() => {
-                  console.log("=== PRODUCT SUBMIT BUTTON CLICKED ===");
-                  console.log("editingProduct:", editingProduct);
-                  console.log("Action:", editingProduct ? "UPDATE" : "CREATE");
-
-                  if (editingProduct) {
-                    handleUpdateProduct();
-                  } else {
-                    handleCreateProduct();
-                  }
-                }}
-                className="bg-green-600 hover:bg-green-700 text-white font-medium transition-colors duration-200"
-              >
-                {editingProduct
-                  ? t("settings.updateProduct")
-                  : t("settings.createProduct")}
-              </Button>
-            </div>
           </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowProductForm(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              onClick={
+                editingProduct ? handleUpdateProduct : handleCreateProduct
+              }
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {editingProduct ? t("common.update") : t("common.create")}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

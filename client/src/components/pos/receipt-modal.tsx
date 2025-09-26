@@ -143,6 +143,40 @@ export function ReceiptModal({
     );
   }
 
+  const [printers, setPrinters] = useState([
+    { type: "LAN", ip: "10.100.100.10" },
+  ]);
+
+  const handleGetPrint = async () => {
+    const printContent = document.getElementById("receipt-content");
+    if (!printContent) {
+      alert("Không tìm thấy nội dung hóa đơn để in.");
+      return;
+    }
+    let content = printContent?.innerHTML ?? "";
+    if (content) {
+      content = generatePrintHTML(printContent, false);
+    }
+    try {
+      const response = await fetch("http://localhost:5100/print", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          printers,
+          content,
+        }),
+      });
+
+      const result = await response.text();
+      alert("Kết quả in: " + result);
+    } catch (error) {
+      console.error("Lỗi khi in:", error);
+      alert("Không in được!");
+    }
+  };
+
   const handlePrint = async () => {
     console.log(
       "🖨️ Receipt Modal: Print button clicked - processing for multi-platform printing",
@@ -1292,7 +1326,8 @@ export function ReceiptModal({
             <div className="flex justify-center space-x-3">
               <Button
                 onClick={() => {
-                  handlePrint(); // First print
+                  // handlePrint(); // First print
+                  handleGetPrint();
                 }}
                 className="bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-200"
               >

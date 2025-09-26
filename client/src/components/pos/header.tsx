@@ -207,7 +207,7 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
               {storeSettings?.storeName || "EDPOS 레스토랑"}
             </div>
             <div className="text-sm opacity-75 text-right font-extrabold text-[#ffffff]">
-              POS 위치: {storeSettings?.defaultFloor || "1층"}-{storeSettings?.defaultZone || "A"}
+              {t("pos.posLocation")}: {storeSettings?.defaultFloor || "1"}{t("pos.floor")}-{storeSettings?.defaultZone || "A"}
             </div>
           </div>
         </div>

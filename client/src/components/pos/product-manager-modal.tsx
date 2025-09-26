@@ -60,7 +60,7 @@ export function ProductManagerModal({
       const num = parseFloat(val.replace(/\./g, ''));
       return !isNaN(num) && num > 0 && num < 100000000; // Max 99,999,999 (8 digits)
     }, "Price must be a valid positive number and less than 100,000,000"),
-    sku: z.string().min(1, t("tables.skuRequired")),
+    sku: z.string().optional(),
     name: z.string().min(1, t("tables.productNameRequired")),
     productType: z.number().min(1, t("tables.productTypeRequired")),
     trackInventory: z.boolean().optional(),
@@ -289,14 +289,21 @@ export function ProductManagerModal({
     return parseFloat(cleaned) || 0;
   };
 
+  // Function to generate unique SKU
+  const generateSKU = () => {
+    const randomChars = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const sku = `ITEM-${randomChars.padEnd(6, '0')}`;
+    form.setValue("sku", sku);
+  };
+
   const onSubmit = (data: z.infer<typeof productFormSchema>) => {
     console.log("Form submission data:", data);
 
     // Validate required fields
-    if (!data.name || !data.sku || !data.price || !data.categoryId || !data.taxRate) {
+    if (!data.name || !data.price || !data.categoryId || !data.taxRate) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields: Name, SKU, Price, Category, and Tax Rate",
+        description: "Please fill in all required fields: Name, Price, Category, and Tax Rate",
         variant: "destructive",
       });
       return;
@@ -316,7 +323,7 @@ export function ProductManagerModal({
     // Transform data to ensure proper types
     const transformedData = {
       name: data.name.trim(),
-      sku: data.sku.trim().toUpperCase(),
+      sku: data.sku ? data.sku.trim().toUpperCase() : "",
       price: data.price.toString(), // Use direct value without parsing
       stock: Number(data.stock) || 0,
       categoryId: Number(data.categoryId),
@@ -325,9 +332,7 @@ export function ProductManagerModal({
       imageUrl: data.imageUrl?.trim() || null,
       taxRate: data.taxRate.toString(),
       priceIncludesTax: Boolean(data.priceIncludesTax), // Explicitly convert to boolean
-      afterTaxPrice: data.afterTaxPrice ? data.afterTaxPrice.toString() : undefined,
-      floor: data.floor || "1층",
-      zone: data.zone || "A구역"
+      afterTaxPrice: data.afterTaxPrice ? data.afterTaxPrice.toString() : undefined
     };
 
     console.log("PriceIncludesTax submission debug:", {
@@ -799,13 +804,24 @@ export function ProductManagerModal({
                       name="sku"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t("tables.sku")}</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder={t("tables.skuPlaceholder")}
-                            />
-                          </FormControl>
+                          <FormLabel>{t("tables.sku")} (Tự động tạo nếu để trống)</FormLabel>
+                          <div className="flex gap-2">
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="ITEM-xxxxxx (tự động tạo)"
+                              />
+                            </FormControl>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={generateSKU}
+                              className="whitespace-nowrap"
+                            >
+                              Tạo SKU
+                            </Button>
+                          </div>
                           <FormMessage />
                         </FormItem>
                       )}

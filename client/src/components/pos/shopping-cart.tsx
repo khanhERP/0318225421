@@ -831,9 +831,9 @@ export function ShoppingCart({
         sku: item.sku || `FOOD${String(item.id).padStart(5, "0")}`,
         taxRate: item.taxRate || "0",
         afterTaxPrice: item.afterTaxPrice,
-        discount: item.discount,
-        discountAmount: item.discountAmount,
-        discountPerUnit: item.discountPerUnit.toString(),
+        discount: itemDiscountAmount.toString(), // Placeholder, actual discount applied per item for E-invoice needs careful calculation
+        discountAmount: itemDiscountAmount.toString(), // This is the calculated discount for this item
+        discountPerUnit: discountPerUnit.toString(),
         originalPrice: item.originalPrice || unitPrice.toString(),
         totalAfterDiscount: totalAfterDiscount.toString(),
         originalTotal: originalTotal.toString(),
@@ -1308,7 +1308,7 @@ export function ShoppingCart({
                       )}{" "}
                       ₫ {t("pos.each")}
                     </p>
-                    {item.taxRate && parseFloat(item.taxRate) > 0 && item.trackInventory !== false && (
+                    {item.taxRate && parseFloat(item.taxRate) > 0 && (
                       <p className="text-xs text-orange-600">
                         Thuế ({item.taxRate}%):{" "}
                         {(() => {
@@ -1553,9 +1553,19 @@ export function ShoppingCart({
                     >
                       <Minus size={10} />
                     </Button>
-                    <span className="w-6 text-center font-medium text-xs">
-                      {item.quantity}
-                    </span>
+                    <Input
+                      type="number"
+                      min="1"
+                      max={item.stock}
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const newQuantity = parseInt(e.target.value) || 1;
+                        if (newQuantity >= 1 && newQuantity <= item.stock) {
+                          onUpdateQuantity(parseInt(item.id), newQuantity);
+                        }
+                      }}
+                      className="w-12 h-6 text-center text-xs p-1 border rounded"
+                    />
                     <Button
                       size="sm"
                       variant="outline"
@@ -1563,7 +1573,7 @@ export function ShoppingCart({
                         onUpdateQuantity(parseInt(item.id), item.quantity + 1)
                       }
                       className="w-6 h-6 p-0"
-                      disabled={item.trackInventory !== false && item.quantity >= item.stock}
+                      disabled={item.quantity >= item.stock}
                     >
                       <Plus size={10} />
                     </Button>

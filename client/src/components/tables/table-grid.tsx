@@ -2938,7 +2938,11 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
                   value={floor}
                   className="flex items-center gap-2 text-sm px-4 py-3 whitespace-nowrap data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-blue-50 transition-all duration-200 rounded-md font-medium border border-transparent data-[state=active]:border-blue-600"
                 >
-                  <span className="font-semibold">{floor}</span>
+                  <span className="font-semibold">
+                        {currentLanguage === "ko" ? floor : 
+                         currentLanguage === "en" ? floor.replace(/(\d+)층/, "Floor $1") :
+                         floor.replace(/(\d+)층/, "Tầng $1")}
+                      </span>
                   <span className="text-xs bg-gray-100 data-[state=active]:bg-blue-400 px-2 py-1 rounded-full">
                     {tablesByFloor[floor].length}
                   </span>

@@ -1218,7 +1218,7 @@ export default function SalesOrders() {
             <div className="flex items-center gap-2 mb-4">
               <FileText className="w-6 h-6 text-green-600" />
               <h1 className="text-2xl font-bold text-gray-800">
-                {t("orders.orderManagement")}
+                {t("purchases.salesOrdersList")}
               </h1>
             </div>
             <p className="text-gray-600 mb-4">

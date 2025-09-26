@@ -406,8 +406,8 @@ export function OrderDialog({
     : [];
 
   const addToCart = (product: Product) => {
-    // Check if product is out of stock and inventory tracking is enabled
-    if (product.trackInventory !== false && product.stock <= 0) {
+    // Check if product is out of stock
+    if (product.stock <= 0) {
       toast({
         title: t("common.error"),
         description: `${product.name} đã hết hàng`,
@@ -419,11 +419,8 @@ export function OrderDialog({
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
-        // Check if adding one more would exceed stock if tracking is enabled
-        if (
-          product.trackInventory !== false &&
-          existing.quantity >= product.stock
-        ) {
+        // Check if adding one more would exceed stock
+        if (existing.quantity >= product.stock) {
           toast({
             title: t("common.warning"),
             description: `Chỉ còn ${product.stock} ${product.name} trong kho`,
@@ -770,21 +767,57 @@ export function OrderDialog({
         );
         const basePrice = parseFloat(item.product.price.toString());
         const quantity = item.quantity;
-        const itemSubtotal = basePrice * quantity;
+        const priceIncludesTax = storeSettings?.priceIncludesTax || false;
 
+        // Calculate tax using the SAME logic as calculateTax function
         let itemTax = 0;
-        // Tax = (after_tax_price - price) * quantity
-        if (
-          product?.afterTaxPrice &&
-          product.afterTaxPrice !== null &&
-          product.afterTaxPrice !== ""
-        ) {
-          const afterTaxPrice = parseFloat(product.afterTaxPrice);
-          const taxPerUnit = afterTaxPrice - basePrice;
-          itemTax = taxPerUnit * quantity;
+        if (product?.taxRate && parseFloat(product.taxRate) > 0) {
+          const taxRate = parseFloat(product.taxRate) / 100;
+          const orderDiscount = discount;
+
+          // Calculate discount for this item using SAME logic as display
+          let itemDiscountAmount = 0;
+          if (orderDiscount > 0) {
+            const totalBeforeDiscount = calculateSubtotal();
+            let itemSubtotal = 0;
+
+            if (priceIncludesTax) {
+              // When priceIncludesTax = true: subtotal = price / (1 + tax_rate / 100)
+              itemSubtotal = (basePrice / (1 + taxRate)) * quantity;
+            } else {
+              // When priceIncludesTax = false: use original price as subtotal
+              itemSubtotal = basePrice * quantity;
+            }
+
+            if (totalBeforeDiscount > 0) {
+              itemDiscountAmount = Math.floor(
+                (orderDiscount * itemSubtotal) / totalBeforeDiscount,
+              );
+            }
+          }
+
+          if (priceIncludesTax) {
+            // When price includes tax:
+            // giá bao gồm thuế = (price - (discount/quantity)) * quantity
+            const discountPerUnit = itemDiscountAmount / quantity;
+            const adjustedPrice = Math.max(0, basePrice - discountPerUnit);
+            const giaGomThue = adjustedPrice * quantity;
+            // subtotal = giá bao gồm thuế / (1 + (taxRate / 100)) (làm tròn)
+            const tamTinh = Math.round(giaGomThue / (1 + taxRate));
+            // tax = giá bao gồm thuế - subtotal
+            itemTax = giaGomThue - tamTinh;
+          } else {
+            // When price doesn't include tax:
+            // subtotal = (price - (discount/quantity)) * quantity
+            const discountPerUnit = itemDiscountAmount / quantity;
+            const adjustedPrice = Math.max(0, basePrice - discountPerUnit);
+            const tamTinh = adjustedPrice * quantity;
+            // tax = subtotal * (taxRate / 100) (làm tròn)
+            itemTax = Math.round(tamTinh * taxRate);
+          }
         }
 
-        const itemTotal = itemSubtotal + itemTax;
+        const itemTotal = basePrice * quantity + itemTax;
 
         console.log(
           `📝 Order Dialog: Processing NEW cart item ${item.product.name}:`,
@@ -794,6 +827,7 @@ export function OrderDialog({
             basePrice,
             itemTax,
             itemTotal,
+            priceIncludesTax,
           },
         );
 
@@ -904,25 +938,39 @@ export function OrderDialog({
         orderedAt: new Date().toISOString(),
       };
 
-      // Calculate discount distribution for new cart items
+      // Calculate discount distribution for new cart items using SAME logic as display
       let cartItemsWithDiscount = cart.map((item) => {
         const product = products?.find(
           (p: Product) => p.id === item.product.id,
         );
         const basePrice = item.product.price;
         const quantity = item.quantity;
-        const itemSubtotal = basePrice * quantity;
+        const priceIncludesTax = storeSettings?.priceIncludesTax || false;
 
+        // Calculate subtotal using SAME logic as calculateSubtotal function
+        let itemSubtotal = 0;
+        if (priceIncludesTax) {
+          // When priceIncludesTax = true: use base price as subtotal (will adjust for tax later)
+          itemSubtotal = basePrice * quantity;
+        } else {
+          // When priceIncludesTax = false: use base price as subtotal
+          itemSubtotal = basePrice * quantity;
+        }
+
+        // Calculate tax using SAME logic as calculateTax function
         let itemTax = 0;
-        // Tax = (after_tax_price - price) * quantity
-        if (
-          product?.afterTaxPrice &&
-          product.afterTaxPrice !== null &&
-          product.afterTaxPrice !== ""
-        ) {
-          const afterTaxPrice = parseFloat(product.afterTaxPrice);
-          const taxPerUnit = afterTaxPrice - basePrice;
-          itemTax = taxPerUnit * quantity;
+        if (product?.taxRate && parseFloat(product.taxRate) > 0) {
+          const taxRate = parseFloat(product.taxRate) / 100;
+
+          if (priceIncludesTax) {
+            // When price includes tax: tax calculation similar to calculateTax
+            const giaGomThue = basePrice * quantity;
+            const tamTinh = Math.round(giaGomThue / (1 + taxRate));
+            itemTax = giaGomThue - tamTinh;
+          } else {
+            // When price doesn't include tax: tax = subtotal * taxRate
+            itemTax = Math.round(itemSubtotal * taxRate);
+          }
         }
 
         const itemTotal = itemSubtotal + itemTax;
@@ -1026,23 +1074,6 @@ export function OrderDialog({
 
   if (!table) return null;
 
-  // Function to determine stock status text and color
-  const getStockStatus = (product: Product) => {
-    if (product.trackInventory === false) {
-      return { text: "Không theo dõi kho", color: "text-gray-500" };
-    }
-    if (product.stock === undefined || product.stock === null) {
-      return { text: "Không xác định", color: "text-gray-400" };
-    }
-    if (product.stock === 0) {
-      return { text: "Hết hàng", color: "text-red-500" };
-    }
-    if (product.stock < 10) {
-      return { text: `Sắp hết (${product.stock})`, color: "text-orange-500" };
-    }
-    return { text: `Còn hàng (${product.stock})`, color: "text-green-600" };
-  };
-
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
@@ -1144,56 +1175,80 @@ export function OrderDialog({
 
             {/* Products Grid */}
             <div className="grid grid-cols-2 gap-3 overflow-y-auto flex-1 min-h-0">
-              {filteredProducts.map((product: Product) => {
-                const stockStatus = getStockStatus(product);
-                return (
-                  <Card
-                    key={product.id}
-                    className={`transition-shadow ${
-                      product.trackInventory !== false && product.stock <= 0
-                        ? "cursor-not-allowed opacity-60"
-                        : "cursor-pointer hover:shadow-md"
-                    }`}
+              {filteredProducts.map((product: Product) => (
+                <Card
+                  key={product.id}
+                  className={`transition-shadow ${
+                    Number(product.stock) > 0
+                      ? "cursor-pointer hover:shadow-md"
+                      : "cursor-not-allowed opacity-60"
+                  }`}
+                >
+                  <CardContent
+                    className="p-3"
+                    onClick={() =>
+                      Number(product.stock) > 0 && addToCart(product)
+                    }
                   >
-                    <CardContent
-                      className="p-3"
-                      onClick={() =>
-                        (product.trackInventory === false ||
-                          product.stock > 0) &&
-                        addToCart(product)
-                      }
-                    >
-                      <div className="space-y-2">
-                        <h4 className="font-medium text-sm">{product.name}</h4>
-                        <p className="text-xs text-gray-600 line-clamp-2">
-                          {product.sku}
-                        </p>
-                        <div className="flex justify-between items-center">
-                          <span className="text-lg font-bold text-green-600">
-                            {Math.round(
-                              parseFloat(product.price),
-                            ).toLocaleString("vi-VN")}{" "}
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm">{product.name}</h4>
+                      <p className="text-xs text-gray-600 line-clamp-2">
+                        {product.sku}
+                      </p>
+                      <div className="flex justify-between items-center">
+                        <div className="flex flex-col">
+                          <span
+                            className={`font-bold ${
+                              Number(product.stock) > 0
+                                ? "text-blue-600"
+                                : "text-gray-400"
+                            }`}
+                          >
+                            {(() => {
+                              // Check store setting for price display
+                              const priceIncludesTax =
+                                storeSettings?.priceIncludesTax || false;
+                              const basePrice = Number(product.price);
+                              const taxRate = Number(product.taxRate || 0);
+
+                              // if (priceIncludesTax && taxRate > 0) {
+                              //   // If price includes tax, display price * (1 + tax/100)
+                              //   const priceWithTax = basePrice * (1 + taxRate / 100);
+                              //   return Math.round(priceWithTax).toLocaleString();
+                              // } else {
+                              //   // If price doesn't include tax, display base price
+                              // }
+                              return Math.round(basePrice).toLocaleString();
+                            })()}{" "}
                             ₫
                           </span>
-                          {product.trackInventory !== false && (
-                            <span
-                              className={`text-xs font-medium ${stockStatus.color}`}
-                            >
-                              {stockStatus.text}
+                          {product.taxRate && (
+                            <span className="text-xs text-gray-500">
+                              {t("reports.tax")}: {product.taxRate}%
                             </span>
                           )}
                         </div>
-                        {product.trackInventory !== false &&
-                          product.stock <= 0 && (
-                            <div className="text-xs text-red-500 font-medium">
-                              Sản phẩm hiện đang hết hàng
-                            </div>
-                          )}
+                        <Badge
+                          variant={
+                            Number(product.stock) > 0
+                              ? "default"
+                              : "destructive"
+                          }
+                        >
+                          {Number(product.stock) > 0
+                            ? `${t("tables.stockCount")} ${product.stock}`
+                            : "Hết hàng"}
+                        </Badge>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                      {Number(product.stock) === 0 && (
+                        <div className="text-xs text-red-500 font-medium">
+                          Sản phẩm hiện đang hết hàng
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
 
@@ -1699,18 +1754,38 @@ export function OrderDialog({
                               >
                                 <Minus className="w-3 h-3" />
                               </Button>
-                              <span className="text-sm font-medium w-8 text-center">
-                                {item.quantity}
-                              </span>
+                              <Input
+                                type="number"
+                                min="1"
+                                max={item.product.stock}
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const newQuantity =
+                                    parseInt(e.target.value) || 1;
+                                  if (
+                                    newQuantity >= 1 &&
+                                    newQuantity <= item.product.stock
+                                  ) {
+                                    setCart((prev) =>
+                                      prev.map((cartItem) =>
+                                        cartItem.product.id === item.product.id
+                                          ? {
+                                              ...cartItem,
+                                              quantity: newQuantity,
+                                            }
+                                          : cartItem,
+                                      ),
+                                    );
+                                  }
+                                }}
+                                className="w-16 h-6 text-center text-sm p-1 border rounded"
+                              />
                               <Button
                                 size="sm"
                                 variant="outline"
                                 onClick={() => addToCart(item.product)}
                                 className="h-6 w-6 p-0"
-                                disabled={
-                                  item.product.trackInventory !== false &&
-                                  item.quantity >= item.product.stock
-                                }
+                                disabled={item.quantity >= item.product.stock}
                               >
                                 <Plus className="w-3 h-3" />
                               </Button>
@@ -1726,16 +1801,6 @@ export function OrderDialog({
                                     item.product.taxRate || 0,
                                   );
 
-                                  // if (priceIncludesTax && taxRate > 0) {
-                                  //   // If price includes tax, display price * (1 + tax/100)
-                                  //   const priceWithTax =
-                                  //     basePrice * (1 + taxRate / 100);
-                                  //   return Math.round(
-                                  //     priceWithTax,
-                                  //   ).toLocaleString();
-                                  // } else {
-                                  //   // If price doesn't include tax, display base price
-                                  // }
                                   return Math.round(basePrice).toLocaleString();
                                 })()}{" "}
                                 ₫

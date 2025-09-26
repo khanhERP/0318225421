@@ -39,8 +39,6 @@ export const products = pgTable("products", {
   priceIncludesTax: boolean("price_includes_tax").notNull().default(false),
   afterTaxPrice: decimal("after_tax_price", { precision: 10, scale: 2 }),
   beforeTaxPrice: decimal("before_tax_price", { precision: 18, scale: 2 }),
-  floor: text("floor").default("1층"),
-  zone: text("zone").default("A구역"),
 });
 
 export const transactions = pgTable("transactions", {
@@ -141,29 +139,29 @@ export const suppliers = pgTable("suppliers", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const purchaseOrders = pgTable("purchase_orders", {
+export const purchaseReceipts = pgTable("purchase_receipts", {
   id: serial("id").primaryKey(),
-  poNumber: text("po_number").notNull().unique(),
+  receiptNumber: text("receipt_number").notNull().unique(),
   supplierId: integer("supplier_id")
     .references(() => suppliers.id)
     .notNull(),
   employeeId: integer("employee_id")
     .references(() => employees.id),
-  status: text("status").notNull().default("pending"), // "pending", "confirmed", "partially_received", "received", "cancelled"
   purchaseDate: date("purchase_date"),
   actualDeliveryDate: date("actual_delivery_date"),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull().default("0.00"),
   tax: decimal("tax", { precision: 10, scale: 2 }).notNull().default("0.00"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  status: text("status").notNull().default("pending"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const purchaseOrderItems = pgTable("purchase_order_items", {
+export const purchaseReceiptItems = pgTable("purchase_receipt_items", {
   id: serial("id").primaryKey(),
-  purchaseOrderId: integer("purchase_order_id")
-    .references(() => purchaseOrders.id)
+  purchaseReceiptId: integer("purchase_receipt_id")
+    .references(() => purchaseReceipts.id)
     .notNull(),
   productId: integer("product_id")
     .references(() => products.id),
@@ -177,10 +175,10 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   notes: text("notes"),
 });
 
-export const purchaseOrderDocuments = pgTable("purchase_order_documents", {
+export const purchaseReceiptDocuments = pgTable("purchase_receipt_documents", {
   id: serial("id").primaryKey(),
-  purchaseOrderId: integer("purchase_order_id")
-    .references(() => purchaseOrders.id)
+  purchaseReceiptId: integer("purchase_receipt_id")
+    .references(() => purchaseReceipts.id)
     .notNull(),
   fileName: text("file_name").notNull(),
   originalFileName: text("original_file_name").notNull(),
@@ -270,27 +268,24 @@ export const insertProductSchema = createInsertSchema(products)
       ),
     priceIncludesTax: z.boolean().optional().default(false),
     afterTaxPrice: z
-      .string()
-      .nullable()
+      .union([z.string(), z.null()])
       .optional()
       .refine(
-        (val) => !val || (!isNaN(Number(val)) && Number(val) > 0),
+        (val) => !val || val === null || (!isNaN(Number(val)) && Number(val) > 0),
         {
           message: "After tax price must be a positive number",
         },
       ),
     beforeTaxPrice: z
-      .string()
-      .nullable()
+      .union([z.string(), z.null()])
       .optional()
       .refine(
-        (val) => !val || (!isNaN(Number(val)) && Number(val) >= 0),
+        (val) => !val || val === null || (!isNaN(Number(val)) && Number(val) > 0),
         {
-          message: "Before tax price must be a non-negative number",
+          message: "Before tax price must be a positive number",
         },
       ),
-    floor: z.string().optional().default("1층"),
-    zone: z.string().optional().default("A구역"),
+    sku: z.string().optional(),
   });
 
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
@@ -423,16 +418,13 @@ export const insertSupplierSchema = createInsertSchema(suppliers)
       .or(z.literal("")),
   });
 
-export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders)
+export const insertPurchaseReceiptSchema = createInsertSchema(purchaseReceipts)
   .omit({
     id: true,
     createdAt: true,
     updatedAt: true,
   })
   .extend({
-    status: z.enum(["pending", "confirmed", "partially_received", "received", "cancelled"], {
-      errorMap: () => ({ message: "Invalid purchase order status" }),
-    }),
     purchaseDate: z.string().optional(),
     actualDeliveryDate: z.string().optional(),
     subtotal: z.string().refine((val) => !isNaN(Number(val)) && Number(val) >= 0, {
@@ -446,10 +438,10 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders)
     }),
   });
 
-export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems)
+export const insertPurchaseReceiptItemSchema = createInsertSchema(purchaseReceiptItems)
   .omit({
     id: true,
-    purchaseOrderId: true,
+    purchaseReceiptId: true,
   })
   .extend({
     quantity: z.number().min(1, "Quantity must be at least 1"),
@@ -462,15 +454,17 @@ export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderIte
     }),
   });
 
-export const insertPurchaseOrderDocumentSchema = createInsertSchema(purchaseOrderDocuments)
+export const insertPurchaseReceiptDocumentSchema = createInsertSchema(purchaseReceiptDocuments)
   .omit({
     id: true,
-    purchaseOrderId: true,
+    purchaseReceiptId: true,
     createdAt: true,
   })
   .extend({
     fileSize: z.number().min(0, "File size cannot be negative"),
   });
+
+
 
 export type Category = typeof categories.$inferSelect;
 export type Product = typeof products.$inferSelect;
@@ -478,9 +472,9 @@ export type Transaction = typeof transactions.$inferSelect;
 export type TransactionItem = typeof transactionItems.$inferSelect;
 export type Employee = InferSelectModel<typeof employees>;
 export type InsertEmployee = InferInsertModel<typeof employees>;
-export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
-export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
-export type PurchaseOrderDocument = typeof purchaseOrderDocuments.$inferSelect;
+export type PurchaseReceipt = typeof purchaseReceipts.$inferSelect;
+export type PurchaseReceiptItem = typeof purchaseReceiptItems.$inferSelect;
+export type PurchaseReceiptDocument = typeof purchaseReceiptDocuments.$inferSelect;
 
 // Customers table
 export const customers = pgTable("customers", {
@@ -520,6 +514,39 @@ export const pointTransactions = pgTable("point_transactions", {
   newBalance: integer("new_balance").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const insertCustomerSchema = createInsertSchema(customers)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    email: z
+      .string()
+      .email("Invalid email format")
+      .optional()
+      .or(z.literal("")),
+    membershipLevel: z
+      .enum(["BRONZE", "SILVER", "GOLD", "PLATINUM"])
+      .optional(),
+    status: z.enum(["active", "inactive"]).optional(),
+  });
+
+export const insertPointTransactionSchema = createInsertSchema(
+  pointTransactions,
+)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .extend({
+    type: z.enum(["earned", "redeemed", "adjusted", "expired"], {
+      errorMap: () => ({
+        message: "Type must be earned, redeemed, adjusted, or expired",
+      }),
+    }),
+  });
 
 export const inventoryTransactions = pgTable("inventory_transactions", {
   id: serial("id").primaryKey(),
@@ -624,40 +651,6 @@ export const invoiceTemplates = pgTable("invoice_templates", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertCustomerSchema = createInsertSchema(customers)
-  .omit({
-    id: true,
-    createdAt: true,
-    updatedAt: true,
-  })
-  .extend({
-    email: z
-      .string()
-      .email("Invalid email format")
-      .optional()
-      .or(z.literal("")),
-    membershipLevel: z
-      .enum(["BRONZE", "SILVER", "GOLD", "PLATINUM"])
-      .optional(),
-    status: z.enum(["active", "inactive"]).optional(),
-  });
-
-export const insertPointTransactionSchema = createInsertSchema(
-  pointTransactions,
-)
-  .omit({
-    id: true,
-    createdAt: true,
-  })
-  .extend({
-    type: z.enum(["earned", "redeemed", "adjusted", "expired"], {
-      errorMap: () => ({
-        message: "Type must be earned, redeemed, adjusted, or expired",
-      }),
-    }),
-  });
-
-export type Customer = InferSelectModel<typeof customers>;
 export type PointTransaction = typeof pointTransactions.$inferSelect;
 export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
 export type Table = InferSelectModel<typeof tables>;
@@ -680,9 +673,9 @@ export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
 export type InsertPointTransaction = z.infer<
   typeof insertPointTransactionSchema
 >;
-export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
-export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;
-export type InsertPurchaseOrderDocument = z.infer<typeof insertPurchaseOrderDocumentSchema>;
+export type InsertPurchaseReceipt = z.infer<typeof insertPurchaseReceiptSchema>;
+export type InsertPurchaseReceiptItem = z.infer<typeof insertPurchaseReceiptItemSchema>;
+export type InsertPurchaseReceiptDocument = z.infer<typeof insertPurchaseReceiptDocumentSchema>;
 
 export const insertEInvoiceConnectionSchema = createInsertSchema(
   eInvoiceConnections,
@@ -849,45 +842,45 @@ export const pointTransactionsRelations = relations(
 );
 
 export const suppliersRelations = relations(suppliers, ({ many }) => ({
-  purchaseOrders: many(purchaseOrders),
+  purchaseReceipts: many(purchaseReceipts),
 }));
 
-export const purchaseOrdersRelations = relations(purchaseOrders, ({ one, many }) => ({
+export const purchaseReceiptsRelations = relations(purchaseReceipts, ({ one, many }) => ({
   supplier: one(suppliers, {
-    fields: [purchaseOrders.supplierId],
+    fields: [purchaseReceipts.supplierId],
     references: [suppliers.id],
   }),
   employee: one(employees, {
-    fields: [purchaseOrders.employeeId],
+    fields: [purchaseReceipts.employeeId],
     references: [employees.id],
   }),
-  items: many(purchaseOrderItems),
-  documents: many(purchaseOrderDocuments),
+  items: many(purchaseReceiptItems),
+  documents: many(purchaseReceiptDocuments),
 }));
 
-export const purchaseOrderItemsRelations = relations(
-  purchaseOrderItems,
+export const purchaseReceiptItemsRelations = relations(
+  purchaseReceiptItems,
   ({ one }) => ({
-    purchaseOrder: one(purchaseOrders, {
-      fields: [purchaseOrderItems.purchaseOrderId],
-      references: [purchaseOrders.id],
+    purchaseReceipt: one(purchaseReceipts, {
+      fields: [purchaseReceiptItems.purchaseReceiptId],
+      references: [purchaseReceipts.id],
     }),
     product: one(products, {
-      fields: [purchaseOrderItems.productId],
+      fields: [purchaseReceiptItems.productId],
       references: [products.id],
     }),
   }),
 );
 
-export const purchaseOrderDocumentsRelations = relations(
-  purchaseOrderDocuments,
+export const purchaseReceiptDocumentsRelations = relations(
+  purchaseReceiptDocuments,
   ({ one }) => ({
-    purchaseOrder: one(purchaseOrders, {
-      fields: [purchaseOrderDocuments.purchaseOrderId],
-      references: [purchaseOrders.id],
+    purchaseReceipt: one(purchaseReceipts, {
+      fields: [purchaseReceiptDocuments.purchaseReceiptId],
+      references: [purchaseReceipts.id],
     }),
     uploadedByEmployee: one(employees, {
-      fields: [purchaseOrderDocuments.uploadedBy],
+      fields: [purchaseReceiptDocuments.uploadedBy],
       references: [employees.id],
     }),
   }),
@@ -897,3 +890,19 @@ export const purchaseOrderDocumentsRelations = relations(
 export type Receipt = Transaction & {
   items: (TransactionItem & { productName: string })[];
 };
+
+// Alias for backward compatibility - use purchase receipt schema
+export const insertPurchaseOrderSchema = insertPurchaseReceiptSchema;
+export const insertPurchaseOrderItemSchema = insertPurchaseReceiptItemSchema;
+
+export const insertInventoryTransactionSchema = createInsertSchema(
+  inventoryTransactions,
+).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InventoryTransaction = typeof inventoryTransactions.$inferSelect;
+export type InsertInventoryTransaction = z.infer<
+  typeof insertInventoryTransactionSchema
+>;

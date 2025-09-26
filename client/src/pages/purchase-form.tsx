@@ -68,12 +68,16 @@ import {
   FileText,
   Image,
   Download,
+  ClipboardCheck,
+  Edit,
+  CheckCircle,
 } from "lucide-react";
 import {
-  insertPurchaseOrderSchema,
-  insertPurchaseOrderItemSchema,
+  insertPurchaseReceiptSchema,
+  insertPurchaseReceiptItemSchema,
   insertProductSchema,
 } from "@shared/schema";
+import { format } from "date-fns";
 
 // Import types we need
 type PurchaseOrderItem = {
@@ -81,15 +85,16 @@ type PurchaseOrderItem = {
   productName: string;
   sku?: string;
   quantity: number;
+  receivedQuantity: number;
   unitPrice: number;
   total: number;
 };
 
 // Form validation schema using shared schema
-const purchaseFormSchema = insertPurchaseOrderSchema.extend({
+const purchaseFormSchema = insertPurchaseReceiptSchema.extend({
   items: z
     .array(
-      insertPurchaseOrderItemSchema.extend({
+      insertPurchaseReceiptItemSchema.extend({
         productName: z.string(),
         sku: z.string().optional(),
         receivedQuantity: z.number().default(0),
@@ -112,11 +117,13 @@ interface ProductSelectionItem {
 
 interface PurchaseFormPageProps {
   id?: string;
+  viewOnly?: boolean;
   onLogout: () => void;
 }
 
 export default function PurchaseFormPage({
   id,
+  viewOnly = false,
   onLogout,
 }: PurchaseFormPageProps) {
   const [, navigate] = useLocation();
@@ -138,35 +145,38 @@ export default function PurchaseFormPage({
       total: number;
     }>
   >([]);
-  const [attachedFiles, setAttachedFiles] = useState<Array<{
-    id?: number;
-    fileName: string;
-    originalFileName: string;
-    fileType: string;
-    fileSize: number;
-    filePath?: string;
-    file?: File;
-    description?: string;
-  }>>([]);
+  const [attachedFiles, setAttachedFiles] = useState<
+    Array<{
+      id?: number;
+      fileName: string;
+      originalFileName: string;
+      fileType: string;
+      fileSize: number;
+      filePath?: string;
+      file?: File;
+      description?: string;
+    }>
+  >([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [showProductSelector, setShowProductSelector] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // State to control submit button
 
-  const isEditMode = Boolean(id);
+  const isEditMode = Boolean(id) && !viewOnly;
 
   // Form setup
-  const form = useForm<PurchaseFormData>({
-    resolver: zodResolver(purchaseFormSchema),
+  const form = useForm<z.infer<typeof insertPurchaseReceiptSchema>>({
+    resolver: zodResolver(insertPurchaseReceiptSchema),
     defaultValues: {
+      receiptNumber: `PN${Date.now()}`,
       supplierId: 0,
-      poNumber: "",
-      purchaseDate: new Date().toISOString().split("T")[0],
+      purchaseDate: format(new Date(), "yyyy-MM-dd"),
+      actualDeliveryDate: "",
+      notes: "",
       subtotal: "0.00",
       tax: "0.00",
       total: "0.00",
-      notes: "",
-      status: "pending" as const,
-      items: [],
-      purchaseType: "",
     },
+    mode: "onChange", // Enable real-time validation
   });
 
   // New product form
@@ -200,6 +210,16 @@ export default function PurchaseFormPage({
     select: (data: any) => data || [],
   });
 
+  // Fetch employees for assignment
+  const { data: employees = [] } = useQuery({
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees"],
+    select: (data: any[]) =>
+      (data || []).map((emp: any) => ({
+        id: emp.id,
+        name: emp.name || `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || 'Unnamed Employee',
+      })),
+  });
+
   // Fetch categories for new product form
   const { data: categories = [] } = useQuery({
     queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories"],
@@ -227,43 +247,174 @@ export default function PurchaseFormPage({
   }, [allProducts, productSearch]);
 
   // Fetch existing purchase order for edit mode
-  const { data: existingOrder } = useQuery({
+  const { data: existingOrder, isLoading: isLoadingOrder } = useQuery({
     queryKey: [`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-orders/${id}`],
-    enabled: isEditMode && Boolean(id),
-    select: (data: any) => data,
+    enabled: Boolean(id),
+    select: (data: any) => {
+      console.log("📊 Purchase order API response:", data);
+      return data;
+    },
   });
 
   // Fetch existing documents for edit mode
   const { data: existingDocuments } = useQuery({
     queryKey: [`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-orders/${id}/documents`],
-    enabled: isEditMode && Boolean(id),
+    enabled: Boolean(id),
     select: (data: any) => data || [],
   });
+
+  // Fetch next PO number for new orders
+  const {
+    data: nextPONumber,
+    error: nextPOError,
+    isLoading: isLoadingPONumber,
+  } = useQuery({
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-orders/next-po-number"],
+    enabled: !isEditMode,
+    queryFn: async () => {
+      try {
+        console.log("🔍 Fetching next PO number...");
+        const response = await apiRequest(
+          "GET",
+          "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-orders/next-po-number",
+        );
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const data = await response.json();
+        console.log("📊 PO Number API Response:", data);
+        return data?.nextPONumber || "PO001";
+      } catch (error) {
+        console.error("❌ PO Number API Error:", error);
+        // Generate client-side fallback with proper format
+        const fallbackPO = "PO001";
+        console.log("🔄 Using client-side fallback PO:", fallbackPO);
+        return fallbackPO;
+      }
+    },
+    retry: 2,
+    refetchOnWindowFocus: false,
+    staleTime: 0,
+    gcTime: 0,
+  });
+
+  // Log PO number fetch status
+  useEffect(() => {
+    console.log("🔍 PO Number Query Status:", {
+      isEditMode,
+      nextPONumber,
+      nextPOError: nextPOError?.message,
+      isLoadingPONumber,
+      enabled: !isEditMode,
+    });
+
+    if (nextPOError) {
+      console.error("❌ Next PO number fetch error:", nextPOError);
+      // Generate fallback PO number with proper format
+      const fallbackPO = "PO001";
+      console.log("🔄 Using fallback PO number:", fallbackPO);
+      form.setValue("poNumber", fallbackPO);
+    }
+
+    if (nextPONumber) {
+      console.log("✅ Successfully fetched next PO number:", nextPONumber);
+    }
+  }, [nextPONumber, nextPOError, isLoadingPONumber, isEditMode, form]);
+
+  // Set default PO number if available and not in edit mode and field is empty
+  useEffect(() => {
+    if (!isEditMode && nextPONumber) {
+      const currentValue = form.getValues("poNumber");
+      // Only set if field is completely empty (not just whitespace)
+      if (!currentValue || currentValue.trim() === "") {
+        console.log("🔢 Setting auto-generated PO number:", nextPONumber);
+        form.setValue("poNumber", nextPONumber);
+        form.trigger("poNumber"); // Trigger validation to update UI
+      }
+    }
+  }, [nextPONumber, isEditMode, form]);
+
+  // Initialize empty PO number for create mode and add default empty row
+  useEffect(() => {
+    if (!isEditMode && !nextPONumber && !isLoadingPONumber && !nextPOError) {
+      console.log("🆕 Initializing empty PO number for new order");
+      // Don't clear if already has a value (like fallback)
+      if (!form.getValues("poNumber")) {
+        form.setValue("poNumber", "");
+      }
+    }
+
+    // Add default empty row for new purchase orders
+    if (!isEditMode && selectedItems.length === 0) {
+      console.log("🆕 Adding default empty row for new purchase order");
+      const defaultEmptyRow = {
+        productId: 0,
+        productName: "",
+        sku: "",
+        quantity: 1,
+        receivedQuantity: 0,
+        unitPrice: 0,
+        total: 0,
+      };
+      setSelectedItems([defaultEmptyRow]);
+    }
+  }, [
+    isEditMode,
+    nextPONumber,
+    isLoadingPONumber,
+    nextPOError,
+    form,
+    selectedItems.length,
+  ]);
 
   // Load existing order data
   useEffect(() => {
     if (existingOrder && typeof existingOrder === "object") {
       const order = existingOrder as any;
-      form.setValue("supplierId", order.supplierId);
-      form.setValue("poNumber", order.poNumber);
-      form.setValue("purchaseDate", order.purchaseDate || "");
-      form.setValue("notes", order.notes || "");
-      form.setValue("status", order.status);
-      form.setValue("purchaseType", order.purchaseType || "");
+      console.log("📋 Loading existing order data:", order);
 
-      // Load existing items
-      if (order.items) {
+      // Load basic order information
+      form.setValue("supplierId", order.supplierId || order.supplierid);
+      form.setValue("receiptNumber", order.receiptNumber || order.ponumber);
+      form.setValue("purchaseDate", order.purchaseDate || order.purchasedate || "");
+      form.setValue("notes", order.notes || "");
+      form.setValue("purchaseType", order.purchaseType || "");
+      form.setValue("employeeId", order.employeeId || order.employeeid);
+
+      // Set financial totals
+      form.setValue("subtotal", order.subtotal || "0.00");
+      form.setValue("tax", order.tax || "0.00");
+      form.setValue("total", order.total || "0.00");
+
+      // Load existing items - fix the items loading logic
+      if (order.items && Array.isArray(order.items) && order.items.length > 0) {
+        console.log("📦 Loading order items:", order.items);
         setSelectedItems(
           order.items.map((item: any) => ({
             productId: item.productId,
-            productName: item.productName,
-            sku: item.sku,
-            quantity: item.quantity,
+            productName: item.productName || "Unknown Product",
+            sku: item.sku || "",
+            quantity: item.quantity || 0,
             receivedQuantity: item.receivedQuantity || 0,
-            unitPrice: parseFloat(item.unitPrice),
-            total: parseFloat(item.unitPrice) * item.quantity,
+            unitPrice: parseFloat(item.unitPrice || "0"),
+            total:
+              parseFloat(item.total || "0") ||
+              parseFloat(item.unitPrice || "0") * (item.quantity || 0),
           })),
         );
+      } else {
+        console.log("⚠️ No items found in order or items is not an array, adding default row");
+        // Add a default empty row for editing
+        const defaultEmptyRow = {
+          productId: 0,
+          productName: "",
+          sku: "",
+          quantity: 1,
+          receivedQuantity: 0,
+          unitPrice: 0,
+          total: 0,
+        };
+        setSelectedItems([defaultEmptyRow]);
       }
     }
   }, [existingOrder, form]);
@@ -280,7 +431,7 @@ export default function PurchaseFormPage({
           fileSize: doc.fileSize,
           filePath: doc.filePath,
           description: doc.description,
-        }))
+        })),
       );
     }
   }, [existingDocuments]);
@@ -301,96 +452,80 @@ export default function PurchaseFormPage({
 
   // Create/Update mutation
   const saveMutation = useMutation({
-    mutationFn: async (data: PurchaseFormData) => {
+    mutationFn: async (data: any) => {
       console.log("Starting mutation with data:", data);
 
+      // Validate data
+      if (!data.items || data.items.length === 0) {
+        throw new Error("Vui lòng thêm ít nhất một sản phẩm hợp lệ");
+      }
+
       if (!data.supplierId || data.supplierId === 0) {
-        throw new Error(t("purchases.supplierRequired"));
+        throw new Error("Vui lòng chọn nhà cung cấp");
       }
 
-      if (selectedItems.length === 0) {
-        throw new Error(t("purchases.itemsRequired"));
+      console.log("API payload:", data);
+
+      const response = isEditMode
+        ? await apiRequest("PUT", `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts/${id}`, data)
+        : await apiRequest("POST", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts", data);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
       }
 
-      const subtotalAmount = selectedItems.reduce(
-        (sum, item) => sum + item.total,
-        0,
-      );
-      const taxAmount = 0; // No tax applied
-      const totalAmount = subtotalAmount;
-
-      const payload = {
-        supplierId: Number(data.supplierId),
-        poNumber: data.poNumber?.trim() || `PO-${Date.now()}`,
-        purchaseDate: data.purchaseDate || null,
-        notes: data.notes?.trim() || null,
-        subtotal: subtotalAmount.toFixed(2),
-        tax: "0.00",
-        total: subtotalAmount.toFixed(2),
-        status: data.status || "pending",
-        purchaseType: data.purchaseType || null,
-        items: selectedItems.map((item) => ({
-          productId: item.productId,
-          productName: item.productName,
-          sku: item.sku || "",
-          quantity: item.quantity,
-          receivedQuantity: item.receivedQuantity || 0,
-          unitPrice: item.unitPrice.toFixed(2),
-          total: item.total.toFixed(2),
-        })),
-      };
-
-      console.log("API payload:", payload);
-
-      try {
-        let response;
-        if (isEditMode) {
-          response = await apiRequest(
-            "PUT",
-            `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-orders/${id}`,
-            payload,
-          );
-        } else {
-          response = await apiRequest("POST", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-orders", payload);
-        }
-
-        console.log("API response:", response);
-        return response;
-      } catch (apiError: any) {
-        console.error("API Error:", apiError);
-        throw new Error(
-          apiError?.response?.data?.message ||
-            apiError?.message ||
-            "Failed to save purchase order",
-        );
-      }
+      const result = await response.json();
+      console.log("API response:", result);
+      return result;
     },
     onSuccess: (response) => {
-      console.log("Mutation success:", response);
+      console.log("✅ Mutation success:", response);
+
+      // Reset submitting state
+      setIsSubmitting(false);
+
       toast({
-        title: t("common.success"),
+        title: "Thành công",
         description: isEditMode
-          ? t("purchases.orderUpdated")
-          : t("purchases.orderCreated"),
+          ? "Phiếu nhập hàng đã được cập nhật thành công"
+          : "Phiếu nhập hàng đã được tạo thành công",
       });
+
+      // Refresh data
       queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-orders"] });
-      navigate("/purchases");
+      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/suppliers"] });
+
+      // Navigate back to purchases list
+      setTimeout(() => {
+        navigate("/purchases");
+      }, 1000);
     },
     onError: (error: any) => {
-      console.error("Mutation error:", error);
-      let errorMessage = "Có lỗi xảy ra khi tạo đơn mua hàng";
+      console.error("❌ Mutation error:", error);
+
+      // Reset submitting state
+      setIsSubmitting(false);
+
+      let errorMessage = "Có lỗi xảy ra khi lưu phiếu nhập hàng";
 
       if (error?.message) {
         errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
       } else if (error?.response?.data?.message) {
         errorMessage = error.response.data.message;
       }
 
       toast({
-        title: t("common.error"),
+        title: "Lỗi",
         description: errorMessage,
         variant: "destructive",
       });
+    },
+    onSettled: () => {
+      // Always reset submitting state as final fallback
+      setIsSubmitting(false);
     },
   });
 
@@ -472,7 +607,11 @@ export default function PurchaseFormPage({
         updatedItems[existingIndex].unitPrice;
       setSelectedItems(updatedItems);
     } else {
-      // Add new item
+      // Find first empty row (productId = 0) to replace
+      const emptyRowIndex = selectedItems.findIndex(
+        (item) => item.productId === 0,
+      );
+
       const newItem = {
         productId: product.id,
         productName: product.name,
@@ -482,30 +621,129 @@ export default function PurchaseFormPage({
         unitPrice: product.unitPrice || 0,
         total: product.unitPrice || 0,
       };
-      setSelectedItems([...selectedItems, newItem]);
+
+      if (emptyRowIndex >= 0) {
+        // Replace empty row with new product
+        const updatedItems = [...selectedItems];
+        updatedItems[emptyRowIndex] = newItem;
+        setSelectedItems(updatedItems);
+      } else {
+        // No empty row found, add new item
+        setSelectedItems([...selectedItems, newItem]);
+      }
     }
     setIsProductDialogOpen(false);
   };
 
-  // Update item quantity
-  const updateItemQuantity = (index: number, quantity: number) => {
-    if (quantity <= 0) {
-      removeItem(index);
-      return;
+  // Update item quantity, price, or receivedQuantity
+  const updateItem = (
+    index: number,
+    field: keyof (typeof selectedItems)[0],
+    value: number | string,
+  ) => {
+    const updatedItems = [...selectedItems];
+    if (field === "productName") {
+      updatedItems[index][field] = value as string;
+    } else {
+      updatedItems[index][field] = value as number;
     }
 
-    const updatedItems = [...selectedItems];
-    updatedItems[index].quantity = quantity;
-    updatedItems[index].total = quantity * updatedItems[index].unitPrice;
+    // Recalculate total if quantity or unitPrice changes
+    if (field === "quantity" || field === "unitPrice") {
+      const item = updatedItems[index];
+      item.total = item.quantity * item.unitPrice;
+    }
     setSelectedItems(updatedItems);
   };
 
-  // Update item unit price
-  const updateItemUnitPrice = (index: number, unitPrice: number) => {
-    const updatedItems = [...selectedItems];
-    updatedItems[index].unitPrice = Math.max(0, unitPrice);
-    updatedItems[index].total = updatedItems[index].quantity * unitPrice;
-    setSelectedItems(updatedItems);
+  // Handle keyboard navigation
+  const handleKeyDown = (
+    e: React.KeyboardEvent,
+    index: number,
+    fieldType: string,
+  ) => {
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+
+      // Define field order for navigation
+      const fieldOrder = [
+        "product",
+        "quantity",
+        "unitPrice",
+        "subtotal",
+        "discountPercent",
+        "discountAmount",
+        "total",
+      ];
+      const currentFieldIndex = fieldOrder.indexOf(fieldType);
+
+      if (
+        fieldType === "total" ||
+        currentFieldIndex === fieldOrder.length - 1
+      ) {
+        // At the last field (total), add new row and focus on product field of new row
+        addNewEmptyRow();
+        setTimeout(() => {
+          const newRowProductInput = document.querySelector(
+            `[data-testid="input-product-${index + 1}"]`,
+          ) as HTMLInputElement;
+          if (newRowProductInput) {
+            newRowProductInput.focus();
+          }
+        }, 100);
+      } else {
+        // Move to next field in same row
+        const nextFieldType = fieldOrder[currentFieldIndex + 1];
+        setTimeout(() => {
+          const nextInput = document.querySelector(
+            `[data-testid="input-${nextFieldType}-${index}"]`,
+          ) as HTMLInputElement;
+          if (nextInput) {
+            nextInput.focus();
+          }
+        }, 100);
+      }
+    }
+  };
+
+  // Add new empty row
+  const addNewEmptyRow = () => {
+    const newEmptyRow = {
+      productId: 0,
+      productName: "",
+      sku: "",
+      quantity: 1,
+      receivedQuantity: 0,
+      unitPrice: 0,
+      total: 0,
+    };
+    setSelectedItems([...selectedItems, newEmptyRow]);
+    console.log("➕ Added new empty row, total items:", selectedItems.length + 1);
+  };
+
+  // Check if form has valid data for submission
+  const hasValidData = () => {
+    const formData = form.getValues();
+    const hasSupplier = formData.supplierId && formData.supplierId > 0;
+    const hasValidItems = selectedItems.some(item =>
+      (item.productId > 0 || (item.productName && item.productName.trim() !== "")) &&
+      item.quantity > 0 &&
+      item.unitPrice >= 0
+    );
+
+    console.log("🔍 Form validation check:", {
+      hasSupplier,
+      hasValidItems,
+      supplierValue: formData.supplierId,
+      itemsCount: selectedItems.length,
+      validItemsCount: selectedItems.filter(item =>
+        (item.productId > 0 || (item.productName && item.productName.trim() !== "")) &&
+        item.quantity > 0 &&
+        item.unitPrice >= 0
+      ).length
+    });
+
+    return hasSupplier && hasValidItems;
   };
 
   // Remove item
@@ -536,14 +774,14 @@ export default function PurchaseFormPage({
 
       // Check file type
       const allowedTypes = [
-        'application/pdf',
-        'image/jpeg',
-        'image/jpg',
-        'image/png',
-        'image/gif',
-        'text/plain',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        "application/pdf",
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/gif",
+        "text/plain",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       ];
 
       if (!allowedTypes.includes(file.type)) {
@@ -561,93 +799,191 @@ export default function PurchaseFormPage({
         fileType: file.type,
         fileSize: file.size,
         file: file,
-        description: '',
+        description: "",
       };
 
-      setAttachedFiles(prev => [...prev, newFile]);
+      setAttachedFiles((prev) => [...prev, newFile]);
     });
   };
 
   const removeFile = (index: number) => {
-    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const updateFileDescription = (index: number, description: string) => {
-    setAttachedFiles(prev => 
-      prev.map((file, i) => 
-        i === index ? { ...file, description } : file
-      )
+    setAttachedFiles((prev) =>
+      prev.map((file, i) => (i === index ? { ...file, description } : file)),
     );
   };
 
   const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   const getFileIcon = (fileType: string) => {
-    if (fileType.startsWith('image/')) return <Image className="h-4 w-4" />;
-    if (fileType === 'application/pdf') return <FileText className="h-4 w-4" />;
+    if (fileType.startsWith("image/")) return <Image className="h-4 w-4" />;
+    if (fileType === "application/pdf") return <FileText className="h-4 w-4" />;
     return <FileText className="h-4 w-4" />;
   };
 
   // Form submission
-  const onSubmit = (data: PurchaseFormData) => {
-    // Kiểm tra các điều kiện bắt buộc
-    if (!data.supplierId || data.supplierId === 0) {
+  const onSubmit = async (values: z.infer<typeof insertPurchaseReceiptSchema>) => {
+    try {
+      setIsSubmitting(true);
+      console.log("🔍 Form submission values:", values);
+
+      if (selectedItems.length === 0) {
+        toast({
+          title: "Lỗi",
+          description: "Vui lòng thêm ít nhất một sản phẩm",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Filter out items that have actual product data
+      const validItems = selectedItems.filter(item => {
+        // Allow items that have productId OR have productName filled
+        const hasProduct = item.productId > 0 || (item.productName && item.productName.trim() !== "");
+        const hasValidQuantity = item.quantity > 0;
+        const hasValidPrice = item.unitPrice >= 0;
+
+        return hasProduct && hasValidQuantity && hasValidPrice;
+      });
+
+      console.log("📋 Item validation result:", {
+        totalItems: selectedItems.length,
+        validItems: validItems.length,
+        details: selectedItems.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          isValid: (item.productId > 0 || (item.productName && item.productName.trim() !== "")) &&
+                   item.quantity > 0 && item.unitPrice >= 0
+        }))
+      });
+
+      if (validItems.length === 0) {
+        console.log("❌ Validation failed: No valid items");
+        toast({
+          title: "Lỗi",
+          description: "Vui lòng thêm ít nhất một sản phẩm với số lượng và giá hợp lệ",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Auto-generate PO Number if empty
+      let finalPONumber = values.receiptNumber?.trim();
+
+      // If receiptNumber is not available, try to use nextPONumber (fetched from query)
+      if (!finalPONumber && nextPONumber) {
+        finalPONumber = nextPONumber;
+        console.log("🔢 Using auto-generated PO number:", finalPONumber);
+      }
+
+      // Validate PO Number
+      if (!finalPONumber) {
+        console.log("❌ Validation failed: No PO number or receipt number");
+        toast({
+          title: "Lỗi",
+          description: "Không thể tạo số phiếu. Vui lòng nhập số phiếu thủ công.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Calculate totals
+      const subtotalAmount = validItems.reduce((sum, item) => sum + item.total, 0);
+
+      // Prepare the final data object
+      const mutationData = {
+        receiptNumber: finalPONumber,
+        supplierId: Number(values.supplierId),
+        employeeId: values.employeeId ? Number(values.employeeId) : null,
+        purchaseDate: values.purchaseDate || null,
+        notes: values.notes?.trim() || null,
+        subtotal: subtotalAmount.toFixed(2),
+        tax: "0.00",
+        total: subtotalAmount.toFixed(2),
+        items: validItems.map((item) => ({
+          productId: item.productId || 0,
+          productName: item.productName || "Sản phẩm chưa rõ",
+          sku: item.sku || "",
+          quantity: item.quantity,
+          receivedQuantity: item.receivedQuantity || 0,
+          unitPrice: item.unitPrice.toFixed(2),
+          total: item.total.toFixed(2),
+        })),
+      };
+
+      console.log("🚀 Final submission data:", mutationData);
+
+      // Use the existing saveMutation
+      await saveMutation.mutateAsync(mutationData);
+
+    } catch (error: any) {
+      console.error("❌ Error in form submission:", error);
+      setIsSubmitting(false);
+
+      let errorMessage = "Có lỗi xảy ra khi lưu phiếu nhập hàng";
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+
       toast({
-        title: t("common.error"),
-        description: t("purchases.supplierRequired"),
+        title: "Lỗi",
+        description: errorMessage,
         variant: "destructive",
       });
-      return;
     }
-
-    if (selectedItems.length === 0) {
-      toast({
-        title: t("common.error"),
-        description: t("purchases.itemsRequired"),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Kiểm tra PO Number
-    if (!data.poNumber || data.poNumber.trim() === "") {
-      toast({
-        title: t("common.error"),
-        description: "Vui lòng nhập số PO",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Kiểm tra các items có số lượng hợp lệ
-    const hasInvalidQuantity = selectedItems.some(
-      (item) => item.quantity <= 0 || item.unitPrice < 0,
-    );
-    if (hasInvalidQuantity) {
-      toast({
-        title: t("common.error"),
-        description: "Vui lòng kiểm tra lại số lượng và giá của các sản phẩm",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    console.log("Submitting purchase order data:", data);
-    console.log("Selected items:", selectedItems);
-    console.log("Attached files:", attachedFiles);
-
-    saveMutation.mutate({ ...data, attachedFiles });
   };
+
+  // Handle save as draft (placeholder, as no specific draft logic is implemented yet)
+  const handleSaveAsDraft = () => {
+    console.log("Saving as draft...");
+    // Implement draft saving logic here if needed
+  };
+
+  // Custom number formatter for KRW
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("ko-KR", {
+      style: "currency",
+      currency: "KRW",
+    }).format(amount);
+  };
+
+  // Show loading screen when fetching existing order
+  if (Boolean(id) && isLoadingOrder) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-900 dark:to-gray-800">
+        <div className="container mx-auto px-4 py-6 max-w-6xl">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Đang tải thông tin phiếu nhập...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-gray-900 dark:to-gray-800">
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
@@ -662,14 +998,18 @@ export default function PurchaseFormPage({
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {isEditMode
-                  ? t("purchases.editPurchaseOrder")
-                  : t("purchases.createPurchaseOrder")}
+                {viewOnly
+                  ? t("purchases.viewPurchaseOrder")
+                  : id
+                    ? t("purchases.editPurchaseOrder")
+                    : t("purchases.createPurchaseOrder")}
               </h1>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {isEditMode
-                  ? t("purchases.editOrderDescription")
-                  : t("purchases.createOrderDescription")}
+                {viewOnly
+                  ? t("purchases.viewOrderDescription")
+                  : id
+                    ? t("purchases.editOrderDescription")
+                    : t("purchases.createOrderDescription")}
               </p>
             </div>
           </div>
@@ -677,9 +1017,9 @@ export default function PurchaseFormPage({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-6">
               {/* Main Form */}
-              <div className="lg:col-span-2 space-y-6">
+              <div className="space-y-6">
                 {/* Order Details Card */}
                 <Card>
                   <CardHeader>
@@ -705,6 +1045,7 @@ export default function PurchaseFormPage({
                                 field.onChange(parseInt(value))
                               }
                               value={field.value?.toString() || ""}
+                              disabled={viewOnly}
                               data-testid="select-supplier"
                             >
                               <FormControl>
@@ -733,18 +1074,36 @@ export default function PurchaseFormPage({
                       {/* PO Number */}
                       <FormField
                         control={form.control}
-                        name="poNumber"
+                        name="receiptNumber" // Changed from poNumber to receiptNumber
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t("purchases.poNumber")}</FormLabel>
+                            <FormLabel>Số phiếu nhập *</FormLabel>
                             <FormControl>
-                              <Input
-                                {...field}
-                                placeholder={t("purchases.poNumberPlaceholder")}
-                                data-testid="input-po-number"
-                              />
+                              <div className="relative">
+                                <Input
+                                  {...field}
+                                  placeholder={
+                                    !isEditMode && isLoadingPONumber
+                                      ? "Đang tạo số PO tự động..."
+                                      : "Nhập số phiếu hoặc để trống để tự động sinh"
+                                  }
+                                  disabled={viewOnly}
+                                  data-testid="input-receipt-number" // Updated data-testid
+                                />
+                                {!isEditMode && isLoadingPONumber && (
+                                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                                  </div>
+                                )}
+                              </div>
                             </FormControl>
                             <FormMessage />
+                            {!isEditMode && nextPOError && (
+                              <p className="text-xs text-amber-600 mt-1">
+                                ⚠️ Tự động tạo số PO thất bại. Vui lòng nhập thủ
+                                công.
+                              </p>
+                            )}
                           </FormItem>
                         )}
                       />
@@ -760,6 +1119,7 @@ export default function PurchaseFormPage({
                               <Input
                                 {...field}
                                 type="date"
+                                disabled={viewOnly}
                                 data-testid="input-purchase-date"
                               />
                             </FormControl>
@@ -778,17 +1138,28 @@ export default function PurchaseFormPage({
                             <Select
                               onValueChange={field.onChange}
                               value={field.value || ""}
+                              disabled={viewOnly}
                               data-testid="select-purchase-type"
                             >
                               <FormControl>
                                 <SelectTrigger>
-                                  <SelectValue placeholder={t("purchases.selectPurchaseType")} />
+                                  <SelectValue
+                                    placeholder={t(
+                                      "purchases.selectPurchaseType",
+                                    )}
+                                  />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="원자재">{t("purchases.rawMaterials")}</SelectItem>
-                                <SelectItem value="비용">{t("purchases.expenses")}</SelectItem>
-                                <SelectItem value="기타">{t("purchases.others")}</SelectItem>
+                                <SelectItem value="raw_materials">
+                                  {t("purchases.rawMaterials")}
+                                </SelectItem>
+                                <SelectItem value="expenses">
+                                  {t("purchases.expenses")}
+                                </SelectItem>
+                                <SelectItem value="others">
+                                  {t("purchases.others")}
+                                </SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage />
@@ -796,145 +1167,147 @@ export default function PurchaseFormPage({
                         )}
                       />
 
-                      {/* File Attachments Section */}
-                      <div className="md:col-span-2">
-                        <FormLabel className="text-base font-medium flex items-center gap-2">
-                          <Upload className="h-4 w-4" />
-                          {t("purchases.attachDocuments")}
-                        </FormLabel>
-                        <p className="text-sm text-gray-600 mb-4">
-                          {t("purchases.attachDocumentsDescription")}
-                        </p>
-                        
-                        {/* File Upload Area */}
-                        <div 
-                          className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors cursor-pointer mb-4"
-                          onClick={() => document.getElementById('file-upload')?.click()}
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            e.currentTarget.classList.add('border-blue-400', 'bg-blue-50');
-                          }}
-                          onDragLeave={(e) => {
-                            e.preventDefault();
-                            e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50');
-                          }}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50');
-                            handleFileUpload(e.dataTransfer.files);
-                          }}
-                        >
-                          <Upload className="h-6 w-6 mx-auto mb-2 text-gray-400" />
-                          <p className="text-sm text-gray-600 mb-1">
-                            {t("purchases.dragOrClickToUpload")}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {t("purchases.maxFileSize")}
-                          </p>
-                          <input
-                            id="file-upload"
-                            type="file"
-                            multiple
-                            accept=".pdf,.jpg,.jpeg,.png,.gif,.txt,.doc,.docx"
-                            className="hidden"
-                            onChange={(e) => handleFileUpload(e.target.files)}
-                          />
-                        </div>
-
-                        {/* Attached Files List */}
-                        {attachedFiles.length > 0 && (
-                          <div className="space-y-2">
-                            <h4 className="text-sm font-medium">{t("purchases.attachedFiles")} ({attachedFiles.length})</h4>
-                            <div className="max-h-40 overflow-y-auto space-y-2">
-                              {attachedFiles.map((file, index) => (
-                                <div key={index} className="border rounded-lg p-2 space-y-2">
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                                      {getFileIcon(file.fileType)}
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-medium truncate" title={file.originalFileName}>
-                                          {file.originalFileName}
-                                        </p>
-                                        <p className="text-xs text-gray-500">
-                                          {formatFileSize(file.fileSize)}
-                                        </p>
-                                      </div>
-                                    </div>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => removeFile(index)}
-                                      className="h-5 w-5 p-0 text-red-500 hover:text-red-700"
-                                    >
-                                      <X className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                  
-                                  {/* File Description */}
-                                  <Textarea
-                                    placeholder={t("purchases.fileDescription")}
-                                    value={file.description || ''}
-                                    onChange={(e) => updateFileDescription(index, e.target.value)}
-                                    className="text-xs resize-none"
-                                    rows={1}
+                      {/* Employee Assignment */}
+                      <FormField
+                        control={form.control}
+                        name="employeeId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t("purchases.assignedTo")}</FormLabel>
+                            <Select
+                              onValueChange={(value) =>
+                                field.onChange(value ? parseInt(value) : null)
+                              }
+                              value={field.value?.toString() || ""}
+                              disabled={viewOnly}
+                              data-testid="select-employee"
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue
+                                    placeholder={t("purchases.selectEmployee")}
                                   />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {employees.map((employee: any) => (
+                                  <SelectItem
+                                    key={employee.id}
+                                    value={employee.id.toString()}
+                                  >
+                                    {employee.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* File Attachments - Balanced with other fields */}
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium flex items-center gap-2">
+                          <Upload className="h-4 w-4" />
+                          Đính kèm tệp
+                        </FormLabel>
+                        <FormControl>
+                          <div
+                            className="border border-dashed border-gray-300 rounded-md p-4 text-center hover:border-gray-400 transition-colors cursor-pointer bg-gray-50/50 h-[42px] flex items-center justify-center"
+                            onClick={() =>
+                              document.getElementById("file-upload")?.click()
+                            }
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.currentTarget.classList.add(
+                                "border-blue-400",
+                                "bg-blue-50",
+                              );
+                            }}
+                            onDragLeave={(e) => {
+                              e.preventDefault();
+                              e.currentTarget.classList.remove(
+                                "border-blue-400",
+                                "bg-blue-50",
+                              );
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.currentTarget.classList.remove(
+                                "border-blue-400",
+                                "bg-blue-50",
+                              );
+                              handleFileUpload(e.dataTransfer.files);
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Upload className="h-4 w-4 text-gray-400" />
+                              <span className="text-sm text-gray-600">
+                                Kéo thả hoặc nhấp để tải tệp
+                              </span>
+                            </div>
+                            <input
+                              id="file-upload"
+                              type="file"
+                              multiple
+                              accept=".pdf,.jpg,.jpeg,.png,.gif,.txt,.doc,.docx"
+                              className="hidden"
+                              onChange={(e) => handleFileUpload(e.target.files)}
+                            />
+                          </div>
+                        </FormControl>
+
+                        {/* Files List - Compact and organized */}
+                        {attachedFiles.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            <div className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                              <FileText className="h-3 w-3" />
+                              Tệp đã tải ({attachedFiles.length})
+                            </div>
+                            <div className="space-y-1 max-h-24 overflow-y-auto">
+                              {attachedFiles.map((file, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center justify-between bg-white border border-gray-200 rounded p-2 hover:bg-gray-50 transition-colors"
+                                >
+                                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    {getFileIcon(file.fileType)}
+                                    <div className="min-w-0 flex-1">
+                                      <p
+                                        className="text-xs font-medium text-gray-900 truncate"
+                                        title={file.originalFileName}
+                                      >
+                                        {file.originalFileName}
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        {formatFileSize(file.fileSize)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => removeFile(index)}
+                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
                                 </div>
                               ))}
                             </div>
                           </div>
                         )}
 
-                        {/* Upload Status */}
                         {isUploading && (
-                          <div className="text-center py-2">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mx-auto mb-1"></div>
-                            <p className="text-xs text-gray-600">{t("purchases.uploadingFiles")}</p>
+                          <div className="flex items-center justify-center py-2">
+                            <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
+                            <span className="text-xs text-gray-600">
+                              Đang tải...
+                            </span>
                           </div>
                         )}
-                      </div>
+                      </FormItem>
                     </div>
-
-                    {/* Status (Edit Mode Only) */}
-                    {isEditMode && (
-                      <FormField
-                        control={form.control}
-                        name="status"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t("purchases.status")}</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              value={field.value}
-                              data-testid="select-status"
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="pending">
-                                  {t("purchases.pending")}
-                                </SelectItem>
-                                <SelectItem value="confirmed">
-                                  {t("purchases.confirmed")}
-                                </SelectItem>
-                                <SelectItem value="partially_received">
-                                  {t("purchases.partially_received")}
-                                </SelectItem>
-                                <SelectItem value="received">
-                                  {t("purchases.received")}
-                                </SelectItem>
-                                <SelectItem value="cancelled">
-                                  {t("purchases.cancelled")}
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
 
                     {/* Notes */}
                     <FormField
@@ -949,6 +1322,7 @@ export default function PurchaseFormPage({
                               value={field.value || ""}
                               placeholder={t("purchases.notesPlaceholder")}
                               rows={3}
+                              disabled={viewOnly}
                               data-testid="textarea-notes"
                             />
                           </FormControl>
@@ -977,10 +1351,12 @@ export default function PurchaseFormPage({
                         onOpenChange={setIsProductDialogOpen}
                       >
                         <DialogTrigger asChild>
-                          <Button size="sm" data-testid="button-add-item">
-                            <Plus className="h-4 w-4 mr-2" />
-                            {t("purchases.addItem")}
-                          </Button>
+                          <div style={{ display: "none" }}>
+                            <Button size="sm" data-testid="button-add-item">
+                              <Plus className="h-4 w-4 mr-2" />
+                              {t("purchases.addItem")}
+                            </Button>
+                          </div>
                         </DialogTrigger>
                         <DialogContent className="max-w-2xl">
                           <DialogHeader>
@@ -1039,10 +1415,7 @@ export default function PurchaseFormPage({
                                     </div>
                                     <div className="text-right">
                                       <p className="font-medium">
-                                        {new Intl.NumberFormat("ko-KR", {
-                                          style: "currency",
-                                          currency: "KRW",
-                                        }).format(product.unitPrice || 0)}
+                                        {formatCurrency(product.unitPrice || 0)}
                                       </p>
                                       <p className="text-sm text-gray-500">
                                         {t("inventory.stock")}:{" "}
@@ -1059,214 +1432,442 @@ export default function PurchaseFormPage({
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {selectedItems.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                        <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>{t("purchases.noItemsSelected")}</p>
-                        <p className="text-sm">
-                          {t("purchases.clickAddItemToStart")}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        <Table>
+                    <div className="space-y-4">
+                      <div className="overflow-x-auto">
+                        <Table className="min-w-full">
                           <TableHeader>
                             <TableRow>
-                              <TableHead>{t("purchases.product")}</TableHead>
-                              <TableHead className="w-24">
+                              <TableHead className="w-12 text-center p-2 font-bold">
+                                No
+                              </TableHead>
+                              <TableHead className="min-w-[180px] max-w-[250px] p-2 font-bold">
+                                {t("purchases.product")}
+                              </TableHead>
+                              <TableHead className="w-20 text-center p-2 font-bold">
+                                {t("purchases.unit")}
+                              </TableHead>
+                              <TableHead className="w-24 text-center p-2 font-bold">
                                 {t("purchases.quantity")}
                               </TableHead>
-                              <TableHead className="w-32">
+                              <TableHead className="w-28 text-center p-2 font-bold">
                                 {t("purchases.unitPrice")}
                               </TableHead>
-                              <TableHead className="w-32">
+                              <TableHead className="w-28 text-center p-2 font-bold">
+                                {t("purchases.subtotalAmount")}
+                              </TableHead>
+                              <TableHead className="w-20 text-center p-2 font-bold">
+                                {t("purchases.discountPercent")}
+                              </TableHead>
+                              <TableHead className="w-28 text-center p-2 font-bold">
+                                {t("purchases.discountAmount")}
+                              </TableHead>
+                              <TableHead className="w-32 text-center p-2 font-bold">
                                 {t("purchases.totalAmount")}
                               </TableHead>
-                              <TableHead className="w-12"></TableHead>
+                              {!viewOnly && (
+                                <TableHead className="w-20 text-center p-2 font-bold">
+                                  {t("purchases.actions")}
+                                </TableHead>
+                              )}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {selectedItems.map((item, index) => (
-                              <TableRow
-                                key={index}
-                                data-testid={`item-row-${index}`}
-                              >
-                                <TableCell>
-                                  <div>
-                                    <p className="font-medium">
-                                      {item.productName}
+                            {selectedItems.length === 0 ? (
+                              <TableRow>
+                                <TableCell
+                                  colSpan={viewOnly ? 9 : 10}
+                                  className="text-center py-12 text-gray-500 dark:text-gray-400"
+                                >
+                                  <div className="flex flex-col items-center">
+                                    <Package className="h-12 w-12 mb-3 opacity-50" />
+                                    <p className="text-lg font-medium mb-1">
+                                      {t("purchases.noItemsSelected")}
                                     </p>
-                                    {item.sku && (
-                                      <p className="text-sm text-gray-500">
-                                        SKU: {item.sku}
-                                      </p>
-                                    )}
+                                    <p className="text-sm text-gray-400">
+                                      {t("purchases.clickAddItemToStart")}
+                                    </p>
                                   </div>
                                 </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    value={item.quantity}
-                                    onChange={(e) =>
-                                      updateItemQuantity(
-                                        index,
-                                        parseInt(e.target.value) || 0,
-                                      )
-                                    }
-                                    min="1"
-                                    className="w-20"
-                                    data-testid={`input-quantity-${index}`}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    value={item.unitPrice}
-                                    onChange={(e) =>
-                                      updateItemUnitPrice(
-                                        index,
-                                        parseFloat(e.target.value) || 0,
-                                      )
-                                    }
-                                    min="0"
-                                    step="0.01"
-                                    className="w-28"
-                                    data-testid={`input-unit-price-${index}`}
-                                  />
-                                </TableCell>
-                                <TableCell className="font-medium">
-                                  {new Intl.NumberFormat("ko-KR", {
-                                    style: "currency",
-                                    currency: "KRW",
-                                  }).format(item.total)}
-                                </TableCell>
-                                <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeItem(index)}
-                                    data-testid={`button-remove-${index}`}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                  </Button>
-                                </TableCell>
                               </TableRow>
-                            ))}
+                            ) : (
+                              selectedItems.map((item, index) => {
+                                const subtotal = item.quantity * item.unitPrice;
+                                const discountPercent =
+                                  (item as any).discountPercent || 0;
+                                const discountAmount =
+                                  subtotal * (discountPercent / 100);
+                                const finalTotal = subtotal - discountAmount;
+
+                                return (
+                                  <TableRow
+                                    key={index}
+                                    data-testid={`item-row-${index}`}
+                                    className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                                  >
+                                    {/* 1. No - Số thứ tự */}
+                                    <TableCell className="text-center font-semibold text-gray-600 p-2">
+                                      <div className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded-full text-xs font-bold">
+                                        {index + 1}
+                                      </div>
+                                    </TableCell>
+
+                                    {/* 2. Mặt hàng */}
+                                    <TableCell className="p-2">
+                                      <div className="flex flex-col">
+                                        {item.productName ? (
+                                          <>
+                                            <p className="font-medium text-gray-900 dark:text-white line-clamp-2 leading-tight">
+                                              {item.productName}
+                                            </p>
+                                            {item.sku && (
+                                              <p className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded mt-1 inline-block w-fit">
+                                                SKU: {item.sku}
+                                              </p>
+                                            )}
+                                          </>
+                                        ) : (
+                                          <Input
+                                            placeholder="Tìm kiếm sản phẩm..."
+                                            className="w-full text-sm h-8 border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                            disabled={viewOnly}
+                                            data-testid={`input-product-${index}`}
+                                            onKeyDown={(e) =>
+                                              handleKeyDown(e, index, "product")
+                                            }
+                                            onClick={() => {
+                                              if (!viewOnly) {
+                                                setIsProductDialogOpen(true);
+                                              }
+                                            }}
+                                            readOnly
+                                          />
+                                        )}
+                                      </div>
+                                    </TableCell>
+
+                                    {/* 3. Đơn vị tính */}
+                                    <TableCell className="text-center p-2">
+                                      <span className="text-sm text-gray-600 bg-gray-50 px-2 py-1 rounded-full">
+                                        Cái
+                                      </span>
+                                    </TableCell>
+
+                                    {/* 4. Số lượng */}
+                                    <TableCell className="p-2">
+                                      <Input
+                                        type="number"
+                                        value={item.quantity}
+                                        onChange={(e) =>
+                                          updateItem(
+                                            index,
+                                            "quantity",
+                                            parseInt(e.target.value) || 0,
+                                          )
+                                        }
+                                        onKeyDown={(e) =>
+                                          handleKeyDown(e, index, "quantity")
+                                        }
+                                        min="1"
+                                        className="w-20 text-center text-sm h-8 border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                        disabled={viewOnly}
+                                        data-testid={`input-quantity-${index}`}
+                                      />
+                                    </TableCell>
+
+                                    {/* 5. Đơn giá */}
+                                    <TableCell className="p-2">
+                                      <Input
+                                        type="text"
+                                        value={item.unitPrice.toLocaleString(
+                                          "ko-KR",
+                                        )}
+                                        onChange={(e) => {
+                                          const value = e.target.value.replace(
+                                            /[^0-9]/g,
+                                            "",
+                                          );
+                                          updateItem(
+                                            index,
+                                            "unitPrice",
+                                            parseFloat(value) || 0,
+                                          );
+                                        }}
+                                        onKeyDown={(e) =>
+                                          handleKeyDown(e, index, "unitPrice")
+                                        }
+                                        className="w-24 text-right text-sm h-8 border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-1 focus:ring-blue-500 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                        disabled={viewOnly}
+                                        data-testid={`input-unitPrice-${index}`}
+                                      />
+                                    </TableCell>
+
+                                    {/* 6. Thành tiền */}
+                                    <TableCell className="p-2">
+                                      <Input
+                                        type="text"
+                                        value={subtotal.toLocaleString("ko-KR")}
+                                        onChange={(e) => {
+                                          const value = e.target.value.replace(
+                                            /[^0-9]/g,
+                                            "",
+                                          );
+                                          const newSubtotal =
+                                            parseFloat(value) || 0;
+                                          const newUnitPrice =
+                                            item.quantity > 0
+                                              ? newSubtotal / item.quantity
+                                              : 0;
+                                          updateItem(
+                                            index,
+                                            "unitPrice",
+                                            newUnitPrice,
+                                          );
+                                        }}
+                                        onKeyDown={(e) =>
+                                          handleKeyDown(e, index, "subtotal")
+                                        }
+                                        className="w-24 text-right font-medium text-sm h-8 border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-1 focus:ring-blue-500 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                        disabled={viewOnly}
+                                        data-testid={`input-subtotal-${index}`}
+                                      />
+                                    </TableCell>
+
+                                    {/* 7. % Chiết khấu */}
+                                    <TableCell className="p-2">
+                                      <Input
+                                        type="number"
+                                        value={discountPercent}
+                                        onChange={(e) => {
+                                          const updatedItems = [
+                                            ...selectedItems,
+                                          ];
+                                          (
+                                            updatedItems[index] as any
+                                          ).discountPercent =
+                                            parseFloat(e.target.value) || 0;
+                                          setSelectedItems(updatedItems);
+                                        }}
+                                        onKeyDown={(e) =>
+                                          handleKeyDown(
+                                            e,
+                                            index,
+                                            "discountPercent",
+                                          )
+                                        }
+                                        min="0"
+                                        max="100"
+                                        step="0.1"
+                                        className="w-16 text-center text-sm h-8 border-gray-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                        disabled={viewOnly}
+                                        data-testid={`input-discountPercent-${index}`}
+                                      />
+                                    </TableCell>
+
+                                    {/* 8. Chiết khấu */}
+                                    <TableCell className="p-2">
+                                      <Input
+                                        type="text"
+                                        value={discountAmount.toLocaleString(
+                                          "ko-KR",
+                                        )}
+                                        onChange={(e) => {
+                                          const value = e.target.value.replace(
+                                            /[^0-9]/g,
+                                            "",
+                                          );
+                                          const newDiscountAmount =
+                                            parseFloat(value) || 0;
+                                          const updatedItems = [
+                                            ...selectedItems,
+                                          ];
+
+                                          // Calculate discount percentage based on manual discount amount input
+                                          const newDiscountPercent =
+                                            subtotal > 0
+                                              ? (newDiscountAmount / subtotal) *
+                                                100
+                                              : 0;
+
+                                          (
+                                            updatedItems[index] as any
+                                          ).discountPercent =
+                                            newDiscountPercent;
+                                          setSelectedItems(updatedItems);
+                                        }}
+                                        onKeyDown={(e) =>
+                                          handleKeyDown(
+                                            e,
+                                            index,
+                                            "discountAmount",
+                                          )
+                                        }
+                                        className="w-24 text-right font-medium text-sm h-8 border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                        disabled={viewOnly}
+                                        data-testid={`input-discountAmount-${index}`}
+                                      />
+                                    </TableCell>
+
+                                    {/* 9. Tổng tiền */}
+                                    <TableCell className="text-right font-bold text-green-600 text-sm p-2">
+                                      <Input
+                                        type="text"
+                                        value={finalTotal.toLocaleString(
+                                          "ko-KR",
+                                        )}
+                                        onChange={(e) => {
+                                          // This is just for display, actual calculation is done automatically
+                                        }}
+                                        onKeyDown={(e) =>
+                                          handleKeyDown(e, index, "total")
+                                        }
+                                        className="w-28 text-right font-bold text-green-600 bg-green-50 border-green-300 focus:border-green-500 focus:ring-1 focus:ring-green-500 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                        disabled={viewOnly}
+                                        readOnly
+                                        data-testid={`input-total-${index}`}
+                                      />
+                                    </TableCell>
+
+                                    {/* Actions */}
+                                    {!viewOnly && (
+                                      <TableCell className="text-center p-2">
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => removeItem(index)}
+                                          className="text-red-500 hover:text-red-700 hover:bg-red-50 w-8 h-8 p-0 rounded-full"
+                                          data-testid={`button-remove-item-${index}`}
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </Button>
+                                      </TableCell>
+                                    )}
+                                  </TableRow>
+                                );
+                              })
+                            )}
+
+                            {/* Summary Row */}
+                            {selectedItems.length > 0 && (
+                              <TableRow className="bg-blue-50 dark:bg-blue-900/20 border-t-2 border-blue-200 font-semibold">
+                                {/* No */}
+                                <TableCell className="text-center p-2">
+                                  <div className="flex items-center justify-center w-8 h-8 bg-blue-200 text-blue-800 rounded-full text-xs font-bold">
+                                    Σ
+                                  </div>
+                                </TableCell>
+
+                                {/* Tổng cộng */}
+                                <TableCell className="p-2 font-bold text-blue-800">
+                                  TỔNG CỘNG
+                                </TableCell>
+
+                                {/* Đơn vị tính */}
+                                <TableCell className="text-center p-2">
+                                  <span className="text-sm text-blue-600">-</span>
+                                </TableCell>
+
+                                {/* Tổng số lượng */}
+                                <TableCell className="p-2">
+                                  <div className="w-20 text-center font-bold text-blue-800 bg-blue-100 border border-blue-300 rounded px-2 py-1">
+                                    {selectedItems.reduce((sum, item) => sum + item.quantity, 0)}
+                                  </div>
+                                </TableCell>
+
+                                {/* Đơn giá - không hiển thị */}
+                                <TableCell className="p-2">
+                                  <span className="text-sm text-blue-600">-</span>
+                                </TableCell>
+
+                                {/* Tổng thành tiền */}
+                                <TableCell className="p-2">
+                                  <div className="w-24 text-right font-bold text-blue-800 bg-blue-100 border border-blue-300 rounded px-2 py-1">
+                                    {selectedItems.reduce((sum, item) => {
+                                      const subtotal = item.quantity * item.unitPrice;
+                                      return sum + subtotal;
+                                    }, 0).toLocaleString("ko-KR")}
+                                  </div>
+                                </TableCell>
+
+                                {/* % Chiết khấu - không hiển thị */}
+                                <TableCell className="p-2">
+                                  <span className="text-sm text-blue-600">-</span>
+                                </TableCell>
+
+                                {/* Tổng chiết khấu */}
+                                <TableCell className="p-2">
+                                  <div className="w-24 text-right font-bold text-red-800 bg-red-100 border border-red-300 rounded px-2 py-1">
+                                    {selectedItems.reduce((sum, item) => {
+                                      const subtotal = item.quantity * item.unitPrice;
+                                      const discountPercent = (item as any).discountPercent || 0;
+                                      const discountAmount = subtotal * (discountPercent / 100);
+                                      return sum + discountAmount;
+                                    }, 0).toLocaleString("ko-KR")}
+                                  </div>
+                                </TableCell>
+
+                                {/* Tổng tiền cuối cùng */}
+                                <TableCell className="p-2">
+                                  <div className="w-28 text-right font-bold text-green-800 bg-green-100 border border-green-300 rounded px-2 py-1">
+                                    {selectedItems.reduce((sum, item) => {
+                                      const subtotal = item.quantity * item.unitPrice;
+                                      const discountPercent = (item as any).discountPercent || 0;
+                                      const discountAmount = subtotal * (discountPercent / 100);
+                                      const finalTotal = subtotal - discountAmount;
+                                      return sum + finalTotal;
+                                    }, 0).toLocaleString("ko-KR")}
+                                  </div>
+                                </TableCell>
+
+                                {/* Actions - empty for summary row */}
+                                {!viewOnly && (
+                                  <TableCell className="text-center p-2">
+                                    <span className="text-sm text-blue-600">-</span>
+                                  </TableCell>
+                                )}
+                              </TableRow>
+                            )}
                           </TableBody>
                         </Table>
                       </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Form Actions - Moved below items table */}
+                <div className="flex gap-4 justify-end mt-6">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate("/purchases")}
+                    data-testid="button-cancel"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    {t("common.cancel")}
+                  </Button>
+
+                  <Button
+                    type="submit"
+                    disabled={saveMutation.isPending || isSubmitting || !hasValidData()}
+                    className={`${(saveMutation.isPending || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    data-testid="button-submit"
+                  >
+                    {saveMutation.isPending || isSubmitting ? (
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Đang lưu...
+                      </div>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        {isEditMode
+                          ? "Cập nhật phiếu nhập"
+                          : "Lưu phiếu nhập"}
+                      </>
                     )}
-                  </CardContent>
-                </Card>
+                  </Button>
+                </div>
               </div>
-
-              {/* Summary Sidebar */}
-              <div className="lg:col-span-1">
-                <Card className="sticky top-6">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calculator className="h-5 w-5" />
-                      {t("purchases.orderSummary")}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span>{t("purchases.subtotal")}</span>
-                        <span
-                          className="font-medium"
-                          data-testid="text-subtotal"
-                        >
-                          {new Intl.NumberFormat("ko-KR", {
-                            style: "currency",
-                            currency: "KRW",
-                          }).format(subtotal)}
-                        </span>
-                      </div>
-                      {tax > 0 && (
-                        <div className="flex justify-between">
-                          <span>{t("purchases.tax")}</span>
-                          <span className="font-medium" data-testid="text-tax">
-                            {new Intl.NumberFormat("ko-KR", {
-                              style: "currency",
-                              currency: "KRW",
-                            }).format(tax)}
-                          </span>
-                        </div>
-                      )}
-                      <Separator />
-                      <div className="flex justify-between text-lg font-bold">
-                        <span>{t("purchases.totalCost")}</span>
-                        <span data-testid="text-total">
-                          {new Intl.NumberFormat("ko-KR", {
-                            style: "currency",
-                            currency: "KRW",
-                          }).format(total)}
-                        </span>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Form Actions */}
-                    <div className="space-y-2">
-                      <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={saveMutation.isPending}
-                        data-testid="button-submit"
-                      >
-                        {saveMutation.isPending ? (
-                          <div className="flex items-center gap-2">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            {t("common.saving")}
-                          </div>
-                        ) : (
-                          <>
-                            <Send className="h-4 w-4 mr-2" />
-                            {isEditMode
-                              ? t("common.update")
-                              : t("common.create")}
-                          </>
-                        )}
-                      </Button>
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => navigate("/purchases")}
-                        data-testid="button-cancel"
-                      >
-                        <X className="h-4 w-4 mr-2" />
-                        {t("common.cancel")}
-                      </Button>
-                    </div>
-
-                    {/* Order Info */}
-                    <Separator />
-                    <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                      <div className="flex justify-between">
-                        <span>{t("purchases.items")}:</span>
-                        <span data-testid="text-item-count">
-                          {selectedItems.length}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>{t("purchases.totalQuantity")}:</span>
-                        <span data-testid="text-total-quantity">
-                          {selectedItems.reduce(
-                            (sum, item) => sum + item.quantity,
-                            0,
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              
             </div>
           </form>
         </Form>

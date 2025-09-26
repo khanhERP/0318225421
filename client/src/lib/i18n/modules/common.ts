@@ -7,11 +7,12 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     cancel: "취소",
     amountShortfall: "부족 금액",
     delete: "삭제",
+    deleting: "삭제 중...",
     edit: "편집",
+    add: "추가",
+    areYouSure: "정말로",
     remotemanagerproduct:
       "비활성화된 모든 상품을 데이터베이스에서 영구적으로 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",
-    add: "추가",
-    areyouremoteorder: "원격 주문을 취소하시겠습니까?",
     productUpdateSuccess: "상품이 업데이트되었습니다",
     productCreateSuccess: "상품이 생성되었습니다",
     invoiceSavedForLater: "나중에 발행하기 위해 송장이 저장되었습니다",
@@ -281,7 +282,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     changeAmount: "거스름돈",
 
     // Subtotal
-    subtotalLabel: "���계:",
+    subtotalLabel: "계:",
 
     // Usage status
     usageStatus: "사용 상태:",
@@ -464,7 +465,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
 
     // Spending thresholds
     editSpendingThreshold: "멤버십 등급 기준 수정",
-    saveSpendingThreshold: "멤버십 등급 기p�� 저장",
+    saveSpendingThreshold: "멤버십 등급 기p 저장",
 
     // Stock status
     inStock: "재고 있음",
@@ -501,9 +502,17 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     save: "Save",
     cancel: "Cancel",
     delete: "Delete",
+    deleting: "Deleting...",
     edit: "Edit",
-    newPayment: "New Payment Method",
     add: "Add",
+    remove: "Remove",
+    update: "Update",
+    create: "Create",
+    search: "Search",
+    filter: "Filter",
+    clear: "Clear",
+    reset: "Reset",
+    areYouSure: "Are you sure you want to delete",
     restaurant: "Restaurant",
     remotemanagerproduct:
       "Are you sure you want to delete all inactive products from the database? This action cannot be undone.",
@@ -896,8 +905,17 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     save: "Lưu",
     cancel: "Hủy",
     delete: "Xóa",
+    deleting: "Đang xóa...",
     edit: "Chỉnh sửa",
     add: "Thêm",
+    remove: "Gỡ bỏ",
+    update: "Cập nhật",
+    create: "Tạo",
+    search: "Tìm kiếm",
+    filter: "Lọc",
+    clear: "Xóa",
+    reset: "Đặt lại",
+    areYouSure: "Bạn có chắc chắn muốn xóa",
     restaurant: "Nhà hàng",
     newPayment: "Phương thức thanh toán mới",
     search: "Tìm kiếm",
