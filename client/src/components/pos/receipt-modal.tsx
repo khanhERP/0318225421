@@ -173,7 +173,7 @@ export function ReceiptModal({
       alert("Kết quả in: " + result);
     } catch (error) {
       console.error("Lỗi khi in:", error);
-      alert("Không in được!");
+      alert("Bạn chưa cài đặt thiết lập máy in. Vui lòng liên hệ với edpos để được hỗ trợ!");
     }
   };
 
