@@ -49,6 +49,7 @@ interface PrinterConfig {
   isEmployee: boolean;
   isKitchen: boolean;
   isActive: boolean;
+  copies?: number;
 }
 
 export function PrinterConfigModal({
@@ -72,6 +73,7 @@ export function PrinterConfigModal({
     isEmployee: false,
     isKitchen: false,
     isActive: true,
+    copies: 0,
   });
 
   const { toast } = useToast();
@@ -200,6 +202,7 @@ export function PrinterConfigModal({
       isEmployee: false,
       isKitchen: false,
       isActive: true,
+      copies: 0,
     });
     setSelectedConfig(null);
     setIsEditing(false);
@@ -261,6 +264,7 @@ export function PrinterConfigModal({
       isEmployee: config.isEmployee,
       isKitchen: config.isKitchen,
       isActive: config.isActive,
+      copies: config.copies || 0,
     });
     setIsEditing(true);
   };
@@ -514,6 +518,23 @@ export function PrinterConfigModal({
                   <Label htmlFor="isActive">{t("pos.inUse")}</Label>
                 </div>
 
+                <div>
+                  <Label htmlFor="copies">Số lần in</Label>
+                  <Input
+                    id="copies"
+                    type="number"
+                    min="0"
+                    value={formData.copies || 0}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        copies: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    placeholder="Nhập số lần in"
+                  />
+                </div>
+
                 <div className="flex gap-2">
                   <Button
                     type="submit"
@@ -585,6 +606,10 @@ export function PrinterConfigModal({
                                       {config.port || "auto"})
                                     </span>
                                   )}
+                                <br />
+                                <span className="text-xs text-blue-600">
+                                  Số lần in: {config.copies || 0}
+                                </span>
                               </div>
                             </div>
                           </div>

@@ -42,6 +42,7 @@ export function ReceiptModal({
   const [showEInvoiceModal, setShowEInvoiceModal] = useState(false);
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
+  const [printers, setPrinters] = useState([]);
   const [title, setTitle] = useState<string>("");
   const { t } = useTranslation();
 
@@ -101,11 +102,34 @@ export function ReceiptModal({
     }
   }, [isOpen, receipt, isPreview, cartItems, total, onConfirm]);
 
-  // Early return after hooks
-  if (!isOpen) {
-    console.log("❌ Receipt Modal: Modal is closed");
-    return null;
-  }
+  // Don't return early here - let the Dialog component handle the open state
+
+  useEffect(() => {
+    async function fetchPrinterConfigs() {
+      const printerResponse = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs");
+      if (printerResponse.ok) {
+        const allConfigs = await printerResponse.json();
+        let activePrinterConfigs = allConfigs.filter(
+          (config) =>
+            config.isActive && (config.isEmployee || config.isKitchen),
+        );
+        if (activePrinterConfigs.length > 0) {
+          const lstPrinters = activePrinterConfigs.map((printer) => {
+            return {
+              name: printer.name,
+              type: printer.printerType,
+              ip: printer.ipAddress,
+              port: printer.port ?? 9100,
+              copies: printer.copies ?? 1,
+            };
+          });
+          setPrinters(lstPrinters);
+        }
+        console.log("✅ Found active printer:", activePrinterConfigs);
+      }
+    }
+    fetchPrinterConfigs();
+  }, []);
 
   // Handle missing data cases
   const hasReceiptData = receipt && typeof receipt === "object";
@@ -143,10 +167,6 @@ export function ReceiptModal({
     );
   }
 
-  const [printers, setPrinters] = useState([
-    { type: "LAN", ip: "10.100.100.10" },
-  ]);
-
   const handleGetPrint = async () => {
     const printContent = document.getElementById("receipt-content");
     if (!printContent) {
@@ -158,7 +178,7 @@ export function ReceiptModal({
       content = generatePrintHTML(printContent, false);
     }
     try {
-      const response = await fetch("http://localhost:5100/print", {
+      const response = await fetch("http://localhost:5000/print", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -171,9 +191,13 @@ export function ReceiptModal({
 
       const result = await response.text();
       alert("Kết quả in: " + result);
+
+      onClose();
     } catch (error) {
       console.error("Lỗi khi in:", error);
-      alert("Bạn chưa cài đặt thiết lập máy in. Vui lòng liên hệ với edpos để được hỗ trợ!");
+      alert(
+        "Bạn chưa thiết lập cài đặt máy in. Vui lòng liên hệ với edpos để được hỗ trợ.",
+      );
     }
   };
 
@@ -222,6 +246,7 @@ export function ReceiptModal({
             (config) =>
               config.isActive && (config.isEmployee || config.isKitchen),
           );
+          console.log("✅ Found active printer:", activePrinterConfigs);
           console.log(
             "✅ Found active printer configs:",
             activePrinterConfigs.length,
@@ -920,6 +945,7 @@ export function ReceiptModal({
     return Math.floor(parseFloat(receipt?.total || "0"));
   };
 
+  // Always render the Dialog component, let it handle the open state
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md w-full max-h-screen overflow-y-auto">
@@ -1326,8 +1352,11 @@ export function ReceiptModal({
             <div className="flex justify-center space-x-3">
               <Button
                 onClick={() => {
-                  // handlePrint(); // First print
-                  handleGetPrint();
+                  if (printers?.length > 0) {
+                    handleGetPrint();
+                  } else {
+                    handlePrint(); // First print
+                  }
                 }}
                 className="bg-blue-600 hover:bg-blue-700 text-white transition-colors duration-200"
               >

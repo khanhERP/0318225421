@@ -135,22 +135,13 @@ export function SalesChartReport() {
         const startDateTime = `${startDate}T${startTime}:00`;
         const endDateTime = `${endDate}T${endTime}:59`;
 
-        // Create Date objects and ensure they represent local time correctly
+        // Create Date objects directly without timezone adjustment
         const startDateTimeLocal = new Date(startDateTime);
         const endDateTimeLocal = new Date(endDateTime);
 
-        // Adjust for timezone offset to ensure we're filtering based on local time
-        const timezoneOffset = startDateTimeLocal.getTimezoneOffset() * 60000;
-        const adjustedStart = new Date(
-          startDateTimeLocal.getTime() - timezoneOffset,
-        );
-        const adjustedEnd = new Date(
-          endDateTimeLocal.getTime() - timezoneOffset,
-        );
-
         // Format to ISO string to ensure consistent format
-        const startDateTimeISO = adjustedStart.toISOString();
-        const endDateTimeISO = adjustedEnd.toISOString();
+        const startDateTimeISO = startDateTimeLocal.toISOString();
+        const endDateTimeISO = endDateTimeLocal.toISOString();
 
         console.log("Sales Chart - Fetching orders with date range:", {
           startDate,
@@ -163,8 +154,6 @@ export function SalesChartReport() {
           endDateTimeISO,
           localTimezoneOffset: startDateTimeLocal.getTimezoneOffset(),
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          adjustedStartLocal: adjustedStart.toLocaleString(),
-          adjustedEndLocal: adjustedEnd.toLocaleString(),
         });
 
         const response = await fetch(
@@ -195,8 +184,8 @@ export function SalesChartReport() {
     },
     retry: 2,
     retryDelay: 500,
-    staleTime: 10 * 60 * 1000, // Cache for 10 minutes
-    gcTime: 15 * 60 * 1000, // Keep in cache for 15 minutes
+    staleTime: 1 * 60 * 1000, // Cache for 1 minute only to ensure fresh data
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     refetchOnWindowFocus: false,
   });
 
@@ -238,7 +227,14 @@ export function SalesChartReport() {
   });
 
   const { data: products } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products", selectedCategory, productType, productSearch],
+    queryKey: [
+      "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products",
+      selectedCategory,
+      productType,
+      productSearch,
+      startDate,
+      endDate,
+    ],
     queryFn: async () => {
       const response = await fetch(
         `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/${selectedCategory}/${productType}/${productSearch || ""}`,
@@ -255,7 +251,13 @@ export function SalesChartReport() {
   });
 
   const { data: customers } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers", customerSearch, customerStatus],
+    queryKey: [
+      "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers",
+      customerSearch,
+      customerStatus,
+      startDate,
+      endDate,
+    ],
     queryFn: async () => {
       const response = await fetch(
         `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/${customerSearch || "all"}/${customerStatus}`,
@@ -271,8 +273,10 @@ export function SalesChartReport() {
     useQuery({
       queryKey: [
         "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/product-analysis",
-        startDate, // Use startDate for consistency
-        endDate, // Use endDate for consistency
+        startDate,
+        endDate,
+        startTime,
+        endTime,
         selectedCategory,
         productType,
         productSearch,
@@ -290,7 +294,7 @@ export function SalesChartReport() {
         return response.json();
       },
       enabled: analysisType === "product",
-      staleTime: 2 * 60 * 1000,
+      staleTime: 1 * 60 * 1000, // Reduced cache time for fresh data
     });
 
   const { data: transactions } = useQuery({
@@ -1028,7 +1032,7 @@ export function SalesChartReport() {
                                 </TableCell>
                                 <TableCell className="text-right border-r min-w-[140px] px-4">
                                   {(() => {
-                                    // Tính thành tiền theo logic đúng với priceIncludeTax từ orders
+                                    // Calculate thành tiền according to correct logic with priceIncludeTax from orders
                                     let totalThanhTien = 0;
                                     dateTransactions.forEach(
                                       (transaction: any) => {
@@ -1244,15 +1248,17 @@ export function SalesChartReport() {
                                           {new Date(
                                             transaction.createdAt ||
                                               transaction.created_at,
+                                          ).toLocaleDateString("vi-VN")}
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                          {new Date(
+                                            transaction.createdAt ||
+                                              transaction.created_at,
                                           ).toLocaleTimeString("vi-VN", {
                                             hour: "2-digit",
                                             minute: "2-digit",
+                                            hour12: false,
                                           })}
-                                        </div>
-                                        <div className="text-xs text-gray-500 font-normal mt-1">
-                                          {getPaymentMethodLabel(
-                                            transaction.paymentMethod,
-                                          )}
                                         </div>
                                       </TableCell>
                                       <TableCell className="text-center border-r text-sm min-w-[100px] px-4">
@@ -1827,12 +1833,10 @@ export function SalesChartReport() {
 
     // Filter completed orders with all search criteria
     const filteredOrders = orders.filter((order: any) => {
-      const orderDate = new Date(
-        order.orderedAt || order.createdAt || order.created_at,
-      );
+      const orderDate = new Date(order.createdAt);
 
       if (isNaN(orderDate.getTime())) {
-        console.warn("Skipping order with invalid date:", order.id);
+        console.warn("Skipping order with invalid createdAt date:", order.id);
         return false;
       }
 
@@ -2835,7 +2839,15 @@ export function SalesChartReport() {
                       "Mã đơn hàng": order.orderNumber || `ORD-${order.id}`,
                       "Ngày giờ": new Date(
                         order.orderedAt || order.createdAt || order.created_at,
-                      ).toLocaleString("vi-VN"),
+                      ).toLocaleString("vi-VN", {
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                        hour12: false,
+                      }),
                       "Khách hàng": order.customerName || "Khách lẻ",
                       "Số đơn": 1,
                       "Doanh thu": formatCurrency(
@@ -3172,6 +3184,7 @@ export function SalesChartReport() {
                                       ).toLocaleTimeString("vi-VN", {
                                         hour: "2-digit",
                                         minute: "2-digit",
+                                        hour12: false,
                                       })}
                                     </div>
                                   </TableCell>
@@ -3548,7 +3561,7 @@ export function SalesChartReport() {
 
     const filteredOrders = orders.filter((order: any) => {
       const orderDate = new Date(
-        order.orderedAt || order.createdAt || order.created_at,
+        order.createdAt || order.created_at || order.orderedAt,
       );
 
       if (isNaN(orderDate.getTime())) {
@@ -3736,7 +3749,15 @@ export function SalesChartReport() {
                         "Mã đơn hàng": order.orderNumber || `ORD-${order.id}`,
                         "Ngày giờ": new Date(
                           order.orderedAt || order.created_at,
-                        ).toLocaleString("vi-VN"),
+                        ).toLocaleString("vi-VN", {
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                          hour12: false,
+                        }),
                         "Số đơn": 1,
                         "Tổng tiền": formatCurrency(
                           Number(order.subtotal || 0),
@@ -3982,12 +4003,14 @@ export function SalesChartReport() {
                                   <TableCell className="text-center border-r text-sm min-w-[150px] px-4">
                                     {new Date(
                                       order.orderedAt || order.created_at,
-                                    ).toLocaleDateString("vi-VN")}{" "}
-                                    {new Date(
-                                      order.orderedAt || order.created_at,
-                                    ).toLocaleTimeString("vi-VN", {
+                                    ).toLocaleString("vi-VN", {
+                                      year: "numeric",
+                                      month: "2-digit",
+                                      day: "2-digit",
                                       hour: "2-digit",
                                       minute: "2-digit",
+                                      second: "2-digit",
+                                      hour12: false,
                                     })}
                                   </TableCell>
                                   <TableCell className="text-center border-r text-sm min-w-[100px] px-4">
@@ -4998,7 +5021,7 @@ export function SalesChartReport() {
               try {
                 // Check if order has tableId to determine if it's dine-in or takeaway
                 const isDineIn = order.tableId && order.tableId !== null;
-                const method = isDineIn ? "Ăn tại chỗ" : "Mang về";
+                const method = isDineIn ? "Ăn t ��i chỗ" : "Mang về";
 
                 const orderRevenue = Number(order.subtotal || 0);
                 const orderDiscount = Number(order.discount || 0);
@@ -6129,4 +6152,3 @@ export function SalesChartReport() {
     </div>
   );
 }
-//

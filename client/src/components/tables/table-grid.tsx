@@ -47,7 +47,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
   const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null); // Ref for WebSocket connection
 
-  // All state declarations must be at the top - no conditional hooks
+  // ALL STATE DECLARATIONS MUST BE AT THE TOP - NO CONDITIONAL HOOKS
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [orderDetailsOpen, setOrderDetailsOpen] = useState(false);
@@ -143,7 +143,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
     isLoading: orderItemsLoading,
     refetch: refetchOrderItems,
   } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", selectedOrder?.id],
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", selectedOrder?.id || "none"],
     enabled: !!selectedOrder?.id && orderDetailsOpen,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
@@ -559,20 +559,22 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
 
   // Set first floor as active if no active floor is set - MUST be with other hooks
   useEffect(() => {
+    if (!tables || !Array.isArray(tables)) {
+      return;
+    }
+
     // Group tables by floor
-    const tablesByFloor = Array.isArray(tables)
-      ? tables.reduce(
-          (acc, table) => {
-            const floor = table.floor || "1층";
-            if (!acc[floor]) {
-              acc[floor] = [];
-            }
-            acc[floor].push(table);
-            return acc;
-          },
-          {} as Record<string, Table[]>,
-        )
-      : {};
+    const tablesByFloor = tables.reduce(
+      (acc, table) => {
+        const floor = table.floor || "1층";
+        if (!acc[floor]) {
+          acc[floor] = [];
+        }
+        acc[floor].push(table);
+        return acc;
+      },
+      {} as Record<string, Table[]>,
+    );
 
     // Sort floors numerically (1층, 2층, 3층, etc.)
     const sortedFloors = Object.keys(tablesByFloor).sort((a, b) => {

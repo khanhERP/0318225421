@@ -65,12 +65,15 @@ export function ProductManagerModal({
     productType: z.number().min(1, t("tables.productTypeRequired")),
     trackInventory: z.boolean().optional(),
     stock: z.number().min(0, "Stock must be 0 or greater"),
-    taxRate: z.string().min(1, "Tax rate is required").refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0 && parseFloat(val) <= 100, "Tax rate must be between 0 and 100"),
+    taxRate: z.union([z.string(), z.number()]).refine((val) => {
+      const numVal = typeof val === 'string' ? parseFloat(val) : val;
+      return !isNaN(numVal) && numVal >= 0 && numVal <= 100;
+    }, "Tax rate must be between 0 and 100"),
     priceIncludesTax: z.boolean().optional(),
-    afterTaxPrice: z.string().optional().refine((val) => {
-      if (!val) return true; // Optional field
-      const num = parseFloat(val.replace(/\./g, ''));
-      return !isNaN(num) && num > 0 && num < 100000000;
+    afterTaxPrice: z.union([z.string(), z.number(), z.undefined()]).optional().refine((val) => {
+      if (!val || val === undefined) return true; // Optional field
+      const numVal = typeof val === 'string' ? parseFloat(val.replace(/\./g, '')) : val;
+      return !isNaN(numVal) && numVal > 0 && numVal < 100000000;
     }, "After tax price must be a valid positive number and less than 100,000,000"),
     floor: z.string().optional(),
     zone: z.string().optional(),
@@ -110,7 +113,7 @@ export function ProductManagerModal({
   const createProductMutation = useMutation({
     mutationFn: async (data: z.infer<typeof productFormSchema>) => {
       let finalData = { ...data };
-      
+
       // 파일 업로드가 선택되고 파일이 있는 경우 Base64로 변환
       if (imageInputMethod === "file" && selectedImageFile) {
         try {
@@ -121,7 +124,7 @@ export function ProductManagerModal({
           throw new Error("이미지 파일 처리 중 오류가 발생했습니다.");
         }
       }
-      
+
       console.log("Sending product data:", finalData);
       const response = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products", {
         method: "POST",
@@ -162,7 +165,7 @@ export function ProductManagerModal({
       }
 
       toast({
-        title: "Error", 
+        title: "Error",
         description: errorMessage,
         variant: "destructive",
       });
@@ -178,7 +181,7 @@ export function ProductManagerModal({
       data: Partial<z.infer<typeof productFormSchema>>;
     }) => {
       let finalData = { ...data };
-      
+
       // 파일 업로드가 선택되고 파일이 있는 경우 Base64로 변환
       if (imageInputMethod === "file" && selectedImageFile) {
         try {
@@ -189,7 +192,7 @@ export function ProductManagerModal({
           throw new Error("이미지 파일 처리 중 오류가 발생했습니다.");
         }
       }
-      
+
       const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -277,7 +280,7 @@ export function ProductManagerModal({
       if (isNaN(num)) return '';
       return num.toLocaleString('vi-VN');
     }
-    
+
     // If it's a number
     if (isNaN(value)) return '';
     return value.toLocaleString('vi-VN');
@@ -297,7 +300,16 @@ export function ProductManagerModal({
   };
 
   const onSubmit = (data: z.infer<typeof productFormSchema>) => {
-    console.log("Form submission data:", data);
+    console.log("=== PRODUCT FORM SUBMISSION DEBUG ===");
+    console.log("Raw form data:", data);
+    console.log("Data types:", {
+      name: typeof data.name,
+      price: typeof data.price,
+      taxRate: typeof data.taxRate,
+      afterTaxPrice: typeof data.afterTaxPrice,
+      categoryId: typeof data.categoryId,
+      stock: typeof data.stock
+    });
 
     // Validate required fields
     if (!data.name || !data.price || !data.categoryId || !data.taxRate) {
@@ -309,8 +321,19 @@ export function ProductManagerModal({
       return;
     }
 
-    // Validate price limit
-    const priceNum = parseFloat(data.price);
+    // Clean and validate price
+    const cleanPrice = data.price.replace(/[^0-9]/g, ''); // Remove all non-numeric characters
+    const priceNum = parseInt(cleanPrice);
+
+    if (!cleanPrice || isNaN(priceNum) || priceNum <= 0) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid price",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (priceNum >= 100000000) {
       toast({
         title: "Error",
@@ -320,30 +343,40 @@ export function ProductManagerModal({
       return;
     }
 
-    // Transform data to ensure proper types
+    // Transform data to ensure proper types - all price fields must be strings
     const transformedData = {
       name: data.name.trim(),
       sku: data.sku ? data.sku.trim().toUpperCase() : "",
-      price: data.price.toString(), // Use direct value without parsing
+      price: priceNum.toString(), // String as expected by schema
       stock: Number(data.stock) || 0,
       categoryId: Number(data.categoryId),
       productType: Number(data.productType) || 1,
       trackInventory: data.trackInventory !== false,
       imageUrl: data.imageUrl?.trim() || null,
-      taxRate: data.taxRate.toString(),
-      priceIncludesTax: Boolean(data.priceIncludesTax), // Explicitly convert to boolean
-      afterTaxPrice: data.afterTaxPrice ? data.afterTaxPrice.toString() : undefined
+      taxRate: String(data.taxRate || "0"), // Ensure string type, preserve user input
+      priceIncludesTax: Boolean(data.priceIncludesTax),
+      afterTaxPrice: data.afterTaxPrice && data.afterTaxPrice.trim() !== "" ?
+        String(parseInt(data.afterTaxPrice.replace(/[^0-9]/g, ''))) :
+        undefined,
+      beforeTaxPrice: undefined, // Let server calculate this
+      floor: String(data.floor || "1층") // String as expected by schema
     };
 
-    console.log("PriceIncludesTax submission debug:", {
-      originalValue: data.priceIncludesTax,
-      originalType: typeof data.priceIncludesTax,
-      transformedValue: transformedData.priceIncludesTax,
-      transformedType: typeof transformedData.priceIncludesTax,
-      booleanConversion: Boolean(data.priceIncludesTax)
+    console.log("Transformed data:", transformedData);
+    console.log("Transformed data types:", {
+      name: typeof transformedData.name,
+      price: typeof transformedData.price,
+      taxRate: typeof transformedData.taxRate,
+      afterTaxPrice: typeof transformedData.afterTaxPrice,
+      categoryId: typeof transformedData.categoryId,
+      stock: typeof transformedData.stock
     });
 
-    console.log("Transformed data:", transformedData);
+    console.log("Tax rate debugging:", {
+      originalTaxRate: data.taxRate,
+      transformedTaxRate: transformedData.taxRate,
+      taxRateType: typeof transformedData.taxRate
+    });
 
     if (editingProduct) {
       updateProductMutation.mutate({ id: editingProduct.id, data: transformedData });
@@ -354,7 +387,7 @@ export function ProductManagerModal({
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
-    
+
     form.reset({
       name: product.name,
       sku: product.sku,
@@ -364,19 +397,19 @@ export function ProductManagerModal({
       productType: product.productType || 1,
       imageUrl: product.imageUrl || "",
       trackInventory: product.trackInventory !== false,
-      taxRate: product.taxRate || "8.00",
+      taxRate: product.taxRate || "0",
       priceIncludesTax: Boolean(product.priceIncludesTax), // Ensure boolean type
       // Use saved after-tax price if available, otherwise calculate
       afterTaxPrice: product.afterTaxPrice || (() => {
         const basePrice = parseFloat(product.price);
-        const taxRate = parseFloat(product.taxRate || "8.00");
+        const taxRate = parseFloat(product.taxRate || "0");
         return Math.round(basePrice + (basePrice * taxRate / 100)).toString();
       })(),
       floor: product.floor || "1층",
       zone: product.zone || "A구역",
     });
     setShowAddForm(true);
-    
+
     console.log("Editing product with priceIncludesTax:", {
       productId: product.id,
       priceIncludesTax: product.priceIncludesTax,
@@ -411,7 +444,7 @@ export function ProductManagerModal({
       floor: "1층",
       zone: "A구역",
     });
-    
+
     console.log("Form reset with priceIncludesTax: false");
   };
 
@@ -422,7 +455,7 @@ export function ProductManagerModal({
   const getProductTypeName = (productType: number) => {
     const types = {
       1: t("tables.goodsType"),
-      2: t("tables.materialType"), 
+      2: t("tables.materialType"),
       3: t("tables.finishedProductType")
     };
     return types[productType as keyof typeof types] || "Unknown";
@@ -457,7 +490,7 @@ export function ProductManagerModal({
         product.sku,
         getCategoryName(product.categoryId),
         parseFloat(product.price).toString(),
-        product.taxRate || "8.00",
+        product.taxRate || "0",
         product.stock.toString(),
         product.imageUrl || "",
       ]);
@@ -523,7 +556,7 @@ export function ProductManagerModal({
           productType: 1,
           imageUrl: "",
           trackInventory: true,
-          taxRate: "8.00",
+          taxRate: "0",
           priceIncludesTax: false,
           afterTaxPrice: "",
           floor: "1층",
@@ -572,7 +605,7 @@ export function ProductManagerModal({
       productType: 1,
       imageUrl: "",
       trackInventory: true,
-      taxRate: "8.00",
+      taxRate: "0",
       priceIncludesTax: false,
       afterTaxPrice: "",
       floor: "1층",
@@ -621,7 +654,7 @@ export function ProductManagerModal({
                     {t("tables.export")}
                   </Button>
                 </div>
-                
+
                 <div className="flex items-center space-x-2">
                   <Input
                     placeholder="Tìm kiếm theo tên hoặc mã SKU..."
@@ -648,7 +681,7 @@ export function ProductManagerModal({
                 ) : filteredProducts.length === 0 ? (
                   <div className="p-8 text-center">
                     <p className="text-gray-500">
-                      {searchTerm 
+                      {searchTerm
                         ? `Không tìm thấy sản phẩm nào với từ khóa "${searchTerm}"`
                         : "Không có sản phẩm nào"
                       }
@@ -719,7 +752,7 @@ export function ProductManagerModal({
                             {Math.round(parseFloat(product.price)).toLocaleString("vi-VN")} ₫
                           </td>
                           <td className="py-3 px-4 pos-text-secondary">
-                            {product.taxRate || "8.00"}%
+                            {product.taxRate || ""}%
                           </td>
                           <td className="py-3 px-4">
                             <span
@@ -840,30 +873,33 @@ export function ProductManagerModal({
                               {...field}
                               type="text"
                               placeholder={t("common.comboValues.pricePlaceholder")}
-                              value={field.value ? parseInt(field.value).toLocaleString('ko-KR') : ''}
+                              value={field.value ?
+                                parseInt(field.value.replace(/[^0-9]/g, '') || '0').toLocaleString('vi-VN') :
+                                ''
+                              }
                               onChange={(e) => {
                                 const value = e.target.value;
-                                // Only allow numbers and commas
-                                const sanitized = value.replace(/[^0-9,]/g, '').replace(/,/g, '');
-                                
+                                // Only allow numbers
+                                const sanitized = value.replace(/[^0-9]/g, '');
+
                                 // Check if the number would exceed the limit
-                                const num = parseInt(sanitized);
-                                if (!isNaN(num) && num >= 100000000) {
+                                const num = parseInt(sanitized || '0');
+                                if (num >= 100000000) {
                                   // Don't allow input that would exceed the limit
                                   return;
                                 }
-                                
-                                // Store the integer value (without commas)
+
+                                // Store the integer value
                                 field.onChange(sanitized);
-                                
+
                                 // Calculate after tax price from base price
                                 if (sanitized && !isNaN(parseInt(sanitized))) {
                                   const basePrice = parseInt(sanitized);
-                                  const taxRate = parseFloat(form.getValues("taxRate") || "8.00");
-                                  
+                                  const taxRate = parseFloat(form.getValues("taxRate") || "0");
+
                                   // Calculate after tax price: afterTaxPrice = basePrice + (basePrice * taxRate/100)
                                   const afterTaxPrice = Math.round(basePrice + (basePrice * taxRate / 100));
-                                  
+
                                   // Update the after tax price field
                                   form.setValue("afterTaxPrice", afterTaxPrice.toString());
                                 }
@@ -892,16 +928,16 @@ export function ProductManagerModal({
                               onChange={(e) => {
                                 const taxRate = e.target.value;
                                 field.onChange(taxRate);
-                                
+
                                 // Calculate after tax price when tax rate changes
                                 const basePrice = form.getValues("price");
                                 if (basePrice && !isNaN(parseInt(basePrice)) && taxRate && !isNaN(parseFloat(taxRate))) {
                                   const basePriceNum = parseInt(basePrice);
                                   const taxRateNum = parseFloat(taxRate);
-                                  
+
                                   // Calculate after tax price: afterTaxPrice = basePrice + (basePrice * taxRate/100)
                                   const afterTaxPrice = Math.round(basePriceNum + (basePriceNum * taxRateNum / 100));
-                                  
+
                                   // Update the after tax price field
                                   form.setValue("afterTaxPrice", afterTaxPrice.toString());
                                 }
@@ -1077,8 +1113,8 @@ export function ProductManagerModal({
                     <Label className="text-sm font-medium">
                       {t("tables.imageUrlOptional")}
                     </Label>
-                    <Tabs 
-                      value={imageInputMethod} 
+                    <Tabs
+                      value={imageInputMethod}
                       onValueChange={(value) => setImageInputMethod(value as "url" | "file")}
                       className="w-full"
                     >
@@ -1092,7 +1128,7 @@ export function ProductManagerModal({
                           파일 업로드
                         </TabsTrigger>
                       </TabsList>
-                      
+
                       <TabsContent value="url" className="mt-3">
                         <FormField
                           control={form.control}
@@ -1111,7 +1147,7 @@ export function ProductManagerModal({
                           )}
                         />
                       </TabsContent>
-                      
+
                       <TabsContent value="file" className="mt-3">
                         <div className="space-y-2">
                           <div className="flex items-center justify-center w-full">
@@ -1199,7 +1235,7 @@ export function ProductManagerModal({
                       )}
                     />
 
-                    
+
                   </div>
 
                   <div className="flex justify-end">

@@ -2448,7 +2448,7 @@ export function PaymentMethodModal({
                               orderForPayment?.discount ||
                               "0",
                           );
-                          let finalTotal;
+                          let finalTotal = 0;
                           if (priceIncludesTax) {
                             // When priceIncludesTax = true: total = subtotal - discount (subtotal already includes tax)
                             finalTotal = Math.max(0, exactSubtotal - discount);

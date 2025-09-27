@@ -39,6 +39,7 @@ export const products = pgTable("products", {
   priceIncludesTax: boolean("price_includes_tax").notNull().default(false),
   afterTaxPrice: decimal("after_tax_price", { precision: 10, scale: 2 }),
   beforeTaxPrice: decimal("before_tax_price", { precision: 18, scale: 2 }),
+  floor: varchar("floor", { length: 50 }).default("1층"),
 });
 
 export const transactions = pgTable("transactions", {
@@ -253,39 +254,58 @@ export const insertProductSchema = createInsertSchema(products)
     id: true,
   })
   .extend({
-    price: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
-      message: "Price must be a positive number",
+    price: z.union([z.string(), z.number()]).refine((val) => {
+      const numVal = typeof val === 'string' ? 
+        parseInt(val.replace(/[^0-9]/g, '')) : val;
+      return !isNaN(numVal) && numVal > 0 && numVal < 100000000;
+    }, {
+      message: "Price must be a positive number less than 100,000,000",
     }),
     stock: z.number().min(0, "Stock cannot be negative"),
     productType: z.number().min(1).max(3, "Product type is required"),
     taxRate: z
-      .string()
-      .refine(
-        (val) => !isNaN(Number(val)) && Number(val) >= 0 && Number(val) <= 100,
-        {
-          message: "Tax rate must be between 0 and 100",
-        },
-      ),
+      .union([z.string(), z.number()])
+      .transform((val) => {
+        // Always convert to string with proper formatting
+        const numVal = typeof val === 'string' ? parseFloat(val) : val;
+        if (isNaN(numVal) || numVal < 0 || numVal > 100) {
+          throw new Error("Tax rate must be between 0 and 100");
+        }
+        return numVal.toFixed(2);
+      }),
     priceIncludesTax: z.boolean().optional().default(false),
     afterTaxPrice: z
-      .union([z.string(), z.null()])
+      .union([z.string(), z.number(), z.null(), z.undefined()])
       .optional()
       .refine(
-        (val) => !val || val === null || (!isNaN(Number(val)) && Number(val) > 0),
+        (val) => {
+          if (!val || val === null || val === undefined) return true;
+          if (typeof val === 'string' && val.trim() === "") return true;
+          const numVal = typeof val === 'string' ? 
+            parseInt(val.replace(/[^0-9]/g, '')) : val;
+          return !isNaN(numVal) && numVal > 0;
+        },
         {
           message: "After tax price must be a positive number",
         },
       ),
     beforeTaxPrice: z
-      .union([z.string(), z.null()])
+      .union([z.string(), z.number(), z.null(), z.undefined()])
       .optional()
       .refine(
-        (val) => !val || val === null || (!isNaN(Number(val)) && Number(val) > 0),
+        (val) => {
+          if (!val || val === null || val === undefined) return true;
+          const numVal = typeof val === 'string' ? Number(val) : val;
+          return !isNaN(numVal) && numVal >= 0;
+        },
         {
           message: "Before tax price must be a positive number",
         },
       ),
     sku: z.string().optional(),
+    name: z.string().min(1, "Product name is required"),
+    categoryId: z.number().min(1, "Category is required"),
+    floor: z.union([z.string(), z.number()]).optional().default("1층"),
   });
 
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
@@ -633,6 +653,7 @@ export const printerConfigs = pgTable("printer_configs", {
   isEmployee: boolean("is_employee").notNull().default(false),
   isKitchen: boolean("is_kitchen").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
+  copies: integer("copies").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -729,6 +750,7 @@ export const insertPrinterConfigSchema = createInsertSchema(printerConfigs).omit
 }).extend({
   printerType: z.enum(["thermal", "inkjet", "laser"]).optional(),
   connectionType: z.enum(["usb", "network", "bluetooth"]).optional(),
+  copies: z.number().min(0).optional().default(0),
 });
 
 export type PrinterConfig = typeof printerConfigs.$inferSelect;
