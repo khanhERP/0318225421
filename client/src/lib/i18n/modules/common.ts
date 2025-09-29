@@ -497,6 +497,10 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     templateUsage: "템플릿 사용",
     paymentInvoice: "결제 송장",
     provisionalVoucher: "임시 영수증",
+    invalidProductData: "유효하지 않은 제품 데이터",
+    productUpdateFailed: "제품 업데이트 실패",
+    floorRequired: "유효한 층을 입력하세요",
+    invalidFloorData: "유효하지 않은 층 데이터",
   },
   en: {
     save: "Save",
@@ -900,6 +904,10 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     newPaymentMethod: "New Payment Method",
     paymentInvoice: "Payment Invoice",
     provisionalVoucher: "Provisional Voucher",
+    invalidProductData: "Invalid product data",
+    productUpdateFailed: "Product update failed",
+    floorRequired: "Please enter a valid floor",
+    invalidFloorData: "Invalid floor data",
   },
   vi: {
     save: "Lưu",
@@ -1290,5 +1298,9 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     newPaymentMethod: "Phương thức thanh toán mới",
     paymentInvoice: "Hóa đơn thanh toán",
     provisionalVoucher: "Phiếu tạm tính",
+    invalidProductData: "Dữ liệu sản phẩm không hợp lệ",
+    productUpdateFailed: "Cập nhật sản phẩm thất bại",
+    floorRequired: "Vui lòng nhập tầng hợp lệ",
+    invalidFloorData: "Dữ liệu tầng không hợp lệ",
   },
 };

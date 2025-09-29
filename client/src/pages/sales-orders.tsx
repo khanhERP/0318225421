@@ -1208,10 +1208,8 @@ export default function SalesOrders() {
     <div className="min-h-screen bg-green-50 grocery-bg">
       {/* Header */}
       <POSHeader />
-
       {/* Right Sidebar */}
       <RightSidebar />
-
       <div className="main-content pt-16 px-6">
         <div className="max-w-full mx-auto py-8">
           <div className="mb-6">
@@ -2631,7 +2629,7 @@ export default function SalesOrders() {
                   </div>
                 )}
 
-                <div className="mt-4 pt-4 border-t bg-blue-50 p-3 rounded">
+                <div className="mt-4 border-t bg-blue-50 p-3 rounded text-center">
                   <div className="grid grid-cols-4 gap-4 text-sm">
                     <div>
                       <span className="font-medium">
@@ -2672,7 +2670,6 @@ export default function SalesOrders() {
           </div>
         </div>
       </div>
-
       <AlertDialog
         open={showBulkCancelDialog}
         onOpenChange={setShowBulkCancelDialog}
@@ -2704,7 +2701,6 @@ export default function SalesOrders() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
       <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -2731,7 +2727,6 @@ export default function SalesOrders() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
       {showEInvoiceModal && selectedInvoice && (
         <EInvoiceModal
           isOpen={showEInvoiceModal}
@@ -2781,7 +2776,6 @@ export default function SalesOrders() {
           orderId={selectedInvoice.id}
         />
       )}
-
       {showPrintDialog && printReceiptData && (
         <PrintDialog
           isOpen={showPrintDialog}
@@ -2792,7 +2786,6 @@ export default function SalesOrders() {
           receiptData={printReceiptData}
         />
       )}
-
       {showReceiptModal && selectedReceipt && (
         <ReceiptModal
           isOpen={showReceiptModal}

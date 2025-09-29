@@ -282,14 +282,29 @@ export function SalesChartReport() {
         productSearch,
       ],
       queryFn: async () => {
+        // Create full datetime strings with proper timezone handling
+        const startDateTime = `${startDate}T${startTime}:00`;
+        const endDateTime = `${endDate}T${endTime}:59`;
+
+        // Create Date objects directly without timezone adjustment
+        const startDateTimeLocal = new Date(startDateTime);
+        const endDateTimeLocal = new Date(endDateTime);
+
+        // Format to ISO string to ensure consistent format
+        const startDateTimeISO = startDateTimeLocal.toISOString();
+        const endDateTimeISO = endDateTimeLocal.toISOString();
+
+        let start = encodeURIComponent(startDateTimeISO);
+        let end = encodeURIComponent(endDateTimeISO);
+
         const params = new URLSearchParams({
-          startDate,
-          endDate,
           categoryId: selectedCategory,
           productType,
           productSearch: productSearch || "",
         });
-        const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/product-analysis?${params}`);
+        const response = await fetch(
+          `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/product-analysis/${encodeURIComponent(startDateTimeISO)}/${encodeURIComponent(endDateTimeISO)}?${params}`,
+        );
         if (!response.ok) throw new Error("Failed to fetch product analysis");
         return response.json();
       },
@@ -1833,7 +1848,7 @@ export function SalesChartReport() {
 
     // Filter completed orders with all search criteria
     const filteredOrders = orders.filter((order: any) => {
-      const orderDate = new Date(order.createdAt);
+      const orderDate = new Date(order.orderedAt);
 
       if (isNaN(orderDate.getTime())) {
         console.warn("Skipping order with invalid createdAt date:", order.id);
@@ -5020,8 +5035,8 @@ export function SalesChartReport() {
             salesMethodFilteredOrders.forEach((order: any) => {
               try {
                 // Check if order has tableId to determine if it's dine-in or takeaway
-                const isDineIn = order.tableId && order.tableId !== null;
-                const method = isDineIn ? "Ăn t ��i chỗ" : "Mang về";
+                const isDineIn = order.salesChannel === "table" ? true : false;
+                const method = isDineIn ? "Ăn tại chỗ" : "Mang về";
 
                 const orderRevenue = Number(order.subtotal || 0);
                 const orderDiscount = Number(order.discount || 0);

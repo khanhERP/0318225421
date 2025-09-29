@@ -14,6 +14,7 @@ import SettingsPage from "@/pages/settings";
 import SuppliersPage from "@/pages/suppliers";
 import PurchasesPage from "@/pages/purchases";
 import PurchaseFormPage from "@/pages/purchase-form";
+import PurchaseViewPage from "./pages/purchase-view";
 import AttendancePage from "@/pages/attendance";
 import AttendanceQRPage from "./pages/attendance-qr";
 import CustomerDisplay from "@/pages/customer-display";
@@ -25,7 +26,7 @@ function Router({ onLogout }: { onLogout: () => void }) {
     const [, setLocation] = useLocation();
 
     useEffect(() => {
-      setLocation('/sales-orders', { replace: true });
+      setLocation("/tables", { replace: true });
     }, [setLocation]);
 
     return null;
@@ -57,11 +58,23 @@ function Router({ onLogout }: { onLogout: () => void }) {
       />
       <Route
         path="/purchases"
-        component={() => <PurchasesPage onLogout={onLogout} />} />
-        <Route path="/purchases/create" component={() => <PurchaseFormPage onLogout={onLogout} />} />
-        <Route path="/purchases/edit/:id" component={({ id }: { id: string }) => <PurchaseFormPage id={id} onLogout={onLogout} />} />
-        <Route path="/purchases/view/:id" component={({ params }: { params: { id: string } }) => <PurchaseFormPage id={params.id} viewOnly={true} onLogout={onLogout} />} />
-        <Route
+        component={() => <PurchasesPage onLogout={onLogout} />}
+      />
+      <Route
+        path="/purchases/view/:id"
+        component={() => <PurchaseViewPage onLogout={onLogout} />}
+      />
+      <Route
+        path="/purchases/create"
+        component={() => <PurchaseFormPage onLogout={onLogout} />}
+      />
+      <Route
+        path="/purchases/edit/:id"
+        component={({ id }: { id: string }) => (
+          <PurchaseFormPage id={id} onLogout={onLogout} />
+        )}
+      />
+      <Route
         path="/suppliers"
         component={() => <SuppliersPage onLogout={onLogout} />}
       />
@@ -70,7 +83,10 @@ function Router({ onLogout }: { onLogout: () => void }) {
         component={() => <AttendancePage onLogout={onLogout} />}
       />
       <Route path="/attendance-qr" component={AttendanceQRPage} />
-      <Route path="/inventory" component={() => <InventoryPage onLogout={onLogout} />} />
+      <Route
+        path="/inventory"
+        component={() => <InventoryPage onLogout={onLogout} />}
+      />
       <Route path="/customer-display" component={CustomerDisplay} />
       <Route path="/sales-orders" component={SalesOrders} />
       <Route path="*" component={NotFoundPage} />

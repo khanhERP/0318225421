@@ -206,7 +206,7 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
             <div className="opacity-90 font-semibold text-[20px]">
               {storeSettings?.storeName || "EDPOS 레스토랑"}
             </div>
-            <div className="text-sm opacity-75 text-right font-extrabold text-[#ffffff]">
+            <div className="text-sm opacity-75 text-right font-extrabold text-[#22c55e]">
               {t("pos.posLocation")}: {storeSettings?.defaultFloor || "1"}{t("pos.floor")}-{storeSettings?.defaultZone || "A"}
             </div>
           </div>

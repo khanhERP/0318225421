@@ -359,7 +359,8 @@ export function ProductManagerModal({
         String(parseInt(data.afterTaxPrice.replace(/[^0-9]/g, ''))) :
         undefined,
       beforeTaxPrice: undefined, // Let server calculate this
-      floor: String(data.floor || "1층") // String as expected by schema
+      floor: String(data.floor || "1층"), // String as expected by schema
+      zone: String(data.zone || "A구역") // Add zone field to ensure it's saved
     };
 
     console.log("Transformed data:", transformedData);

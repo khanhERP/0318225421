@@ -460,8 +460,32 @@ export default function PurchaseFormPage({
         throw new Error("Vui lòng thêm ít nhất một sản phẩm hợp lệ");
       }
 
+      // Validate required fields
+      const missingFields = [];
+
       if (!data.supplierId || data.supplierId === 0) {
-        throw new Error("Vui lòng chọn nhà cung cấp");
+        missingFields.push('Nhà cung cấp');
+      }
+
+      // receiptNumber is now validated in onSubmit, so we don't need to check it here again unless it's the only way to check.
+      // However, the original logic in onSubmit already handles the finalPONumber.
+
+      if (!data.purchaseDate) {
+        missingFields.push('Ngày nhập');
+      }
+
+      if (!data.purchaseType) {
+        missingFields.push('Loại mua hàng');
+      }
+
+      if (missingFields.length > 0) {
+        toast({
+          title: "Lỗi",
+          description: `Vui lòng nhập đầy đủ thông tin cho các trường bắt buộc sau: ${missingFields.join(', ')}`,
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return; // Stop mutation if required fields are missing
       }
 
       console.log("API payload:", data);
@@ -889,17 +913,37 @@ export default function PurchaseFormPage({
         console.log("🔢 Using auto-generated PO number:", finalPONumber);
       }
 
-      // Validate PO Number
+      // Validate required fields
+      const missingFields = [];
+
+      if (!values.supplierId || values.supplierId === 0) {
+        missingFields.push('Nhà cung cấp');
+      }
+
       if (!finalPONumber) {
-        console.log("❌ Validation failed: No PO number or receipt number");
+        missingFields.push('Số phiếu nhập');
+      }
+
+      if (!values.purchaseDate) {
+        missingFields.push('Ngày nhập');
+      }
+
+      // Lấy giá trị Loại mua hàng từ form control
+      const currentPurchaseType = form.getValues("purchaseType");
+      if (!currentPurchaseType || currentPurchaseType.trim() === "") {
+        missingFields.push('Loại mua hàng');
+      }
+
+      if (missingFields.length > 0) {
         toast({
           title: "Lỗi",
-          description: "Không thể tạo số phiếu. Vui lòng nhập số phiếu thủ công.",
+          description: `Vui lòng nhập đầy đủ thông tin cho các trường bắt buộc sau: ${missingFields.join(', ')}`,
           variant: "destructive",
         });
         setIsSubmitting(false);
         return;
       }
+
 
       // Calculate totals
       const subtotalAmount = validItems.reduce((sum, item) => sum + item.total, 0);
@@ -1039,7 +1083,10 @@ export default function PurchaseFormPage({
                         name="supplierId"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t("purchases.supplier")}</FormLabel>
+                            <FormLabel className="flex items-center gap-1">
+                              <span>{t("purchases.supplier")}</span>
+                              <span className="text-red-500">*</span>
+                            </FormLabel>
                             <Select
                               onValueChange={(value) =>
                                 field.onChange(parseInt(value))
@@ -1077,7 +1124,10 @@ export default function PurchaseFormPage({
                         name="receiptNumber" // Changed from poNumber to receiptNumber
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Số phiếu nhập *</FormLabel>
+                            <FormLabel className="flex items-center gap-1">
+                              <span>Số phiếu nhập</span>
+                              <span className="text-red-500">*</span>
+                            </FormLabel>
                             <FormControl>
                               <div className="relative">
                                 <Input
@@ -1114,7 +1164,10 @@ export default function PurchaseFormPage({
                         name="purchaseDate"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t("purchases.purchaseDate")}</FormLabel>
+                            <FormLabel className="flex items-center gap-1">
+                              <span>{t("purchases.purchaseDate")}</span>
+                              <span className="text-red-500">*</span>
+                            </FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
@@ -1134,7 +1187,10 @@ export default function PurchaseFormPage({
                         name="purchaseType"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t("purchases.purchaseType")}</FormLabel>
+                            <FormLabel className="flex items-center gap-1">
+                              <span>{t("purchases.purchaseType")}</span>
+                              <span className="text-red-500">*</span>
+                            </FormLabel>
                             <Select
                               onValueChange={field.onChange}
                               value={field.value || ""}
@@ -1636,7 +1692,7 @@ export default function PurchaseFormPage({
                                     <TableCell className="p-2">
                                       <Input
                                         type="number"
-                                        value={discountPercent}
+                                        value={discountPercent.toFixed(1)}
                                         onChange={(e) => {
                                           const updatedItems = [
                                             ...selectedItems,
@@ -1660,6 +1716,12 @@ export default function PurchaseFormPage({
                                         className="w-16 text-center text-sm h-8 border-gray-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
                                         disabled={viewOnly}
                                         data-testid={`input-discountPercent-${index}`}
+                                        onBlur={(e) => {
+                                          const value = parseFloat(e.target.value) || 0;
+                                          const updatedItems = [...selectedItems];
+                                          (updatedItems[index] as any).discountPercent = parseFloat(value.toFixed(1));
+                                          setSelectedItems(updatedItems);
+                                        }}
                                       />
                                     </TableCell>
 

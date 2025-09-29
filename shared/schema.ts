@@ -40,6 +40,7 @@ export const products = pgTable("products", {
   afterTaxPrice: decimal("after_tax_price", { precision: 10, scale: 2 }),
   beforeTaxPrice: decimal("before_tax_price", { precision: 18, scale: 2 }),
   floor: varchar("floor", { length: 50 }).default("1층"),
+  zone: varchar("zone", { length: 50 }).default("A구역"),
 });
 
 export const transactions = pgTable("transactions", {
@@ -306,6 +307,7 @@ export const insertProductSchema = createInsertSchema(products)
     name: z.string().min(1, "Product name is required"),
     categoryId: z.number().min(1, "Category is required"),
     floor: z.union([z.string(), z.number()]).optional().default("1층"),
+    zone: z.union([z.string(), z.number()]).optional().default("A구역"),
   });
 
 export const insertTransactionSchema = createInsertSchema(transactions).omit({
