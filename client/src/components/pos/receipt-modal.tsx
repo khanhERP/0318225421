@@ -198,6 +198,7 @@ export function ReceiptModal({
       alert(
         "Bạn chưa thiết lập cài đặt máy in. Vui lòng liên hệ với edpos để được hỗ trợ.",
       );
+      onClose();
     }
   };
 
@@ -340,6 +341,7 @@ export function ReceiptModal({
       } else {
         await handleDesktopPrinting(printContent);
       }
+      onClose();
     } catch (error) {
       console.error("❌ Print error:", error);
       alert(`Có lỗi xảy ra khi in: ${error.message}\nVui lòng thử lại.`);
@@ -347,6 +349,7 @@ export function ReceiptModal({
       if (printContent) {
         handleDesktopPrint(printContent);
       }
+      onClose();
     }
   };
 

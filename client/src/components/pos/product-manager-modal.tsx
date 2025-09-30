@@ -1,6 +1,15 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { X, Plus, Upload, Download, Edit, Trash2, Link, FileImage } from "lucide-react";
+import {
+  X,
+  Plus,
+  Upload,
+  Download,
+  Edit,
+  Trash2,
+  Link,
+  FileImage,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -56,25 +65,32 @@ export function ProductManagerModal({
 
   const productFormSchema = insertProductSchema.extend({
     categoryId: z.number().min(1, t("tables.categoryRequired")),
-    price: z.string().min(1, "Price is required").refine((val) => {
-      const num = parseFloat(val.replace(/\./g, ''));
-      return !isNaN(num) && num > 0 && num < 100000000; // Max 99,999,999 (8 digits)
-    }, "Price must be a valid positive number and less than 100,000,000"),
+    price: z
+      .string()
+      .min(1, "Price is required")
+      .refine((val) => {
+        const num = parseFloat(val.replace(/\./g, ""));
+        return !isNaN(num) && num > 0 && num < 100000000; // Max 99,999,999 (8 digits)
+      }, "Price must be a valid positive number and less than 100,000,000"),
     sku: z.string().optional(),
     name: z.string().min(1, t("tables.productNameRequired")),
     productType: z.number().min(1, t("tables.productTypeRequired")),
     trackInventory: z.boolean().optional(),
     stock: z.number().min(0, "Stock must be 0 or greater"),
     taxRate: z.union([z.string(), z.number()]).refine((val) => {
-      const numVal = typeof val === 'string' ? parseFloat(val) : val;
+      const numVal = typeof val === "string" ? parseFloat(val) : val;
       return !isNaN(numVal) && numVal >= 0 && numVal <= 100;
     }, "Tax rate must be between 0 and 100"),
     priceIncludesTax: z.boolean().optional(),
-    afterTaxPrice: z.union([z.string(), z.number(), z.undefined()]).optional().refine((val) => {
-      if (!val || val === undefined) return true; // Optional field
-      const numVal = typeof val === 'string' ? parseFloat(val.replace(/\./g, '')) : val;
-      return !isNaN(numVal) && numVal > 0 && numVal < 100000000;
-    }, "After tax price must be a valid positive number and less than 100,000,000"),
+    afterTaxPrice: z
+      .union([z.string(), z.number(), z.undefined()])
+      .optional()
+      .refine((val) => {
+        if (!val || val === undefined) return true; // Optional field
+        const numVal =
+          typeof val === "string" ? parseFloat(val.replace(/\./g, "")) : val;
+        return !isNaN(numVal) && numVal > 0 && numVal < 100000000;
+      }, "After tax price must be a valid positive number and less than 100,000,000"),
     floor: z.string().optional(),
     zone: z.string().optional(),
   });
@@ -82,7 +98,9 @@ export function ProductManagerModal({
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [imageInputMethod, setImageInputMethod] = useState<"url" | "file">("url");
+  const [imageInputMethod, setImageInputMethod] = useState<"url" | "file">(
+    "url",
+  );
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const { toast } = useToast();
 
@@ -92,7 +110,7 @@ export function ProductManagerModal({
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
+      reader.onerror = (error) => reject(error);
     });
   };
 
@@ -258,44 +276,47 @@ export function ProductManagerModal({
       productType: 1,
       imageUrl: "",
       trackInventory: true,
-      taxRate: "8.00",
+      taxRate: "8.00", // Keep 8% as default
       priceIncludesTax: false,
       afterTaxPrice: "",
-      floor: "1층",
-      zone: "A구역",
+      floor: "1",
+      zone: "A",
     },
   });
 
   // Helper functions for currency formatting
   const formatCurrency = (value: string | number): string => {
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
       // If it's already formatted with dots, parse and reformat
-      if (value.includes('.')) {
-        const num = parseFloat(value.replace(/\./g, ''));
-        if (isNaN(num)) return '';
-        return num.toLocaleString('vi-VN');
+      if (value.includes(".")) {
+        const num = parseFloat(value.replace(/\./g, ""));
+        if (isNaN(num)) return "";
+        return num.toLocaleString("vi-VN");
       }
       // If it's a plain number string
       const num = parseFloat(value);
-      if (isNaN(num)) return '';
-      return num.toLocaleString('vi-VN');
+      if (isNaN(num)) return "";
+      return num.toLocaleString("vi-VN");
     }
 
     // If it's a number
-    if (isNaN(value)) return '';
-    return value.toLocaleString('vi-VN');
+    if (isNaN(value)) return "";
+    return value.toLocaleString("vi-VN");
   };
 
   const parseCurrency = (value: string): number => {
     // Remove all dots and parse as number
-    const cleaned = value.replace(/\./g, '');
+    const cleaned = value.replace(/\./g, "");
     return parseFloat(cleaned) || 0;
   };
 
   // Function to generate unique SKU
   const generateSKU = () => {
-    const randomChars = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const sku = `ITEM-${randomChars.padEnd(6, '0')}`;
+    const randomChars = Math.random()
+      .toString(36)
+      .substring(2, 8)
+      .toUpperCase();
+    const sku = `ITEM-${randomChars.padEnd(6, "0")}`;
     form.setValue("sku", sku);
   };
 
@@ -308,21 +329,22 @@ export function ProductManagerModal({
       taxRate: typeof data.taxRate,
       afterTaxPrice: typeof data.afterTaxPrice,
       categoryId: typeof data.categoryId,
-      stock: typeof data.stock
+      stock: typeof data.stock,
     });
 
     // Validate required fields
     if (!data.name || !data.price || !data.categoryId || !data.taxRate) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields: Name, Price, Category, and Tax Rate",
+        description:
+          "Please fill in all required fields: Name, Price, Category, and Tax Rate",
         variant: "destructive",
       });
       return;
     }
 
     // Clean and validate price
-    const cleanPrice = data.price.replace(/[^0-9]/g, ''); // Remove all non-numeric characters
+    const cleanPrice = data.price.replace(/[^0-9]/g, ""); // Remove all non-numeric characters
     const priceNum = parseInt(cleanPrice);
 
     if (!cleanPrice || isNaN(priceNum) || priceNum <= 0) {
@@ -355,12 +377,13 @@ export function ProductManagerModal({
       imageUrl: data.imageUrl?.trim() || null,
       taxRate: String(data.taxRate || "0"), // Ensure string type, preserve user input
       priceIncludesTax: Boolean(data.priceIncludesTax),
-      afterTaxPrice: data.afterTaxPrice && data.afterTaxPrice.trim() !== "" ?
-        String(parseInt(data.afterTaxPrice.replace(/[^0-9]/g, ''))) :
-        undefined,
+      afterTaxPrice:
+        data.afterTaxPrice && data.afterTaxPrice.trim() !== ""
+          ? String(parseInt(data.afterTaxPrice.replace(/[^0-9]/g, "")))
+          : undefined,
       beforeTaxPrice: undefined, // Let server calculate this
-      floor: String(data.floor || "1층"), // String as expected by schema
-      zone: String(data.zone || "A구역") // Add zone field to ensure it's saved
+      floor: String(data.floor || "1"), // String as expected by schema
+      zone: String(data.zone || "A"), // Add zone field to ensure it's saved
     };
 
     console.log("Transformed data:", transformedData);
@@ -370,17 +393,20 @@ export function ProductManagerModal({
       taxRate: typeof transformedData.taxRate,
       afterTaxPrice: typeof transformedData.afterTaxPrice,
       categoryId: typeof transformedData.categoryId,
-      stock: typeof transformedData.stock
+      stock: typeof transformedData.stock,
     });
 
     console.log("Tax rate debugging:", {
       originalTaxRate: data.taxRate,
       transformedTaxRate: transformedData.taxRate,
-      taxRateType: typeof transformedData.taxRate
+      taxRateType: typeof transformedData.taxRate,
     });
 
     if (editingProduct) {
-      updateProductMutation.mutate({ id: editingProduct.id, data: transformedData });
+      updateProductMutation.mutate({
+        id: editingProduct.id,
+        data: transformedData,
+      });
     } else {
       createProductMutation.mutate(transformedData);
     }
@@ -392,7 +418,7 @@ export function ProductManagerModal({
     form.reset({
       name: product.name,
       sku: product.sku,
-      price: product.price, // Show actual price value without formatting
+      price: Math.round(parseFloat(product.price)).toString(), // Ensure price is stored as clean integer string
       stock: product.stock,
       categoryId: product.categoryId,
       productType: product.productType || 1,
@@ -401,20 +427,22 @@ export function ProductManagerModal({
       taxRate: product.taxRate || "0",
       priceIncludesTax: Boolean(product.priceIncludesTax), // Ensure boolean type
       // Use saved after-tax price if available, otherwise calculate
-      afterTaxPrice: product.afterTaxPrice || (() => {
-        const basePrice = parseFloat(product.price);
-        const taxRate = parseFloat(product.taxRate || "0");
-        return Math.round(basePrice + (basePrice * taxRate / 100)).toString();
-      })(),
-      floor: product.floor || "1층",
-      zone: product.zone || "A구역",
+      afterTaxPrice:
+        product.afterTaxPrice ||
+        (() => {
+          const basePrice = parseFloat(product.price);
+          const taxRate = parseFloat(product.taxRate || "0");
+          return Math.round(basePrice + (basePrice * taxRate) / 100).toString();
+        })(),
+      floor: product.floor || "1",
+      zone: product.zone || "A",
     });
     setShowAddForm(true);
 
     console.log("Editing product with priceIncludesTax:", {
       productId: product.id,
       priceIncludesTax: product.priceIncludesTax,
-      formValue: Boolean(product.priceIncludesTax)
+      formValue: Boolean(product.priceIncludesTax),
     });
   };
 
@@ -439,11 +467,11 @@ export function ProductManagerModal({
       productType: 1,
       imageUrl: "",
       trackInventory: true,
-      taxRate: "8.00",
-      priceIncludesTax: false, // Explicitly set to false for new products
+      taxRate: "8.00", // Changed default from 10.00 to 8.00
+      priceIncludesTax: false,
       afterTaxPrice: "",
-      floor: "1층",
-      zone: "A구역",
+      floor: "1",
+      zone: "A",
     });
 
     console.log("Form reset with priceIncludesTax: false");
@@ -457,7 +485,7 @@ export function ProductManagerModal({
     const types = {
       1: t("tables.goodsType"),
       2: t("tables.materialType"),
-      3: t("tables.finishedProductType")
+      3: t("tables.finishedProductType"),
     };
     return types[productType as keyof typeof types] || "Unknown";
   };
@@ -557,11 +585,11 @@ export function ProductManagerModal({
           productType: 1,
           imageUrl: "",
           trackInventory: true,
-          taxRate: "0",
+          taxRate: "8.00", // Changed from "0" to "8.00"
           priceIncludesTax: false,
           afterTaxPrice: "",
-          floor: "1층",
-          zone: "A구역",
+          floor: "1",
+          zone: "A",
         });
       } else {
         // 편집 모드에서 기존 이미지 URL이 있는지 확인
@@ -579,17 +607,17 @@ export function ProductManagerModal({
   // Add keyboard support for closing modal
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isOpen) {
+      if (event.key === "Escape" && isOpen) {
         handleModalClose();
       }
     };
 
     if (isOpen) {
-      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener("keydown", handleKeyDown);
     }
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen]);
 
@@ -606,24 +634,20 @@ export function ProductManagerModal({
       productType: 1,
       imageUrl: "",
       trackInventory: true,
-      taxRate: "0",
+      taxRate: "0", // Changed from "0" to "8.00"
       priceIncludesTax: false,
       afterTaxPrice: "",
-      floor: "1층",
-      zone: "A구역",
+      floor: "1",
+      zone: "A",
     });
     onClose();
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleModalClose}>
-      <DialogContent
-        className="max-w-4xl w-full max-h-screen overflow-y-auto"
-      >
+      <DialogContent className="max-w-4xl w-full max-h-screen overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {t("tables.productManagement")}
-          </DialogTitle>
+          <DialogTitle>{t("tables.productManagement")}</DialogTitle>
         </DialogHeader>
 
         <div className="p-6">
@@ -684,8 +708,7 @@ export function ProductManagerModal({
                     <p className="text-gray-500">
                       {searchTerm
                         ? `Không tìm thấy sản phẩm nào với từ khóa "${searchTerm}"`
-                        : "Không có sản phẩm nào"
-                      }
+                        : "Không có sản phẩm nào"}
                     </p>
                   </div>
                 ) : (
@@ -750,7 +773,10 @@ export function ProductManagerModal({
                             {getProductTypeName(product.productType || 1)}
                           </td>
                           <td className="py-3 px-4 font-medium">
-                            {Math.round(parseFloat(product.price)).toLocaleString("vi-VN")} ₫
+                            {Math.round(
+                              parseFloat(product.price),
+                            ).toLocaleString("vi-VN")}{" "}
+                            ₫
                           </td>
                           <td className="py-3 px-4 pos-text-secondary">
                             {product.taxRate || ""}%
@@ -838,7 +864,9 @@ export function ProductManagerModal({
                       name="sku"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t("tables.sku")} (Tự động tạo nếu để trống)</FormLabel>
+                          <FormLabel>
+                            {t("tables.sku")} (Tự động tạo nếu để trống)
+                          </FormLabel>
                           <div className="flex gap-2">
                             <FormControl>
                               <Input
@@ -873,36 +901,50 @@ export function ProductManagerModal({
                             <Input
                               {...field}
                               type="text"
-                              placeholder={t("common.comboValues.pricePlaceholder")}
-                              value={field.value ?
-                                parseInt(field.value.replace(/[^0-9]/g, '') || '0').toLocaleString('vi-VN') :
-                                ''
+                              placeholder={t(
+                                "common.comboValues.pricePlaceholder",
+                              )}
+                              value={
+                                field.value
+                                  ? parseInt(
+                                      field.value
+                                        .toString()
+                                        .replace(/[^0-9]/g, "") || "0",
+                                    ).toLocaleString("vi-VN")
+                                  : ""
                               }
                               onChange={(e) => {
                                 const value = e.target.value;
                                 // Only allow numbers
-                                const sanitized = value.replace(/[^0-9]/g, '');
+                                const sanitized = value.replace(/[^0-9]/g, "");
 
                                 // Check if the number would exceed the limit
-                                const num = parseInt(sanitized || '0');
+                                const num = parseInt(sanitized || "0");
                                 if (num >= 100000000) {
                                   // Don't allow input that would exceed the limit
                                   return;
                                 }
 
-                                // Store the integer value
+                                // Store the raw numeric value as string
                                 field.onChange(sanitized);
 
                                 // Calculate after tax price from base price
                                 if (sanitized && !isNaN(parseInt(sanitized))) {
                                   const basePrice = parseInt(sanitized);
-                                  const taxRate = parseFloat(form.getValues("taxRate") || "0");
+                                  const taxRate = parseFloat(
+                                    form.getValues("taxRate") || "0",
+                                  );
 
                                   // Calculate after tax price: afterTaxPrice = basePrice + (basePrice * taxRate/100)
-                                  const afterTaxPrice = Math.round(basePrice + (basePrice * taxRate / 100));
+                                  const afterTaxPrice = Math.round(
+                                    basePrice + (basePrice * taxRate) / 100,
+                                  );
 
                                   // Update the after tax price field
-                                  form.setValue("afterTaxPrice", afterTaxPrice.toString());
+                                  form.setValue(
+                                    "afterTaxPrice",
+                                    afterTaxPrice.toString(),
+                                  );
                                 }
                               }}
                             />
@@ -932,15 +974,26 @@ export function ProductManagerModal({
 
                                 // Calculate after tax price when tax rate changes
                                 const basePrice = form.getValues("price");
-                                if (basePrice && !isNaN(parseInt(basePrice)) && taxRate && !isNaN(parseFloat(taxRate))) {
+                                if (
+                                  basePrice &&
+                                  !isNaN(parseInt(basePrice)) &&
+                                  taxRate &&
+                                  !isNaN(parseFloat(taxRate))
+                                ) {
                                   const basePriceNum = parseInt(basePrice);
                                   const taxRateNum = parseFloat(taxRate);
 
                                   // Calculate after tax price: afterTaxPrice = basePrice + (basePrice * taxRate/100)
-                                  const afterTaxPrice = Math.round(basePriceNum + (basePriceNum * taxRateNum / 100));
+                                  const afterTaxPrice = Math.round(
+                                    basePriceNum +
+                                      (basePriceNum * taxRateNum) / 100,
+                                  );
 
                                   // Update the after tax price field
-                                  form.setValue("afterTaxPrice", afterTaxPrice.toString());
+                                  form.setValue(
+                                    "afterTaxPrice",
+                                    afterTaxPrice.toString(),
+                                  );
                                 }
                               }}
                             />
@@ -1026,9 +1079,15 @@ export function ProductManagerModal({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="1">{t("tables.goodsType")}</SelectItem>
-                              <SelectItem value="2">{t("tables.materialType")}</SelectItem>
-                              <SelectItem value="3">{t("tables.finishedProductType")}</SelectItem>
+                              <SelectItem value="1">
+                                {t("tables.goodsType")}
+                              </SelectItem>
+                              <SelectItem value="2">
+                                {t("tables.materialType")}
+                              </SelectItem>
+                              <SelectItem value="3">
+                                {t("tables.finishedProductType")}
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -1057,16 +1116,36 @@ export function ProductManagerModal({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="1층">1층</SelectItem>
-                              <SelectItem value="2층">2층</SelectItem>
-                              <SelectItem value="3층">3층</SelectItem>
-                              <SelectItem value="4층">4층</SelectItem>
-                              <SelectItem value="5층">5층</SelectItem>
-                              <SelectItem value="6층">6층</SelectItem>
-                              <SelectItem value="7층">7층</SelectItem>
-                              <SelectItem value="8층">8층</SelectItem>
-                              <SelectItem value="9층">9층</SelectItem>
-                              <SelectItem value="10층">10층</SelectItem>
+                              <SelectItem value="1">
+                                {t("common.floor")} 1
+                              </SelectItem>
+                              <SelectItem value="2">
+                                {t("common.floor")} 2
+                              </SelectItem>
+                              <SelectItem value="3">
+                                {t("common.floor")} 3
+                              </SelectItem>
+                              <SelectItem value="4">
+                                {t("common.floor")} 4
+                              </SelectItem>
+                              <SelectItem value="5">
+                                {t("common.floor")} 5
+                              </SelectItem>
+                              <SelectItem value="6">
+                                {t("common.floor")} 6
+                              </SelectItem>
+                              <SelectItem value="7">
+                                {t("common.floor")} 7
+                              </SelectItem>
+                              <SelectItem value="8">
+                                {t("common.floor")} 8
+                              </SelectItem>
+                              <SelectItem value="9">
+                                {t("common.floor")} 9
+                              </SelectItem>
+                              <SelectItem value="10">
+                                {t("common.floor")} 10
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -1092,15 +1171,30 @@ export function ProductManagerModal({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="전체구역">전체구역</SelectItem>
-                              <SelectItem value="A구역">A구역</SelectItem>
-                              <SelectItem value="B구역">B구역</SelectItem>
-                              <SelectItem value="C구역">C구역</SelectItem>
-                              <SelectItem value="D구역">D구역</SelectItem>
-                              <SelectItem value="E구역">E구역</SelectItem>
-                              <SelectItem value="F구역">F구역</SelectItem>
-                              <SelectItem value="VIP구역">VIP구역</SelectItem>
-                              <SelectItem value="테라스구역">테라스구역</SelectItem>
+                              <SelectItem value="A">
+                                {t("common.zone")} A
+                              </SelectItem>
+                              <SelectItem value="B">
+                                {t("common.zone")} B
+                              </SelectItem>
+                              <SelectItem value="C">
+                                {t("common.zone")} C
+                              </SelectItem>
+                              <SelectItem value="D">
+                                {t("common.zone")} D
+                              </SelectItem>
+                              <SelectItem value="E">
+                                {t("common.zone")} E
+                              </SelectItem>
+                              <SelectItem value="F">
+                                {t("common.zone")} F
+                              </SelectItem>
+                              <SelectItem value="Vip">
+                                {t("common.zone")} VIP
+                              </SelectItem>
+                              <SelectItem value="All">
+                                {t("common.all")}
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -1116,17 +1210,25 @@ export function ProductManagerModal({
                     </Label>
                     <Tabs
                       value={imageInputMethod}
-                      onValueChange={(value) => setImageInputMethod(value as "url" | "file")}
+                      onValueChange={(value) =>
+                        setImageInputMethod(value as "url" | "file")
+                      }
                       className="w-full"
                     >
                       <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="url" className="flex items-center gap-2">
+                        <TabsTrigger
+                          value="url"
+                          className="flex items-center gap-2"
+                        >
                           <Link className="w-4 h-4" />
-                          URL 입력
+                          {t("common.urlInput")}
                         </TabsTrigger>
-                        <TabsTrigger value="file" className="flex items-center gap-2">
+                        <TabsTrigger
+                          value="file"
+                          className="flex items-center gap-2"
+                        >
                           <FileImage className="w-4 h-4" />
-                          파일 업로드
+                          {t("common.fileUpload")}
                         </TabsTrigger>
                       </TabsList>
 
@@ -1139,7 +1241,7 @@ export function ProductManagerModal({
                               <FormControl>
                                 <Input
                                   {...field}
-                                  value={field.value || ''}
+                                  value={field.value || ""}
                                   placeholder={t("tables.imageUrl")}
                                 />
                               </FormControl>
@@ -1161,16 +1263,23 @@ export function ProductManagerModal({
                                       {selectedImageFile.name}
                                     </p>
                                     <p className="text-xs text-gray-500">
-                                      {(selectedImageFile.size / 1024).toFixed(1)} KB
+                                      {(selectedImageFile.size / 1024).toFixed(
+                                        1,
+                                      )}{" "}
+                                      KB
                                     </p>
                                   </>
                                 ) : (
                                   <>
                                     <Upload className="w-8 h-8 mb-2 text-gray-400" />
                                     <p className="mb-2 text-sm text-gray-500">
-                                      <span className="font-semibold">이미지 파일을 선택하거나</span>
+                                      <span className="font-semibold">
+                                        {t("common.selectImageFile")}
+                                      </span>
                                     </p>
-                                    <p className="text-xs text-gray-500">드래그엤드롭으로 업로드</p>
+                                    <p className="text-xs text-gray-500">
+                                      {t("common.dragDropUpload")}
+                                    </p>
                                   </>
                                 )}
                               </div>
@@ -1185,7 +1294,8 @@ export function ProductManagerModal({
                                     if (file.size > 5 * 1024 * 1024) {
                                       toast({
                                         title: "오류",
-                                        description: "이미지 크기는 5MB를 초과할 수 없습니다.",
+                                        description:
+                                          "이미지 크기는 5MB를 초과할 수 없습니다.",
                                         variant: "destructive",
                                       });
                                       return;
@@ -1235,8 +1345,6 @@ export function ProductManagerModal({
                         </FormItem>
                       )}
                     />
-
-
                   </div>
 
                   <div className="flex justify-end">

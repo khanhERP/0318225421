@@ -15,6 +15,7 @@ import {
   FileText,
   ClipboardCheck,
   Building2,
+  BookOpen, // Import BookOpen icon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -76,6 +77,12 @@ export function RightSidebar() {
       icon: Package,
       label: t("nav.inventory"),
       href: "/inventory",
+    },
+    // Add Cash Book menu item
+    {
+      icon: BookOpen,
+      label: "Sổ quỹ",
+      href: "/cash-book",
     },
     {
       icon: Users,
@@ -211,7 +218,7 @@ export function RightSidebar() {
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-green-200 bg-green-50">
           <div className="text-sm text-gray-500 text-center">
             <div className="font-medium">EDPOS System</div>
-            <div className="text-xs opacity-75">29/09/2025</div>
+            <div className="text-xs opacity-75">30/09/2025</div>
           </div>
         </div>
       )}

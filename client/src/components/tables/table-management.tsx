@@ -428,10 +428,7 @@ export function TableManagement() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("tables.floorLabel")}</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                    >
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue
@@ -440,16 +437,18 @@ export function TableManagement() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="1층">1층</SelectItem>
-                        <SelectItem value="2층">2층</SelectItem>
-                        <SelectItem value="3층">3층</SelectItem>
-                        <SelectItem value="4층">4층</SelectItem>
-                        <SelectItem value="5층">5층</SelectItem>
-                        <SelectItem value="6층">6층</SelectItem>
-                        <SelectItem value="7층">7층</SelectItem>
-                        <SelectItem value="8층">8층</SelectItem>
-                        <SelectItem value="9층">9층</SelectItem>
-                        <SelectItem value="10층">10층</SelectItem>
+                        <SelectItem value="1">{t("common.floor")} 1</SelectItem>
+                        <SelectItem value="2">{t("common.floor")} 2</SelectItem>
+                        <SelectItem value="3">{t("common.floor")} 3</SelectItem>
+                        <SelectItem value="4">{t("common.floor")} 4</SelectItem>
+                        <SelectItem value="5">{t("common.floor")} 5</SelectItem>
+                        <SelectItem value="6">{t("common.floor")} 6</SelectItem>
+                        <SelectItem value="7">{t("common.floor")} 7</SelectItem>
+                        <SelectItem value="8">{t("common.floor")} 8</SelectItem>
+                        <SelectItem value="9">{t("common.floor")} 9</SelectItem>
+                        <SelectItem value="10">
+                          {t("common.floor")} 10
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -463,10 +462,7 @@ export function TableManagement() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>{t("tables.zoneLabel")}</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                    >
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue
@@ -475,14 +471,16 @@ export function TableManagement() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="A구역">A구역</SelectItem>
-                        <SelectItem value="B구역">B구역</SelectItem>
-                        <SelectItem value="C구역">C구역</SelectItem>
-                        <SelectItem value="D구역">D구역</SelectItem>
-                        <SelectItem value="E구역">E구역</SelectItem>
-                        <SelectItem value="F구역">F구역</SelectItem>
-                        <SelectItem value="VIP구역">VIP구역</SelectItem>
-                        <SelectItem value="테라스구역">테라스구역</SelectItem>
+                        <SelectItem value="A">{t("common.zone")} A</SelectItem>
+                        <SelectItem value="B">{t("common.zone")} B</SelectItem>
+                        <SelectItem value="C">{t("common.zone")} C</SelectItem>
+                        <SelectItem value="D">{t("common.zone")} D</SelectItem>
+                        <SelectItem value="E">{t("common.zone")} E</SelectItem>
+                        <SelectItem value="F">{t("common.zone")} F</SelectItem>
+                        <SelectItem value="Vip">
+                          {t("common.zone")} VIP
+                        </SelectItem>
+                        <SelectItem value="All">{t("common.all")}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

@@ -73,11 +73,11 @@ export function DashboardOverview() {
     isLoading: ordersLoading,
     error: ordersError,
   } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range", startDate, endDate],
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range", startDate, endDate, "all"],
     queryFn: async () => {
       try {
         const response = await fetch(
-          `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range/${startDate}/${endDate}`,
+          `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range/${startDate}/${endDate}/all`,
         );
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -208,11 +208,8 @@ export function DashboardOverview() {
       // Calculate subtotal revenue from completed orders (excludes tax, after discount)
       const subtotalRevenue = completedOrders.reduce(
         (total: number, order: any) => {
-          const subtotal = Number(order.subtotal || 0);
-          const tax = Number(order.tax || 0);
-          const discount = Number(order.discount || 0);
-          const revenue = subtotal - discount; // Same formula as dashboard
-          return total + revenue;
+          const subtotal = Number(order.subtotal || 0); // Subtotal đã là giá trị sau khi trừ discount
+          return total + subtotal;
         },
         0,
       );

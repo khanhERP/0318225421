@@ -212,6 +212,10 @@ export function EInvoiceModal({
     enabled: isOpen,
   });
 
+  const { data: products, isLoading: productsLoading } = useQuery({
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"],
+  });
+
   // Filter templates to only show ones that are in use (useCK: true)
   const invoiceTemplates = allInvoiceTemplates.filter(
     (template) => template.useCK === true,
@@ -886,7 +890,14 @@ export function EInvoiceModal({
           : 1;
       })();
 
+      // Get taxRate from products database instead of cartItems
+      const product = products?.find((p: any) => p.id === item.id);
       const itemTaxRate = (() => {
+        if (product?.taxRate) {
+          const parsed = parseFloat(product.taxRate);
+          return isNaN(parsed) ? 0 : parsed;
+        }
+        // Fallback to cart item taxRate if product not found
         if (typeof item.taxRate === "string") {
           const parsed = parseFloat(item.taxRate);
           return isNaN(parsed) ? 0 : parsed;
@@ -922,7 +933,7 @@ export function EInvoiceModal({
         amt: Math.round(itemSubtotal), // Thành tiền chưa thuế
         discRate: 0, // Tỷ lệ chiết khấu
         discAmt: 0, // Tiền chiết khấu
-        vatRt: itemTaxRate.toString(), // Thuế suất thực tế từ cart
+        vatRt: itemTaxRate.toString(), // Thuế suất từ bảng products theo productId
         vatAmt: Math.round(itemTax), // Tiền thuế tính từ dữ liệu thực tế
         totalAmt: Math.round(itemTotal), // Tổng tiền có thuế tính từ dữ liệu thực tế
       };

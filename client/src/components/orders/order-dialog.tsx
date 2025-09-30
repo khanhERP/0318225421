@@ -35,6 +35,16 @@ interface CartItem {
   notes?: string;
 }
 
+// Helper function for currency formatting
+const formatCurrency = (amount: string): string => {
+  return parseFloat(amount).toLocaleString("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+};
+
 export function OrderDialog({
   open,
   onOpenChange,
@@ -408,7 +418,9 @@ export function OrderDialog({
         const floorMatch =
           !table?.floor || !product.floor || product.floor === table.floor;
 
-        return categoryMatch && floorMatch;
+        const productType = Number(product.productType) !== 2;
+
+        return categoryMatch && floorMatch && productType;
       })
     : [];
 
@@ -813,8 +825,7 @@ export function OrderDialog({
             const tamTinh = Math.round(giaGomThue / (1 + taxRate));
             // tax = giá bao gồm thuế - subtotal
             itemTax = giaGomThue - tamTinh;
-          } 
-          else {
+          } else {
             // When price doesn't include tax:
             // subtotal = (price - (discount/quantity)) * quantity
             const discountPerUnit = itemDiscountAmount / quantity;
@@ -1861,7 +1872,7 @@ export function OrderDialog({
                                   }
 
                                   if (priceIncludesTax) {
-                                    // Khi priceIncludesTax = true:
+                                    // When price includes tax:
                                     // giá bao gồm thuế = (price - (discount/quantity)) * quantity
                                     const discountPerUnit =
                                       itemDiscountAmount / quantity;
@@ -1877,7 +1888,7 @@ export function OrderDialog({
                                     // tax = giá bao gồm thuế - subtotal
                                     taxAmount = giaGomThue - tamTinh;
                                   } else {
-                                    // Khi priceIncludesTax = false:
+                                    // When price doesn't include tax:
                                     // subtotal = (price - (discount/quantity)) * quantity
                                     const discountPerUnit =
                                       itemDiscountAmount / quantity;

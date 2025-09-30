@@ -86,6 +86,7 @@ export function SalesChartReport() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [productType, setProductType] = useState("all");
   const [customerStatus, setCustomerStatus] = useState("all");
+  const [selectedFloor, setSelectedFloor] = useState<string>("all"); // State for floor filter
 
   // Pagination state for product report
   const [productCurrentPage, setProductCurrentPage] = useState(1);
@@ -128,6 +129,7 @@ export function SalesChartReport() {
       endDate,
       startTime,
       endTime,
+      selectedFloor, // Include floor filter in query key
     ],
     queryFn: async () => {
       try {
@@ -154,10 +156,15 @@ export function SalesChartReport() {
           endDateTimeISO,
           localTimezoneOffset: startDateTimeLocal.getTimezoneOffset(),
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          selectedFloor,
         });
 
+        // Construct URL with floor filter if it's not 'all'
+        const floorFilter =
+          selectedFloor !== "all" ? `/${selectedFloor}` : "/all";
+
         const response = await fetch(
-          `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range/${encodeURIComponent(startDateTimeISO)}/${encodeURIComponent(endDateTimeISO)}`,
+          `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range/${encodeURIComponent(startDateTimeISO)}/${encodeURIComponent(endDateTimeISO)}${floorFilter}`,
         );
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -214,8 +221,14 @@ export function SalesChartReport() {
     enabled: analysisType === "product", // Only fetch when needed
   });
 
-  const { data: tables } = useQuery({
+  // Query tables for floor data
+  const {
+    data: tables,
+    isLoading: tablesLoading,
+    error: tablesError,
+  } = useQuery({
     queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"],
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   // Combined loading state
@@ -279,37 +292,78 @@ export function SalesChartReport() {
         endTime,
         selectedCategory,
         productType,
+        selectedFloor, // Include floor filter in query key
         productSearch,
       ],
       queryFn: async () => {
-        // Create full datetime strings with proper timezone handling
-        const startDateTime = `${startDate}T${startTime}:00`;
-        const endDateTime = `${endDate}T${endTime}:59`;
+        try {
+          // Create full datetime strings with proper timezone handling
+          const startDateTime = `${startDate}T${startTime}:00`;
+          const endDateTime = `${endDate}T${endTime}:59`;
 
-        // Create Date objects directly without timezone adjustment
-        const startDateTimeLocal = new Date(startDateTime);
-        const endDateTimeLocal = new Date(endDateTime);
+          // Create Date objects directly without timezone adjustment
+          const startDateTimeLocal = new Date(startDateTime);
+          const endDateTimeLocal = new Date(endDateTime);
 
-        // Format to ISO string to ensure consistent format
-        const startDateTimeISO = startDateTimeLocal.toISOString();
-        const endDateTimeISO = endDateTimeLocal.toISOString();
+          // Format to ISO string to ensure consistent format
+          const startDateTimeISO = startDateTimeLocal.toISOString();
+          const endDateTimeISO = endDateTimeLocal.toISOString();
 
-        let start = encodeURIComponent(startDateTimeISO);
-        let end = encodeURIComponent(endDateTimeISO);
+          const params = new URLSearchParams({
+            categoryId: selectedCategory || "all",
+            productType: productType || "all",
+            productSearch: productSearch || "",
+          });
 
-        const params = new URLSearchParams({
-          categoryId: selectedCategory,
-          productType,
-          productSearch: productSearch || "",
-        });
-        const response = await fetch(
-          `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/product-analysis/${encodeURIComponent(startDateTimeISO)}/${encodeURIComponent(endDateTimeISO)}?${params}`,
-        );
-        if (!response.ok) throw new Error("Failed to fetch product analysis");
-        return response.json();
+          // Construct URL with floor filter if it's not 'all'
+          const floorFilter =
+            selectedFloor !== "all" ? `/${selectedFloor}` : "/all";
+
+          console.log("📊 Fetching product analysis data:", {
+            startDateTimeISO,
+            endDateTimeISO,
+            floorFilter,
+            params: params.toString(),
+          });
+
+          const response = await fetch(
+            `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/product-analysis/${encodeURIComponent(startDateTimeISO)}/${encodeURIComponent(endDateTimeISO)}${floorFilter}?${params}`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            },
+          );
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(
+              "❌ Product analysis API error:",
+              response.status,
+              errorText,
+            );
+            throw new Error(
+              `Failed to fetch product analysis: ${response.status} ${errorText}`,
+            );
+          }
+
+          const data = await response.json();
+          console.log(
+            "✅ Product analysis data received:",
+            data?.productStats?.length || 0,
+            "products",
+          );
+          return data;
+        } catch (error) {
+          console.error("❌ Product analysis query error:", error);
+          throw error;
+        }
       },
       enabled: analysisType === "product",
       staleTime: 1 * 60 * 1000, // Reduced cache time for fresh data
+      retry: 2,
+      retryDelay: 1000,
     });
 
   const { data: transactions } = useQuery({
@@ -355,6 +409,36 @@ export function SalesChartReport() {
       mobile: "Mobile",
     };
     return labels[method as keyof typeof labels] || method;
+  };
+
+  // Function to get unique floors from tables data
+  const getUniqueFloors = (): string[] => {
+    if (!tables || !Array.isArray(tables)) {
+      return [];
+    }
+    const floors = tables
+      .map((table: any) => table.floor)
+      .filter((floor: any) => floor !== null && floor !== undefined);
+    return Array.from(new Set(floors)).sort();
+  };
+
+  // Function to get fixed floors
+  const getFixedFloors = (): string[] => {
+    // Provide 10 fixed floors as requested
+    return Array.from({ length: 10 }, (_, i) => `Tầng ${i + 1}`);
+  };
+
+  // Function to get available floors, considering both fixed and dynamic data
+  const getAvailableFloors = (): string[] => {
+    const uniqueFloors = getUniqueFloors();
+    const fixedFloors = getFixedFloors();
+
+    // Combine and ensure uniqueness, prioritizing uniqueFloors if they exist
+    // If uniqueFloors are empty, use fixedFloors. Otherwise, combine them.
+    const allFloors = uniqueFloors.length > 0 ? uniqueFloors : fixedFloors;
+
+    // Further processing if needed, but for now, return unique ones
+    return Array.from(new Set(allFloors)).sort();
   };
 
   const getReportTitle = () => {
@@ -926,7 +1010,7 @@ export function SalesChartReport() {
                             {paymentMethodsArray.map(
                               (method: any, index: number) => (
                                 <TableHead
-                                  key={`payment-method-header-${index}-${method}`}
+                                  key={`payment-header-${index}-${method}`}
                                   className="text-center border-r bg-blue-50 min-w-[130px] font-bold"
                                 >
                                   {getPaymentMethodLabel(method)}
@@ -1127,9 +1211,6 @@ export function SalesChartReport() {
                                       (transaction: any) => {
                                         const orderPriceIncludeTax =
                                           transaction.priceIncludeTax === true;
-                                        const transactionTotal = Number(
-                                          transaction.total || 0,
-                                        );
                                         const transactionSubtotal = Number(
                                           transaction.subtotal || 0,
                                         );
@@ -1138,6 +1219,9 @@ export function SalesChartReport() {
                                         );
                                         const transactionTax = Number(
                                           transaction.tax || 0,
+                                        );
+                                        const transactionTotal = Number(
+                                          transaction.total || 0,
                                         );
 
                                         let customerPayment;
@@ -1224,12 +1308,12 @@ export function SalesChartReport() {
                                   return (
                                     <>
                                       {paymentMethodsArray.map(
-                                        (method: any) => {
+                                        (method: any, methodIndex: number) => {
                                           const amount =
                                             paymentMethodsForDate[method] || 0;
                                           return (
                                             <TableCell
-                                              key={method}
+                                              key={`payment-${date}-${methodIndex}-${method}`}
                                               className="text-right border-r font-medium min-w-[130px] px-4"
                                             >
                                               {amount > 0
@@ -1640,15 +1724,39 @@ export function SalesChartReport() {
                         </TableCell>
                         <TableCell className="text-right border-r text-blue-600 min-w-[140px] px-4">
                           {(() => {
-                            // Calculate total money = total revenue + total tax
-                            const totalRevenue = Object.values(
-                              dailySales,
-                            ).reduce((sum, data) => sum + data.revenue, 0);
-                            const totalTax = Object.values(dailySales).reduce(
-                              (sum, data) => sum + (data.tax || 0),
-                              0,
-                            );
-                            return formatCurrency(totalRevenue + totalTax);
+                            // Calculate total customer payment from all transactions
+                            let totalCustomerPayment = 0;
+                            filteredTransactions.forEach((transaction: any) => {
+                              const orderPriceIncludeTax =
+                                transaction.priceIncludeTax === true;
+                              const transactionSubtotal = Number(
+                                transaction.subtotal || 0,
+                              );
+                              const transactionDiscount = Number(
+                                transaction.discount || 0,
+                              );
+                              const transactionTax = Number(
+                                transaction.tax || 0,
+                              );
+                              const transactionTotal = Number(
+                                transaction.total || 0,
+                              );
+
+                              let customerPayment;
+                              if (orderPriceIncludeTax) {
+                                // priceIncludeTax = true: customer payment = total from DB
+                                customerPayment = transactionTotal;
+                              } else {
+                                // priceIncludeTax = false: customer payment = revenue + tax
+                                const revenue = Math.max(
+                                  0,
+                                  transactionSubtotal - transactionDiscount,
+                                );
+                                customerPayment = revenue + transactionTax;
+                              }
+                              totalCustomerPayment += customerPayment;
+                            });
+                            return formatCurrency(totalCustomerPayment);
                           })()}
                         </TableCell>
                         {(() => {
@@ -1665,14 +1773,16 @@ export function SalesChartReport() {
                             const transactionDiscount = Number(
                               transaction.discount || 0,
                             );
-                            const transactionTax = Number(transaction.tax || 0);
+                            const transactionTax = Number(
+                              transaction.tax || 0,
+                            );
                             const transactionTotal = Number(
                               transaction.total || 0,
                             );
 
                             const customerPayment =
                               transaction.priceIncludeTax === true
-                                ? transactionSubtotal + transactionTax
+                                ? transactionTotal
                                 : transactionSubtotal -
                                   transactionDiscount +
                                   transactionTax;
@@ -1855,6 +1965,15 @@ export function SalesChartReport() {
         return false;
       }
 
+      // Apply floor filter
+      const floorMatch =
+        selectedFloor === "all" ||
+        !order.tableId ||
+        !tables ||
+        !Array.isArray(tables) ||
+        tables.find((table: any) => table.id === order.tableId)?.floor ===
+          selectedFloor;
+
       const dateMatch = orderDate >= start && orderDate <= end;
       const statusMatch =
         order.status === "paid" ||
@@ -1943,7 +2062,12 @@ export function SalesChartReport() {
         (order.id && order.id.toString().includes(orderSearch));
 
       return (
-        dateMatch && statusMatch && employeeMatch && customerMatch && orderMatch
+        dateMatch &&
+        statusMatch &&
+        employeeMatch &&
+        customerMatch &&
+        orderMatch &&
+        floorMatch // Add floor match
       );
     });
 
@@ -2478,7 +2602,33 @@ export function SalesChartReport() {
                                   {formatCurrency(item.discount)}
                                 </TableCell>
                                 <TableCell className="text-right text-green-600 font-medium min-w-[120px] px-2">
-                                  {formatCurrency(item.revenue)}
+                                  {(() => {
+                                    const transactionSubtotal = Number(
+                                      item.subtotal || 0,
+                                    );
+                                    const transactionDiscount = Number(
+                                      item.discount || 0,
+                                    );
+
+                                    // Check priceIncludeTax from the order
+                                    const orderPriceIncludeTax =
+                                      order.priceIncludeTax === true;
+
+                                    let doanhThu;
+                                    if (orderPriceIncludeTax) {
+                                      // priceIncludeTax = true: doanh thu = subtotal
+                                      doanhThu = transactionSubtotal;
+                                    } else {
+                                      // priceIncludeTax = false: doanh thu = subtotal - discount
+                                      doanhThu = Math.max(
+                                        0,
+                                        transactionSubtotal -
+                                          transactionDiscount,
+                                      );
+                                    }
+
+                                    return formatCurrency(doanhThu);
+                                  })()}
                                 </TableCell>
                                 <TableCell className="text-right min-w-[100px] px-2">
                                   {(() => {
@@ -2553,6 +2703,9 @@ export function SalesChartReport() {
                       <TableCell className="text-center border-r bg-green-100 min-w-[120px] px-4">
                         TỔNG CỘNG
                       </TableCell>
+                      <TableCell className="text-center border-r bg-green-100 min-w-[150px] px-4">
+                        -
+                      </TableCell>
                       <TableCell className="text-center border-r bg-green-100 min-w-[120px] px-4">
                         {groupedOrders.length} đơn
                       </TableCell>
@@ -2563,9 +2716,6 @@ export function SalesChartReport() {
                         -
                       </TableCell>
                       <TableCell className="text-center border-r bg-blue-100 min-w-[200px] px-4">
-                        -
-                      </TableCell>
-                      <TableCell className="text-center border-r bg-blue-100 min-w-[60px] px-4">
                         -
                       </TableCell>
                       <TableCell className="text-center border-r bg-blue-100 min-w-[100px] px-4">
@@ -2607,7 +2757,7 @@ export function SalesChartReport() {
                       <TableCell className="text-center min-w-[120px] px-4">
                         -
                       </TableCell>
-                      <TableCell className="text-center min-w-[120px] px-4">
+                      <TableCell className="text-center min-w-[100px] px-4">
                         -
                       </TableCell>
                     </TableRow>
@@ -2666,7 +2816,9 @@ export function SalesChartReport() {
                   </button>
                   <button
                     onClick={() =>
-                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                      setCurrentPage((prev) =>
+                        Math.min(prev + 1, totalPages),
+                      )
                     }
                     disabled={currentPage === totalPages}
                     className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
@@ -3025,7 +3177,7 @@ export function SalesChartReport() {
                           {paymentMethodsArray.map(
                             (method: any, index: number) => (
                               <TableHead
-                                key={`payment-method-header-${index}-${method}`}
+                                key={`payment-header-${index}-${method}`}
                                 className="text-center border-r bg-blue-50 min-w-[130px] font-bold"
                               >
                                 {getPaymentMethodLabel(method)}
@@ -3351,15 +3503,12 @@ export function SalesChartReport() {
                           .reduce((sum, item) => sum + item.totalOrders, 0)
                           .toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-right border-r min-w-[140px] px-4">
-                        {formatCurrency(
-                          data.reduce(
-                            (sum, item) => sum + item.totalSubtotal,
-                            0,
-                          ),
-                        )}
+                      <TableCell className="text-center border-r min-w-[130px]">
+                        {data
+                          .reduce((sum, item) => sum + item.totalSubtotal, 0)
+                          .toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-right border-r text-red-600 min-w-[120px] px-4">
+                      <TableCell className="text-right border-r min-w-[140px] px-4">
                         {formatCurrency(
                           data.reduce(
                             (sum, item) => sum + item.totalDiscount,
@@ -3367,100 +3516,102 @@ export function SalesChartReport() {
                           ),
                         )}
                       </TableCell>
+                      {analysisType !== "employee" && (
+                        <TableCell className="text-right border-r text-red-600 min-w-[120px] px-4">
+                          {formatCurrency(
+                            data.reduce(
+                              (sum, customer) => sum + customer.discount,
+                              0,
+                            ),
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right border-r min-w-[120px] px-4">
                         {formatCurrency(
                           data.reduce(
-                            (sum, item) => sum + item.totalRevenue,
+                            (sum, customer) => sum + customer.totalRevenue,
                             0,
                           ),
                         )}
                       </TableCell>
                       <TableCell className="text-right border-r min-w-[120px] px-4">
                         {formatCurrency(
-                          data.reduce((sum, item) => sum + item.totalTax, 0),
+                          data.reduce(
+                            (sum, customer) => sum + customer.totalTax,
+                            0,
+                          ),
                         )}
                       </TableCell>
-                      <TableCell className="text-right border-r text-blue-600 font-bold min-w-[140px] px-4">
+                      <TableCell className="text-right border-r min-w-[120px] px-4">
                         {formatCurrency(
                           data.reduce(
-                            (sum, item) => sum + (Number(item.totalMoney) || 0),
+                            (sum, customer) => sum + customer.totalMoney,
                             0,
                           ),
                         )}
                       </TableCell>
                       {(() => {
-                        // Calculate total payment methods across all employees
+                        // Calculate total payment methods across all dates
                         const totalPaymentMethods: {
                           [method: string]: number;
                         } = {};
+                        filteredCompletedOrders.forEach((transaction: any) => {
+                          const method = transaction.paymentMethod || "cash";
 
-                        data.forEach((employee: any) => {
-                          if (employee.paymentMethods) {
-                            Object.entries(employee.paymentMethods).forEach(
-                              ([method, amount]) => {
-                                totalPaymentMethods[method] =
-                                  (totalPaymentMethods[method] || 0) +
-                                  Number(amount);
-                              },
-                            );
-                          }
+                          const transactionSubtotal = Number(
+                            transaction.subtotal || 0,
+                          );
+                          const transactionDiscount = Number(
+                            transaction.discount || 0,
+                          );
+                          const transactionTax = Number(transaction.tax || 0);
+                          const transactionTotal = Number(
+                            transaction.total || 0,
+                          );
+
+                          const customerPayment =
+                            transaction.priceIncludeTax === true
+                              ? transactionTotal
+                              : transactionSubtotal -
+                                transactionDiscount +
+                                transactionTax;
+
+                          totalPaymentMethods[method] =
+                            (totalPaymentMethods[method] || 0) +
+                            customerPayment;
                         });
 
-                        // Get all unique payment methods from all employee data
+                        // Get all unique payment methods from all completed orders
                         const allPaymentMethods = new Set();
-                        if (data && Array.isArray(data)) {
-                          data.forEach((employee: any) => {
-                            if (
-                              employee.orders &&
-                              Array.isArray(employee.orders)
-                            ) {
-                              employee.orders.forEach((order: any) => {
-                                const method = order.paymentMethod || "cash";
-                                allPaymentMethods.add(method);
-                              });
-                            }
+                        if (
+                          filteredCompletedOrders &&
+                          Array.isArray(filteredCompletedOrders)
+                        ) {
+                          filteredCompletedOrders.forEach((order: any) => {
+                            const method = order.paymentMethod || "cash";
+                            allPaymentMethods.add(method);
                           });
                         }
 
                         const paymentMethodsArray =
                           Array.from(allPaymentMethods).sort();
+                        const grandTotal = Object.values(
+                          totalPaymentMethods,
+                        ).reduce(
+                          (sum: number, amount: number) => sum + amount,
+                          0,
+                        );
 
                         return (
                           <>
                             {paymentMethodsArray.map((method: any) => {
-                              // Calculate total customer payment = total revenue + total tax for this method
-                              let totalCustomerPaymentForMethod = 0;
-                              data.forEach((employee: any) => {
-                                if (
-                                  employee.orders &&
-                                  Array.isArray(employee.orders)
-                                ) {
-                                  employee.orders.forEach((order: any) => {
-                                    if (
-                                      (order.paymentMethod || "cash") === method
-                                    ) {
-                                      const orderRevenue = Math.max(
-                                        0,
-                                        Number(order.subtotal || 0),
-                                      );
-                                      const orderTax = Number(order.tax || 0);
-                                      totalCustomerPaymentForMethod +=
-                                        orderRevenue + orderTax;
-                                    }
-                                  });
-                                }
-                              });
-
+                              const total = totalPaymentMethods[method] || 0;
                               return (
                                 <TableCell
                                   key={method}
                                   className="text-right border-r font-bold text-green-600 min-w-[130px] px-4"
                                 >
-                                  {totalCustomerPaymentForMethod > 0
-                                    ? formatCurrency(
-                                        totalCustomerPaymentForMethod,
-                                      )
-                                    : "-"}
+                                  {total > 0 ? formatCurrency(total) : "-"}
                                 </TableCell>
                               );
                             })}
@@ -3474,7 +3625,7 @@ export function SalesChartReport() {
             </div>
           </div>
 
-          {/* Pagination Controls */}
+          {/* Pagination Controls for Customer Report */}
           {data.length > 0 && (
             <div className="flex items-center justify-between space-x-6 py-4">
               <div className="flex items-center space-x-2">
@@ -3576,12 +3727,21 @@ export function SalesChartReport() {
 
     const filteredOrders = orders.filter((order: any) => {
       const orderDate = new Date(
-        order.createdAt || order.created_at || order.orderedAt,
+        order.orderedAt || order.created_at || order.createdAt,
       );
 
       if (isNaN(orderDate.getTime())) {
         return false;
       }
+
+      // Apply floor filter
+      const floorMatch =
+        selectedFloor === "all" ||
+        !order.tableId ||
+        !tables ||
+        !Array.isArray(tables) ||
+        tables.find((table: any) => table.id === order.tableId)?.floor ===
+          selectedFloor;
 
       const dateMatch = orderDate >= start && orderDate <= end;
 
@@ -3635,7 +3795,13 @@ export function SalesChartReport() {
         order.status === "completed" ||
         order.status === "cancelled";
 
-      return dateMatch && customerMatch && statusMatch && validOrderStatus;
+      return (
+        dateMatch &&
+        customerMatch &&
+        statusMatch &&
+        validOrderStatus &&
+        floorMatch
+      ); // Add floor match
     });
 
     // Calculate customer sales
@@ -3693,7 +3859,7 @@ export function SalesChartReport() {
         customerSales[customerId].totalAmount += orderSubtotal + orderDiscount;
       } else {
         // When priceIncludeTax = false: doanh thu = subtotal - discount
-        orderRevenue = Math.max(0, orderSubtotal);
+        orderRevenue = Math.max(0, orderSubtotal - orderDiscount);
         customerSales[customerId].totalAmount += orderSubtotal - orderDiscount;
       }
       customerSales[customerId].revenue += orderRevenue;
@@ -4290,12 +4456,23 @@ export function SalesChartReport() {
     const validOrders = Array.isArray(orders) ? orders : [];
 
     // Filter orders that are completed, paid, or cancelled
-    const relevantOrders = validOrders.filter(
-      (order: any) =>
-        order.status === "paid" ||
-        order.status === "completed" ||
-        order.status === "cancelled",
-    );
+    const relevantOrders = validOrders.filter((order: any) => {
+      // Apply floor filter
+      const floorMatch =
+        selectedFloor === "all" ||
+        !order.tableId ||
+        !tables ||
+        !Array.isArray(tables) ||
+        tables.find((table: any) => table.id === order.tableId)?.floor ===
+          selectedFloor;
+
+      return (
+        (order.status === "paid" ||
+          order.status === "completed" ||
+          order.status === "cancelled") &&
+        floorMatch
+      );
+    });
 
     console.log("Sales Channel Report Debug:", {
       totalOrders: validOrders.length,
@@ -4621,6 +4798,15 @@ export function SalesChartReport() {
                   return false;
                 }
 
+                // Apply floor filter
+                const floorMatch =
+                  selectedFloor === "all" ||
+                  !order.tableId ||
+                  !tables ||
+                  !Array.isArray(tables) ||
+                  tables.find((table: any) => table.id === order.tableId)
+                    ?.floor === selectedFloor;
+
                 // EXACT same date parsing as dashboard
                 const orderDate = new Date(
                   order.orderedAt ||
@@ -4636,7 +4822,7 @@ export function SalesChartReport() {
 
                 const dateMatch =
                   orderDate >= timeStart && orderDate <= timeEnd;
-                return dateMatch;
+                return dateMatch && floorMatch;
               } catch (error) {
                 console.warn("Error filtering order:", order.id, error);
                 return false;
@@ -4753,6 +4939,15 @@ export function SalesChartReport() {
                 if (order.status !== "completed" && order.status !== "paid")
                   return false;
 
+                // Apply floor filter
+                const floorMatch =
+                  selectedFloor === "all" ||
+                  !order.tableId ||
+                  !tables ||
+                  !Array.isArray(tables) ||
+                  tables.find((table: any) => table.id === order.tableId)
+                    ?.floor === selectedFloor;
+
                 // Try multiple possible date fields (EXACT same as dashboard)
                 const orderDate = new Date(
                   order.orderedAt ||
@@ -4806,7 +5001,7 @@ export function SalesChartReport() {
                       .toLowerCase()
                       .includes(selectedEmployee.toLowerCase()));
 
-                return dateMatch && employeeMatch;
+                return dateMatch && employeeMatch && floorMatch;
               } catch (error) {
                 console.warn(
                   "Error filtering employee order:",
@@ -4892,10 +5087,20 @@ export function SalesChartReport() {
                   return false;
                 }
 
+                // Apply floor filter
+                const floorMatch =
+                  selectedFloor === "all" ||
+                  !order.tableId ||
+                  !tables ||
+                  !Array.isArray(tables) ||
+                  tables.find((table: any) => table.id === order.tableId)
+                    ?.floor === selectedFloor;
+
                 return (
                   orderDate >= custStart &&
                   orderDate <= custEnd &&
-                  order.status === "paid"
+                  order.status === "paid" &&
+                  floorMatch
                 );
               } catch (error) {
                 console.warn(
@@ -4981,6 +5186,15 @@ export function SalesChartReport() {
                 )
                   return false;
 
+                // Apply floor filter
+                const floorMatch =
+                  selectedFloor === "all" ||
+                  !order.tableId ||
+                  !tables ||
+                  !Array.isArray(tables) ||
+                  tables.find((table: any) => table.id === order.tableId)
+                    ?.floor === selectedFloor;
+
                 const orderDate = new Date(
                   order.orderedAt ||
                     order.createdAt ||
@@ -4997,7 +5211,9 @@ export function SalesChartReport() {
                 }
 
                 return (
-                  orderDate >= salesMethodStart && orderDate <= salesMethodEnd
+                  orderDate >= salesMethodStart &&
+                  orderDate <= salesMethodEnd &&
+                  floorMatch
                 );
               } catch (error) {
                 console.warn(
@@ -5098,10 +5314,26 @@ export function SalesChartReport() {
       );
     }
 
-    if (!productAnalysisData || !productAnalysisData.productStats) {
+    if (
+      !productAnalysisData?.productStats ||
+      productAnalysisData.productStats.length === 0
+    ) {
       return (
-        <div className="flex justify-center py-8">
-          <div className="text-gray-500">Không có dữ liệu sản phẩm</div>
+        <div className="text-center py-8">
+          <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            {t("reports.noDataTitle")}
+          </h3>
+          <p className="text-gray-500 max-w-sm mx-auto">
+            📊 {t("reports.noDataDescription")}
+            <br />({formatDate(startDate)} - {formatDate(endDate)})
+            <br />
+            Thử chọn khoảng thời gian khác hoặc kiểm tra dữ liệu đơn hàng và hóa
+            đơn
+          </p>
+          <div className="mt-4 text-sm text-gray-400">
+            Không có dữ liệu sản phẩm
+          </div>
         </div>
       );
     }
@@ -5187,8 +5419,8 @@ export function SalesChartReport() {
               <Table className="w-full min-w-[1000px] xl:min-w-full">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>{t("reports.productCode")}</TableHead>
-                    <TableHead>{t("reports.productName")}</TableHead>
+                    <TableHead>{t("reports.productCode")} </TableHead>
+                    <TableHead> {t("reports.productName")} </TableHead>
                     <TableHead className="text-center">
                       {t("common.unit")}
                     </TableHead>
@@ -5247,12 +5479,12 @@ export function SalesChartReport() {
                             {product.productSku}
                           </button>
                         </TableCell>
-                        <TableCell>{product.productName}</TableCell>
+                        <TableCell> {product.productName} </TableCell>
                         <TableCell className="text-center">
                           {t("common.perUnit")}
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline">{product.quantity}</Badge>
+                          <Badge variant="outline"> {product.quantity} </Badge>
                         </TableCell>
                         <TableCell className="text-right font-semibold">
                           {formatCurrency(
@@ -5316,7 +5548,10 @@ export function SalesChartReport() {
                           (totalRevenue || 0) - (totalDiscount || 0),
                         )}
                       </TableCell>
-                      <TableCell className="text-center font-bold">-</TableCell>
+                      <TableCell className="text-center font-bold">
+                        {" "}
+                        -
+                      </TableCell>
                     </TableRow>
                   )}
                 </TableBody>
@@ -5328,7 +5563,7 @@ export function SalesChartReport() {
           {data.length > 0 && (
             <div className="flex items-center justify-between space-x-6 py-4">
               <div className="flex items-center space-x-2">
-                <p className="text-sm font-medium">{t("common.show")} </p>
+                <p className="text-sm font-medium"> {t("common.show")} </p>
                 <Select
                   value={productPageSize.toString()}
                   onValueChange={(value) => {
@@ -5340,14 +5575,14 @@ export function SalesChartReport() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent side="top">
-                    <SelectItem value="15">15</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="30">30</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="15"> 15 </SelectItem>
+                    <SelectItem value="20"> 20 </SelectItem>
+                    <SelectItem value="30"> 30 </SelectItem>
+                    <SelectItem value="50"> 50 </SelectItem>
+                    <SelectItem value="100"> 100 </SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-sm font-medium"> {t("common.rows")}</p>
+                <p className="text-sm font-medium"> {t("common.rows")} </p>
               </div>
 
               <div className="flex items-center space-x-2">
@@ -5750,7 +5985,7 @@ export function SalesChartReport() {
         <CardContent className="pt-6">
           <div className="space-y-6">
             {/* Main Filter Row */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Analysis Type */}
               <div className="space-y-2">
                 <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
@@ -5772,7 +6007,7 @@ export function SalesChartReport() {
                     }
                   }}
                 >
-                  <SelectTrigger className="h-10 text-sm border-gray-200 hover:border-blue-300 focus:border-blue-500 transition-colors">
+                  <SelectTrigger className="h-10 text-sm border-gray-200 hover:border-blue-300 transition-colors">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -5841,8 +6076,47 @@ export function SalesChartReport() {
                 />
               </div>
 
-              {/* Empty space for balance */}
-              <div className="hidden lg:block"></div>
+              {/* Floor Filter */}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                  {t("tables.floorLabel")}
+                </Label>
+                <Select
+                  value={selectedFloor}
+                  onValueChange={setSelectedFloor}
+                  disabled={tablesLoading}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={tablesLoading ? "Đang tải..." : "Chọn tầng"}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả</SelectItem>
+                    {tablesLoading ? (
+                      <SelectItem value="loading" disabled>
+                        Đang tải dữ liệu...
+                      </SelectItem>
+                    ) : tablesError ? (
+                      <SelectItem value="error" disabled>
+                        Lỗi tải dữ liệu
+                      </SelectItem>
+                    ) : (
+                      getAvailableFloors().map((floor) => (
+                        <SelectItem key={floor} value={floor}>
+                          {floor}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {tablesError && (
+                  <p className="text-xs text-red-500 mt-1">
+                    Không thể tải dữ liệu tầng
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 

@@ -19,6 +19,7 @@ import AttendancePage from "@/pages/attendance";
 import AttendanceQRPage from "./pages/attendance-qr";
 import CustomerDisplay from "@/pages/customer-display";
 import SalesOrders from "@/pages/sales-orders";
+import CashBookPage from "./pages/cash-book";
 import NotFoundPage from "./pages/not-found";
 
 function Router({ onLogout }: { onLogout: () => void }) {
@@ -89,6 +90,7 @@ function Router({ onLogout }: { onLogout: () => void }) {
       />
       <Route path="/customer-display" component={CustomerDisplay} />
       <Route path="/sales-orders" component={SalesOrders} />
+      <Route path="/cash-book" component={() => <CashBookPage onLogout={onLogout} />} />
       <Route path="*" component={NotFoundPage} />
     </Switch>
   );

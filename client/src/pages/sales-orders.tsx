@@ -69,6 +69,7 @@ interface Invoice {
   customerCode?: string; // Added missing customerCode field
   paymentStatus?: string; // Added missing paymentStatus field
   exactDiscount?: string; // Added missing exactDiscount field
+  priceIncludeTax?: boolean; // Added priceIncludeTax field
 }
 
 interface InvoiceItem {
@@ -80,6 +81,8 @@ interface InvoiceItem {
   unitPrice: string;
   total: string;
   taxRate: string;
+  discount?: string; // Added discount field
+  sku?: string; // Added sku field
 }
 
 interface Order {
@@ -113,6 +116,7 @@ interface Order {
   displayNumber?: string;
   displayStatus?: number;
   discount?: string; // Added discount field
+  priceIncludeTax?: boolean; // Added priceIncludeTax field
 }
 
 // Helper function to safely determine item type
@@ -386,7 +390,11 @@ export default function SalesOrders() {
           results.push({ orderId, success: true });
         } catch (error) {
           console.error(`Error canceling order ${orderId}:`, error);
-          results.push({ orderId, success: false, error: (error as Error).message });
+          results.push({
+            orderId,
+            success: false,
+            error: (error as Error).message,
+          });
         }
       }
       return results;
@@ -605,7 +613,12 @@ export default function SalesOrders() {
     },
   });
 
-  const getPaymentMethodName = (method: number | string) => {
+  const getPaymentMethodName = (method: number | string | null) => {
+    // Handle null/undefined cases explicitly
+    if (method === null || method === undefined) {
+      return "Chưa thanh toán";
+    }
+    
     switch (method) {
       case 1:
       case "cash":
@@ -615,8 +628,6 @@ export default function SalesOrders() {
       case "debitCard":
         return "Chuyển khoản";
       case 3:
-        return "TM/CK";
-      case 4:
       case "qrCode":
       case "momo":
       case "zalopay":
@@ -694,7 +705,8 @@ export default function SalesOrders() {
           statusColors[status as keyof typeof statusColors] || statusColors[0]
         }
       >
-        {statusLabels[status as keyof typeof statusColors] || t("common.einvoiceStatus.notPublished")}
+        {statusLabels[status as keyof typeof statusColors] ||
+          t("common.einvoiceStatus.notPublished")}
       </Badge>
     );
   };
@@ -768,6 +780,7 @@ export default function SalesOrders() {
         notes: order.notes || "",
         createdAt: order.orderedAt, // Use orderedAt as createdAt
         discount: order.discount || "0", // Map discount field
+        priceIncludeTax: order.priceIncludeTax || false, // Map priceIncludeTax field
       }))
     : [];
 
@@ -1452,8 +1465,12 @@ export default function SalesOrders() {
                             </tr>
                           ) : (
                             filteredInvoices.map((item) => {
-                              const customerCode = item.customerCode || item.customerTaxCode || `KH000${String(item.id).padStart(3, "0")}`;
-                              const customerName = item.customerName || "Khách hàng lẻ";
+                              const customerCode =
+                                item.customerCode ||
+                                item.customerTaxCode ||
+                                `KH000${String(item.id).padStart(3, "0")}`;
+                              const customerName =
+                                item.customerName || "Khách hàng lẻ";
                               const discount = parseFloat(item.discount || "0");
                               const tax = parseFloat(item.tax || "0");
                               const subtotal = parseFloat(item.subtotal || "0");
@@ -1579,7 +1596,7 @@ export default function SalesOrders() {
                                     <td className="px-3 py-3 text-right">
                                       <div className="text-sm font-medium">
                                         {formatCurrency(
-                                          parseFloat(item.total || "0")
+                                          parseFloat(item.total || "0"),
                                         )}
                                       </div>
                                     </td>
@@ -1652,7 +1669,8 @@ export default function SalesOrders() {
                                                                 onChange={(e) =>
                                                                   updateEditableInvoiceField(
                                                                     "orderNumber",
-                                                                    e.target.value,
+                                                                    e.target
+                                                                      .value,
                                                                   )
                                                                 }
                                                                 className="w-32"
@@ -1671,19 +1689,23 @@ export default function SalesOrders() {
                                                               <Input
                                                                 type="date"
                                                                 value={
-                                                                  editableInvoice.orderedAt?.split("T")[0] ||
-                                                                  ""
+                                                                  editableInvoice.orderedAt?.split(
+                                                                    "T",
+                                                                  )[0] || ""
                                                                 }
                                                                 onChange={(e) =>
                                                                   updateEditableInvoiceField(
                                                                     "orderedAt",
-                                                                    e.target.value,
+                                                                    e.target
+                                                                      .value,
                                                                   )
                                                                 }
                                                                 className="w-32"
                                                               />
                                                             ) : (
-                                                              formatDate(selectedInvoice.orderedAt)
+                                                              formatDate(
+                                                                selectedInvoice.orderedAt,
+                                                              )
                                                             )}
                                                           </td>
                                                           <td className="py-1 pr-4 font-medium whitespace-nowrap">
@@ -1700,7 +1722,8 @@ export default function SalesOrders() {
                                                                 onChange={(e) =>
                                                                   updateEditableInvoiceField(
                                                                     "customerName",
-                                                                    e.target.value,
+                                                                    e.target
+                                                                      .value,
                                                                   )
                                                                 }
                                                                 className="w-40"
@@ -1724,7 +1747,8 @@ export default function SalesOrders() {
                                                                 onChange={(e) =>
                                                                   updateEditableInvoiceField(
                                                                     "customerPhone",
-                                                                    e.target.value,
+                                                                    e.target
+                                                                      .value,
                                                                   )
                                                                 }
                                                                 className="w-32"
@@ -1735,16 +1759,30 @@ export default function SalesOrders() {
                                                             )}
                                                           </td>
                                                           <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                            Phương thức thanh toán:
+                                                          </td>
+                                                          <td className="py-1 pr-6">
+                                                            {getPaymentMethodName(
+                                                              selectedInvoice.paymentMethod
+                                                            )}
+                                                          </td>
+                                                          <td className="py-1 pr-4 font-medium whitespace-nowrap">
                                                             Trạng thái:
                                                           </td>
                                                           <td className="py-1">
                                                             {(() => {
-                                                              const statusLabels = {
-                                                                1: "Hoàn thành",
-                                                                2: "Đang phục vụ", 
-                                                                3: "Đã hủy"
-                                                              };
-                                                              return statusLabels[selectedInvoice.displayStatus] || "Đang phục vụ";
+                                                              const statusLabels =
+                                                                {
+                                                                  1: "Hoàn thành",
+                                                                  2: "Đang phục vụ",
+                                                                  3: "Đã hủy",
+                                                                };
+                                                              return (
+                                                                statusLabels[
+                                                                  selectedInvoice
+                                                                    .displayStatus
+                                                                ] || "Đang phục vụ"
+                                                              );
                                                             })()}
                                                           </td>
                                                         </tr>
@@ -1760,11 +1798,28 @@ export default function SalesOrders() {
                                                           </td>
                                                           <td className="py-1 pr-6">
                                                             {(() => {
-                                                              const salesChannel = selectedInvoice.salesChannel;
-                                                              if (salesChannel === "table") return "Ăn tại chỗ";
-                                                              if (salesChannel === "pos") return "Bán tại quầy";
-                                                              if (salesChannel === "online") return "Bán online";
-                                                              if (salesChannel === "delivery") return "Giao hàng";
+                                                              const salesChannel =
+                                                                selectedInvoice.salesChannel;
+                                                              if (
+                                                                salesChannel ===
+                                                                "table"
+                                                              )
+                                                                return "Ăn tại chỗ";
+                                                              if (
+                                                                salesChannel ===
+                                                                "pos"
+                                                              )
+                                                                return "Bán tại quầy";
+                                                              if (
+                                                                salesChannel ===
+                                                                "online"
+                                                              )
+                                                                return "Bán online";
+                                                              if (
+                                                                salesChannel ===
+                                                                "delivery"
+                                                              )
+                                                                return "Giao hàng";
                                                               return "Ăn tại chỗ";
                                                             })()}
                                                           </td>
@@ -1772,7 +1827,9 @@ export default function SalesOrders() {
                                                             Bàn:
                                                           </td>
                                                           <td className="py-1 pr-6">
-                                                            {selectedInvoice.salesChannel === "table" && selectedInvoice.tableId
+                                                            {selectedInvoice.salesChannel ===
+                                                              "table" &&
+                                                            selectedInvoice.tableId
                                                               ? `Bàn ${selectedInvoice.tableId}`
                                                               : "-"}
                                                           </td>
@@ -1790,13 +1847,15 @@ export default function SalesOrders() {
                                                                 onChange={(e) =>
                                                                   updateEditableInvoiceField(
                                                                     "symbol",
-                                                                    e.target.value,
+                                                                    e.target
+                                                                      .value,
                                                                   )
                                                                 }
                                                                 className="w-24"
                                                               />
                                                             ) : (
-                                                              selectedInvoice.symbol || "-"
+                                                              selectedInvoice.symbol ||
+                                                              "-"
                                                             )}
                                                           </td>
                                                           <td className="py-1 pr-4 font-medium whitespace-nowrap">
@@ -1813,7 +1872,8 @@ export default function SalesOrders() {
                                                                 onChange={(e) =>
                                                                   updateEditableInvoiceField(
                                                                     "invoiceNumber",
-                                                                    e.target.value,
+                                                                    e.target
+                                                                      .value,
                                                                   )
                                                                 }
                                                                 className="w-32"
@@ -1821,7 +1881,9 @@ export default function SalesOrders() {
                                                             ) : (
                                                               selectedInvoice.invoiceNumber ||
                                                               selectedInvoice.orderNumber ||
-                                                              String(selectedInvoice.id).padStart(8, "0")
+                                                              String(
+                                                                selectedInvoice.id,
+                                                              ).padStart(8, "0")
                                                             )}
                                                           </td>
                                                           <td className="py-1 pr-4 font-medium whitespace-nowrap">
@@ -1829,20 +1891,27 @@ export default function SalesOrders() {
                                                           </td>
                                                           <td className="py-1">
                                                             {(() => {
-                                                              const statusLabels = {
-                                                                0: "Chưa phát hành",
-                                                                1: "Đã phát hành",
-                                                                2: "Tạo nháp",
-                                                                3: "Đã duyệt",
-                                                                4: "Đã bị thay thế (hủy)",
-                                                                5: "Thay thế tạm",
-                                                                6: "Thay thế",
-                                                                7: "Đã bị điều chỉnh",
-                                                                8: "Điều chỉnh tạm",
-                                                                9: "Điều chỉnh",
-                                                                10: "Đã hủy"
-                                                              };
-                                                              return statusLabels[selectedInvoice.einvoiceStatus || 0] || "Chưa phát hành";
+                                                              const statusLabels =
+                                                                {
+                                                                  0: "Chưa phát hành",
+                                                                  1: "Đã phát hành",
+                                                                  2: "Tạo nháp",
+                                                                  3: "Đã duyệt",
+                                                                  4: "Đã bị thay thế (hủy)",
+                                                                  5: "Thay thế tạm",
+                                                                  6: "Thay thế",
+                                                                  7: "Đã bị điều chỉnh",
+                                                                  8: "Điều chỉnh tạm",
+                                                                  9: "Điều chỉnh",
+                                                                  10: "Đã hủy",
+                                                                };
+                                                              return (
+                                                                statusLabels[
+                                                                  selectedInvoice.einvoiceStatus ||
+                                                                    0
+                                                                ] ||
+                                                                "Chưa phát hành"
+                                                              );
                                                             })()}
                                                           </td>
                                                         </tr>
@@ -1863,7 +1932,7 @@ export default function SalesOrders() {
                                                       <div className="col-span-2">
                                                         {t("common.itemCode")}
                                                       </div>
-                                                      <div className="col-span-3">
+                                                      <div className="col-span-2">
                                                         {t("common.itemName")}
                                                       </div>
                                                       <div className="col-span-1">
@@ -1876,15 +1945,20 @@ export default function SalesOrders() {
                                                         {t("common.unitPrice")}
                                                       </div>
                                                       <div className="col-span-1">
-                                                        {t("reports.discount")}
-                                                      </div>
-                                                      <div className="col-span-1">
                                                         {t(
                                                           "common.subtotalAmount",
                                                         )}
                                                       </div>
                                                       <div className="col-span-1">
+                                                        {t("reports.discount")}
+                                                      </div>
+                                                      <div className="col-span-1">
                                                         {t("common.taxVAT")}
+                                                      </div>
+                                                      <div className="col-span-1">
+                                                        {t(
+                                                          "common.totalAmount",
+                                                        )}
                                                       </div>
                                                     </div>
                                                     {(() => {
@@ -1907,135 +1981,76 @@ export default function SalesOrders() {
                                                         ) => (
                                                           <div
                                                             key={item.id}
-                                                            className="grid grid-cols-12 gap-2 text-xs p-2 border-t"
+                                                            className="grid grid-cols-12 gap-2 text-xs p-2 border-t hover:bg-gray-50"
                                                           >
-                                                            <div className="col-span-1">
+                                                            <div className="col-span-1 text-center py-1">
                                                               {index + 1}
                                                             </div>
-                                                            <div className="col-span-2">
-                                                              SP
-                                                              {String(
-                                                                item.productId,
-                                                              ).padStart(
-                                                                3,
-                                                                "0",
-                                                              )}
+                                                            <div className="col-span-2 text-left py-1">
+                                                              SP{String(item.productId).padStart(3, "0")}
                                                             </div>
-                                                            <div className="col-span-3">
+                                                            <div className="col-span-2 text-left py-1 truncate" title={item.productName}>
                                                               {item.productName}
                                                             </div>
-                                                            <div className="col-span-1">
+                                                            <div className="col-span-1 text-center py-1">
                                                               Cái
                                                             </div>
-                                                            <div className="col-span-1">
+                                                            <div className="col-span-1 text-center py-1">
                                                               {item.quantity}
                                                             </div>
-                                                            <div className="col-span-1">
-                                                              {formatCurrency(
-                                                                item.unitPrice,
-                                                              )}
+                                                            <div className="col-span-1 text-right py-1">
+                                                              {formatCurrency(item.unitPrice)}
                                                             </div>
-                                                            <div className="col-span-1 text-red-600">
-                                                              -
-                                                              {formatCurrency(
-                                                                item.discount,
-                                                              )}
-                                                            </div>
-                                                            <div className="col-span-1">
+                                                            <div className="col-span-1 text-right py-1">
                                                               {(() => {
-                                                                const unitPrice =
-                                                                  parseFloat(
-                                                                    item.unitPrice ||
-                                                                      "0",
-                                                                  );
-                                                                const quantity =
-                                                                  parseInt(
-                                                                    item.quantity ||
-                                                                      "0",
-                                                                  );
-                                                                const discount =
-                                                                  parseFloat(
-                                                                    item.discount ||
-                                                                      "0",
-                                                                  );
-                                                                const total =
-                                                                  unitPrice *
-                                                                    quantity -
-                                                                  discount;
-                                                                return formatCurrency(
-                                                                  total.toString(),
-                                                                );
+                                                                const unitPrice = parseFloat(item.unitPrice || "0");
+                                                                const quantity = parseInt(item.quantity || "0");
+                                                                const total = unitPrice * quantity;
+                                                                return formatCurrency(total.toString());
                                                               })()}
                                                             </div>
-                                                            <div className="col-span-1">
-                                                              {(() => {
-                                                                // Calculate tax using the same logic as other components
-                                                                const unitPrice =
-                                                                  parseFloat(
-                                                                    item.unitPrice ||
-                                                                      "0",
-                                                                  );
-                                                                const quantity =
-                                                                  parseInt(
-                                                                    item.quantity ||
-                                                                      "0",
-                                                                  );
-
-                                                                // Find the product to get afterTaxPrice and taxRate
-                                                                const product =
-                                                                  products.find(
-                                                                    (p: any) =>
-                                                                      p.id ===
-                                                                      item.productId,
-                                                                  );
-                                                                let taxAmount = 0;
-
-                                                                if (
-                                                                  product?.afterTaxPrice &&
-                                                                  product.afterTaxPrice !==
-                                                                    null &&
-                                                                  product.afterTaxPrice !==
-                                                                    ""
-                                                                ) {
-                                                                  // Use afterTaxPrice method: tax = (afterTaxPrice - unitPrice) * quantity
-                                                                  const afterTaxPrice =
-                                                                    parseFloat(
-                                                                      product.afterTaxPrice,
-                                                                    );
-                                                                  const taxPerUnit =
-                                                                    Math.max(
-                                                                      0,
-                                                                      afterTaxPrice -
-                                                                        unitPrice,
-                                                                    );
-                                                                  taxAmount =
-                                                                    taxPerUnit *
-                                                                    quantity;
-                                                                } else if (
-                                                                  product?.taxRate &&
-                                                                  parseFloat(
-                                                                    product.taxRate,
-                                                                  ) > 0
-                                                                ) {
-                                                                  // Use taxRate method: tax = (unitPrice * taxRate/100) * quantity
-                                                                  const taxRate =
-                                                                    parseFloat(
-                                                                      product.taxRate,
-                                                                    );
-                                                                  taxAmount =
-                                                                    ((unitPrice *
-                                                                      taxRate) /
-                                                                      100) *
-                                                                    quantity;
-                                                                }
-
-                                                                return formatCurrency(
-                                                                  Math.floor(
-                                                                    taxAmount,
-                                                                  ),
-                                                                );
-                                                              })()}
+                                                            <div className="col-span-1 text-right text-red-600 py-1">
+                                                              -{formatCurrency(item.discount || "0")}
                                                             </div>
+                                                            {(() => {
+                                                              // Calculate tax using the same logic as other components
+                                                              let unitPrice = parseFloat(item.unitPrice || "0");
+                                                              let quantity = parseInt(item.quantity || "0");
+                                                              let discount = parseFloat(item.discount || "0");
+
+                                                              // Find the product to get afterTaxPrice and taxRate
+                                                              const product = products.find((p: any) => p.id === item.productId);
+                                                              let taxAmount = 0;
+
+                                                              if (
+                                                                product?.afterTaxPrice &&
+                                                                product.afterTaxPrice !== null &&
+                                                                product.afterTaxPrice !== ""
+                                                              ) {
+                                                                // Use afterTaxPrice method: tax = (afterTaxPrice - unitPrice) * quantity
+                                                                const afterTaxPrice = parseFloat(product.afterTaxPrice);
+                                                                const taxPerUnit = Math.max(0, afterTaxPrice - unitPrice);
+                                                                taxAmount = taxPerUnit * quantity;
+                                                              } else if (
+                                                                product?.taxRate &&
+                                                                parseFloat(product.taxRate) > 0
+                                                              ) {
+                                                                // Use taxRate method: tax = (unitPrice * taxRate/100) * quantity
+                                                                const taxRate = parseFloat(product.taxRate);
+                                                                taxAmount = ((unitPrice * taxRate) / 100) * quantity;
+                                                              }
+
+                                                              return (
+                                                                <>
+                                                                  <div className="col-span-1 text-right py-1">
+                                                                    {formatCurrency(Math.floor(taxAmount))}
+                                                                  </div>
+                                                                  <div className="col-span-1 text-right font-medium py-1">
+                                                                    {formatCurrency(Math.floor(unitPrice * quantity - discount + taxAmount))}
+                                                                  </div>
+                                                                </>
+                                                              );
+                                                            })()}
                                                           </div>
                                                         ),
                                                       );
@@ -2047,23 +2062,27 @@ export default function SalesOrders() {
                                                   <div className="grid grid-cols-2 gap-4 text-sm">
                                                     <div className="space-y-2">
                                                       {(() => {
-                                                        const subtotal =
-                                                          parseFloat(
-                                                            selectedInvoice.subtotal ||
-                                                              "0",
-                                                          );
-                                                        const tax = parseFloat(
-                                                          selectedInvoice.tax ||
-                                                            "0",
-                                                        );
+                                                        // Calculate correct amounts based on priceIncludeTax
+                                                        const priceIncludeTax = selectedInvoice.priceIncludeTax;
+                                                        const storedSubtotal = parseFloat(selectedInvoice.subtotal || "0");
+                                                        const storedTax = parseFloat(selectedInvoice.tax || "0");
+                                                        const storedDiscount = parseFloat(selectedInvoice.discount || "0");
 
-                                                       const discount =  parseFloat(
-                                                          selectedInvoice.discount ||
-                                                            "0",
-                                                        );
+                                                        let thanhTien, tax, subtotal;
 
-                                                        const totalPayment =
-                                                          subtotal + tax + discount;
+                                                        if (priceIncludeTax) {
+                                                          // priceIncludeTax = true: thành tiền = subtotal (price / (1 + taxRate))
+                                                          thanhTien = storedSubtotal;
+                                                          tax = storedTax;
+                                                          subtotal = storedSubtotal;
+                                                        } else {
+                                                          // priceIncludeTax = false: thành tiền = subtotal (price * quantity)
+                                                          thanhTien = storedSubtotal;
+                                                          tax = storedTax;
+                                                          subtotal = storedSubtotal;
+                                                        }
+
+                                                        const totalPayment = parseFloat(selectedInvoice.total || "0");
                                                         return (
                                                           <>
                                                             <div className="flex justify-between">
@@ -2087,17 +2106,11 @@ export default function SalesOrders() {
                                                                 :
                                                               </span>
                                                               <span className="font-bold">
-                                                                {formatCurrency(
-                                                                  subtotal,
-                                                                )}
+                                                                {formatCurrency(thanhTien)}
                                                               </span>
                                                             </div>
                                                             {(() => {
-                                                              const discountAmount =
-                                                                parseFloat(
-                                                                  selectedInvoice.discount ||
-                                                                    "0",
-                                                                );
+                                                              const discountAmount = storedDiscount;
                                                               return discountAmount >
                                                                 0 ? (
                                                                 <div className="flex justify-between text-red-600">
@@ -2142,14 +2155,31 @@ export default function SalesOrders() {
                                                             "paid" ||
                                                           selectedInvoice.paymentStatus ===
                                                             "paid";
-                                                        
+
                                                         // Calculate the actual total amount (subtotal + tax - discount)
-                                                        const subtotal = parseFloat(selectedInvoice.subtotal || "0");
-                                                        const tax = parseFloat(selectedInvoice.tax || "0");
-                                                        const discount = parseFloat(selectedInvoice.discount || "0");
-                                                        const totalAmount = Math.max(0, subtotal + tax);
-                                                        
-                                                        let paidAmount = isPaid ? totalAmount : 0;
+                                                        const subtotal =
+                                                          parseFloat(
+                                                            selectedInvoice.subtotal ||
+                                                              "0",
+                                                          );
+                                                        const tax = parseFloat(
+                                                          selectedInvoice.tax ||
+                                                            "0",
+                                                        );
+                                                        const discount =
+                                                          parseFloat(
+                                                            selectedInvoice.discount ||
+                                                              "0",
+                                                          );
+                                                        const totalAmount =
+                                                          Math.max(
+                                                            0,
+                                                            subtotal + tax,
+                                                          );
+
+                                                        let paidAmount = isPaid
+                                                          ? totalAmount
+                                                          : 0;
                                                         const paymentMethod =
                                                           selectedInvoice.paymentMethod;
 
@@ -2217,6 +2247,16 @@ export default function SalesOrders() {
                                                                       paidAmount,
                                                                     )
                                                                   : "0"}
+                                                              </span>
+                                                            </div>
+                                                            <div className="flex justify-between border-t pt-2 mt-2">
+                                                              <span className="font-semibold">
+                                                                Phương thức thanh toán:
+                                                              </span>
+                                                              <span className="font-bold text-blue-600">
+                                                                {getPaymentMethodName(
+                                                                  selectedInvoice.paymentMethod
+                                                                )}
                                                               </span>
                                                             </div>
                                                           </>

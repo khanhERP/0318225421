@@ -8,6 +8,7 @@ import {
   boolean,
   varchar,
   date,
+  numeric, // Import numeric
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { relations, sql } from "drizzle-orm";
@@ -256,7 +257,7 @@ export const insertProductSchema = createInsertSchema(products)
   })
   .extend({
     price: z.union([z.string(), z.number()]).refine((val) => {
-      const numVal = typeof val === 'string' ? 
+      const numVal = typeof val === 'string' ?
         parseInt(val.replace(/[^0-9]/g, '')) : val;
       return !isNaN(numVal) && numVal > 0 && numVal < 100000000;
     }, {
@@ -282,7 +283,7 @@ export const insertProductSchema = createInsertSchema(products)
         (val) => {
           if (!val || val === null || val === undefined) return true;
           if (typeof val === 'string' && val.trim() === "") return true;
-          const numVal = typeof val === 'string' ? 
+          const numVal = typeof val === 'string' ?
             parseInt(val.replace(/[^0-9]/g, '')) : val;
           return !isNaN(numVal) && numVal > 0;
         },
@@ -930,3 +931,46 @@ export type InventoryTransaction = typeof inventoryTransactions.$inferSelect;
 export type InsertInventoryTransaction = z.infer<
   typeof insertInventoryTransactionSchema
 >;
+
+// Purchase orders table
+export const purchaseOrders = pgTable('purchase_orders', {
+  id: serial('id').primaryKey(),
+  orderNumber: varchar('order_number', { length: 50 }).notNull(),
+  supplierId: integer('supplier_id').references(() => suppliers.id),
+  status: varchar('status', { length: 20 }).default('pending'),
+  expectedDeliveryDate: timestamp('expected_delivery_date'),
+  notes: text('notes'),
+  total: numeric('total', { precision: 10, scale: 2 }).default('0'),
+  createdAt: timestamp('created_at').default(sql`now()`),
+  updatedAt: timestamp('updated_at').default(sql`now()`)
+});
+
+// Income vouchers table
+export const incomeVouchers = pgTable('income_vouchers', {
+  id: serial('id').primaryKey(),
+  voucherNumber: varchar('voucher_number', { length: 50 }).notNull(),
+  date: varchar('date', { length: 10 }).notNull(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+  account: varchar('account', { length: 50 }).notNull(),
+  recipient: varchar('recipient', { length: 255 }).notNull(),
+  phone: varchar('phone', { length: 20 }),
+  category: varchar('category', { length: 50 }).notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at').default(sql`now()`),
+  updatedAt: timestamp('updated_at').default(sql`now()`)
+});
+
+// Expense vouchers table
+export const expenseVouchers = pgTable('expense_vouchers', {
+  id: serial('id').primaryKey(),
+  voucherNumber: varchar('voucher_number', { length: 50 }).notNull(),
+  date: varchar('date', { length: 10 }).notNull(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+  account: varchar('account', { length: 50 }).notNull(),
+  recipient: varchar('recipient', { length: 255 }).notNull(),
+  phone: varchar('phone', { length: 20 }),
+  category: varchar('category', { length: 50 }).notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at').default(sql`now()`),
+  updatedAt: timestamp('updated_at').default(sql`now()`)
+});
