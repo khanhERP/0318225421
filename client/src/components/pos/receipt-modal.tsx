@@ -198,7 +198,6 @@ export function ReceiptModal({
       alert(
         "Bạn chưa thiết lập cài đặt máy in. Vui lòng liên hệ với edpos để được hỗ trợ.",
       );
-      onClose();
     }
   };
 
@@ -349,7 +348,6 @@ export function ReceiptModal({
       if (printContent) {
         handleDesktopPrint(printContent);
       }
-      onClose();
     }
   };
 
@@ -931,8 +929,11 @@ export function ReceiptModal({
       );
     }
 
-    // Close the modal
-    onClose();
+    window.dispatchEvent(
+      new CustomEvent("printCompleted", {
+        detail: { closeAllModals: true, refreshData: true },
+      }),
+    );
   };
 
   // Use stored values directly from receipt data
@@ -1507,6 +1508,7 @@ export function ReceiptModal({
               return [];
             }
           })()}
+          orderId={receipt?.id}
         />
       )}
     </Dialog>

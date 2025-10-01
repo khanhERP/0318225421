@@ -535,7 +535,10 @@ export function EInvoiceModal({
       } else {
         // Calculate discount from cart items if available
         calculatedDiscount = cartItems.reduce((sum, item) => {
-          const itemDiscount = typeof item.discount === "string" ? parseFloat(item.discount || "0") : (item.discount || 0);
+          const itemDiscount =
+            typeof item.discount === "string"
+              ? parseFloat(item.discount || "0")
+              : item.discount || 0;
           return sum + itemDiscount;
         }, 0);
       }
@@ -544,113 +547,131 @@ export function EInvoiceModal({
       const priceIncludeTax = orderData?.priceIncludeTax ?? false;
 
       cartItems.forEach((item, index) => {
-          const itemPrice =
-            typeof item.price === "string"
-              ? parseFloat(item.price)
-              : item.price;
-          const itemQuantity =
-            typeof item.quantity === "string"
-              ? parseInt(item.quantity)
-              : item.quantity;
-          const product = products?.find((p: any) => p.id === item.id);
-          const itemTaxRate = product?.taxRate ? parseFloat(product.taxRate) : 0;
+        const itemPrice =
+          typeof item.price === "string" ? parseFloat(item.price) : item.price;
+        const itemQuantity =
+          typeof item.quantity === "string"
+            ? parseInt(item.quantity)
+            : item.quantity;
+        const product = products?.find((p: any) => p.id === item.id);
+        const itemTaxRate = product?.taxRate ? parseFloat(product.taxRate) : 0;
 
-          // Calculate discount for this item (same logic as main publish)
-          let itemDiscountAmount = 0;
-          if (calculatedDiscount > 0) {
-            const totalBeforeDiscount = cartItems.reduce((total, cartItem) => {
-              const cartItemPrice = typeof cartItem.price === "string" ? parseFloat(cartItem.price) : cartItem.price;
-              const cartItemQuantity = typeof cartItem.quantity === "string" ? parseInt(cartItem.quantity) : cartItem.quantity;
-              return total + (cartItemPrice * cartItemQuantity);
-            }, 0);
+        // Calculate discount for this item (same logic as main publish)
+        let itemDiscountAmount = 0;
+        if (calculatedDiscount > 0) {
+          const totalBeforeDiscount = cartItems.reduce((total, cartItem) => {
+            const cartItemPrice =
+              typeof cartItem.price === "string"
+                ? parseFloat(cartItem.price)
+                : cartItem.price;
+            const cartItemQuantity =
+              typeof cartItem.quantity === "string"
+                ? parseInt(cartItem.quantity)
+                : cartItem.quantity;
+            return total + cartItemPrice * cartItemQuantity;
+          }, 0);
 
-            const isLastItem = index === cartItems.length - 1;
+          const isLastItem = index === cartItems.length - 1;
 
-            if (isLastItem) {
-              let previousDiscounts = 0;
-              for (let i = 0; i < cartItems.length - 1; i++) {
-                const prevItem = cartItems[i];
-                const prevItemPrice = typeof prevItem.price === "string" ? parseFloat(prevItem.price) : prevItem.price;
-                const prevItemQuantity = typeof prevItem.quantity === "string" ? parseInt(prevItem.quantity) : prevItem.quantity;
-                const prevItemTotal = prevItemPrice * prevItemQuantity;
-                const prevItemDiscount =
-                  totalBeforeDiscount > 0
-                    ? Math.round((calculatedDiscount * prevItemTotal) / totalBeforeDiscount)
-                    : 0;
-                previousDiscounts += prevItemDiscount;
-              }
-              itemDiscountAmount = calculatedDiscount - previousDiscounts;
-            } else {
-              const itemTotal = itemPrice * itemQuantity;
-              itemDiscountAmount =
+          if (isLastItem) {
+            let previousDiscounts = 0;
+            for (let i = 0; i < cartItems.length - 1; i++) {
+              const prevItem = cartItems[i];
+              const prevItemPrice =
+                typeof prevItem.price === "string"
+                  ? parseFloat(prevItem.price)
+                  : prevItem.price;
+              const prevItemQuantity =
+                typeof prevItem.quantity === "string"
+                  ? parseInt(prevItem.quantity)
+                  : prevItem.quantity;
+              const prevItemTotal = prevItemPrice * prevItemQuantity;
+              const prevItemDiscount =
                 totalBeforeDiscount > 0
-                  ? Math.round((calculatedDiscount * itemTotal) / totalBeforeDiscount)
+                  ? Math.round(
+                      (calculatedDiscount * prevItemTotal) /
+                        totalBeforeDiscount,
+                    )
                   : 0;
+              previousDiscounts += prevItemDiscount;
             }
+            itemDiscountAmount = calculatedDiscount - previousDiscounts;
+          } else {
+            const itemTotal = itemPrice * itemQuantity;
+            itemDiscountAmount =
+              totalBeforeDiscount > 0
+                ? Math.round(
+                    (calculatedDiscount * itemTotal) / totalBeforeDiscount,
+                  )
+                : 0;
           }
+        }
 
-          let itemSubtotal = 0;
+        let itemSubtotal = 0;
 
-          if (priceIncludeTax && itemTaxRate > 0) {
-            // When priceIncludeTax = true: use beforeTaxPrice or calculate from formula (same as sales-orders)
+        if (priceIncludeTax && itemTaxRate > 0) {
+          // When priceIncludeTax = true: use beforeTaxPrice or calculate from formula (same as sales-orders)
+          if (
+            product?.beforeTaxPrice &&
+            product.beforeTaxPrice !== null &&
+            product.beforeTaxPrice !== ""
+          ) {
+            const beforeTaxPrice = parseFloat(product.beforeTaxPrice);
+            itemSubtotal = beforeTaxPrice * itemQuantity;
+          } else {
+            // Fallback: calculate using sales-orders formula
+            const taxRate = itemTaxRate / 100;
+            const giaGomThue = itemPrice * itemQuantity;
+            const tamTinh = Math.round(giaGomThue / (1 + taxRate));
+            itemSubtotal = tamTinh;
+          }
+        } else {
+          // When priceIncludeTax = false: use base price as subtotal (same as sales-orders)
+          itemSubtotal = itemPrice * itemQuantity;
+        }
+
+        // Calculate tax using EXACT same logic as sales-orders
+        let itemTax = 0;
+        if (itemTaxRate > 0) {
+          if (priceIncludeTax) {
             if (
               product?.beforeTaxPrice &&
               product.beforeTaxPrice !== null &&
               product.beforeTaxPrice !== ""
             ) {
               const beforeTaxPrice = parseFloat(product.beforeTaxPrice);
-              itemSubtotal = beforeTaxPrice * itemQuantity;
+              itemTax = Math.max(
+                0,
+                (itemPrice - beforeTaxPrice) * itemQuantity,
+              );
             } else {
-              // Fallback: calculate using sales-orders formula
               const taxRate = itemTaxRate / 100;
               const giaGomThue = itemPrice * itemQuantity;
               const tamTinh = Math.round(giaGomThue / (1 + taxRate));
-              itemSubtotal = tamTinh;
+              itemTax = giaGomThue - tamTinh;
             }
           } else {
-            // When priceIncludeTax = false: use base price as subtotal (same as sales-orders)
-            itemSubtotal = itemPrice * itemQuantity;
-          }
-
-          // Calculate tax using EXACT same logic as sales-orders
-          let itemTax = 0;
-          if (itemTaxRate > 0) {
-            if (priceIncludeTax) {
-              if (
-                product?.beforeTaxPrice &&
-                product.beforeTaxPrice !== null &&
-                product.beforeTaxPrice !== ""
-              ) {
-                const beforeTaxPrice = parseFloat(product.beforeTaxPrice);
-                itemTax = Math.max(0, (itemPrice - beforeTaxPrice) * itemQuantity);
-              } else {
-                const taxRate = itemTaxRate / 100;
-                const giaGomThue = itemPrice * itemQuantity;
-                const tamTinh = Math.round(giaGomThue / (1 + taxRate));
-                itemTax = giaGomThue - tamTinh;
-              }
+            if (
+              product?.afterTaxPrice &&
+              product.afterTaxPrice !== null &&
+              product.afterTaxPrice !== ""
+            ) {
+              const afterTaxPrice = parseFloat(product.afterTaxPrice);
+              const taxPerUnit = afterTaxPrice - itemPrice;
+              itemTax = Math.max(0, taxPerUnit * itemQuantity);
             } else {
-              if (
-                product?.afterTaxPrice &&
-                product.afterTaxPrice !== null &&
-                product.afterTaxPrice !== ""
-              ) {
-                const afterTaxPrice = parseFloat(product.afterTaxPrice);
-                const taxPerUnit = afterTaxPrice - itemPrice;
-                itemTax = Math.max(0, taxPerUnit * itemQuantity);
-              } else {
-                itemTax = Math.round(itemSubtotal * (itemTaxRate / 100));
-              }
+              itemTax = Math.round(itemSubtotal * (itemTaxRate / 100));
             }
           }
+        }
 
-          calculatedSubtotal += itemSubtotal;
-          calculatedTax += itemTax;
+        calculatedSubtotal += itemSubtotal;
+        calculatedTax += itemTax;
 
-          console.log(
-            `💰 Publish Later Item calculation (sales-orders logic): ${item.name} - Price: ${itemPrice}, Qty: ${itemQuantity}, Discount: ${itemDiscountAmount}, Subtotal: ${itemSubtotal}, Tax: ${itemTax}`,
-          );
-        });
+        console.log(
+          `💰 Publish Later Item calculation (sales-orders logic): ${item.name} - Price: ${itemPrice}, Qty: ${itemQuantity}, Discount: ${itemDiscountAmount}, Subtotal: ${itemSubtotal}, Tax: ${itemTax}`,
+        );
+      });
 
       console.log(
         `💰 Total calculations: Subtotal: ${calculatedSubtotal}, Tax: ${calculatedTax}, Discount: ${calculatedDiscount}, Total: ${total}`,
@@ -685,7 +706,7 @@ export function EInvoiceModal({
         invoiceDate: new Date(),
         status: "draft",
         einvoiceStatus: 0, // 0 = Chưa phát hành
-        notes: `E-Invoice draft - MST: ${formData.taxCode || "N/A"}, Template: ${selectedTemplate?.name || "N/A"}, Giảm giá: ${calculatedDiscount.toLocaleString('vi-VN')} ₫, Đợi phát hành sau`,
+        notes: `E-Invoice draft - MST: ${formData.taxCode || "N/A"}, Template: ${selectedTemplate?.name || "N/A"}, Giảm giá: ${calculatedDiscount.toLocaleString("vi-VN")} ₫, Đợi phát hành sau`,
         items: cartItems.map((item, index) => {
           const itemPrice =
             typeof item.price === "string"
@@ -696,19 +717,29 @@ export function EInvoiceModal({
               ? parseInt(item.quantity)
               : item.quantity;
           const product = products?.find((p: any) => p.id === item.id);
-          const itemTaxRate = product?.taxRate ? parseFloat(product.taxRate) : 0;
+          const itemTaxRate = product?.taxRate
+            ? parseFloat(product.taxRate)
+            : 0;
 
           // Calculate proportional discount for this item
           const itemBeforeDiscountTotal = itemPrice * itemQuantity;
           const totalBeforeDiscount = cartItems.reduce((sum, cartItem) => {
-            const cartItemPrice = typeof cartItem.price === "string" ? parseFloat(cartItem.price) : cartItem.price;
-            const cartItemQuantity = typeof cartItem.quantity === "string" ? parseInt(cartItem.quantity) : cartItem.quantity;
-            return sum + (cartItemPrice * cartItemQuantity);
+            const cartItemPrice =
+              typeof cartItem.price === "string"
+                ? parseFloat(cartItem.price)
+                : cartItem.price;
+            const cartItemQuantity =
+              typeof cartItem.quantity === "string"
+                ? parseInt(cartItem.quantity)
+                : cartItem.quantity;
+            return sum + cartItemPrice * cartItemQuantity;
           }, 0);
 
           let itemDiscountAmount = 0;
           if (calculatedDiscount > 0 && totalBeforeDiscount > 0) {
-            itemDiscountAmount = (calculatedDiscount * itemBeforeDiscountTotal) / totalBeforeDiscount;
+            itemDiscountAmount =
+              (calculatedDiscount * itemBeforeDiscountTotal) /
+              totalBeforeDiscount;
           }
 
           // Calculate item subtotal and tax using same logic as main function
@@ -740,7 +771,10 @@ export function EInvoiceModal({
                 product.beforeTaxPrice !== ""
               ) {
                 const beforeTaxPrice = parseFloat(product.beforeTaxPrice);
-                itemTax = Math.max(0, (itemPrice - beforeTaxPrice) * itemQuantity);
+                itemTax = Math.max(
+                  0,
+                  (itemPrice - beforeTaxPrice) * itemQuantity,
+                );
               } else {
                 const taxRate = itemTaxRate / 100;
                 const giaGomThue = itemPrice * itemQuantity;
@@ -896,7 +930,10 @@ export function EInvoiceModal({
       // Update existing order status for publish later if orderId is provided
       if (orderId) {
         try {
-          console.log("🔄 Updating existing order status for publish later:", orderId);
+          console.log(
+            "🔄 Updating existing order status for publish later:",
+            orderId,
+          );
 
           const orderUpdateData = {
             einvoiceStatus: 0, // 0 = chưa phát hành (for publish later)
@@ -919,18 +956,30 @@ export function EInvoiceModal({
 
           if (updateResponse.ok) {
             const updatedOrder = await updateResponse.json();
-            console.log("✅ Order updated successfully for publish later:", updatedOrder);
+            console.log(
+              "✅ Order updated successfully for publish later:",
+              updatedOrder,
+            );
           } else {
             const errorText = await updateResponse.text();
-            console.error("❌ Failed to update order for publish later:", errorText);
+            console.error(
+              "❌ Failed to update order for publish later:",
+              errorText,
+            );
           }
         } catch (updateError) {
-          console.error("❌ Error updating order for publish later:", updateError);
+          console.error(
+            "❌ Error updating order for publish later:",
+            updateError,
+          );
         }
       }
 
       console.log("✅ PUBLISH LATER: Prepared data for onConfirm");
-      console.log("📦 PUBLISH LATER: Complete invoice data:", completeInvoiceData);
+      console.log(
+        "📦 PUBLISH LATER: Complete invoice data:",
+        completeInvoiceData,
+      );
 
       // Call onConfirm to trigger receipt modal display
       onConfirm(completeInvoiceData);
@@ -1090,7 +1139,9 @@ export function EInvoiceModal({
     };
 
     // Get order discount from orderData if available
-    const orderDiscount = orderData?.discount ? parseFloat(orderData.discount) : 0;
+    const orderDiscount = orderData?.discount
+      ? parseFloat(orderData.discount)
+      : 0;
 
     // Calculate totals using EXACT same logic as shopping-cart
     let cartSubtotal = 0;
@@ -1099,7 +1150,10 @@ export function EInvoiceModal({
     // Determine if tax should be included based on orderData
     let priceIncludeTax = orderData?.priceIncludeTax ?? false;
 
-    console.log("🔍 E-invoice: Starting calculation with order discount:", orderDiscount);
+    console.log(
+      "🔍 E-invoice: Starting calculation with order discount:",
+      orderDiscount,
+    );
     console.log("🔍 E-invoice: priceIncludeTax setting:", priceIncludeTax);
 
     // Calculate totals using EXACT same logic as shopping-cart
@@ -1117,9 +1171,15 @@ export function EInvoiceModal({
       let itemDiscountAmount = 0;
       if (orderDiscount > 0) {
         const totalBeforeDiscount = cartItems.reduce((total, cartItem) => {
-          const cartItemPrice = typeof cartItem.price === "string" ? parseFloat(cartItem.price) : cartItem.price;
-          const cartItemQuantity = typeof cartItem.quantity === "string" ? parseInt(cartItem.quantity) : cartItem.quantity;
-          return total + (cartItemPrice * cartItemQuantity);
+          const cartItemPrice =
+            typeof cartItem.price === "string"
+              ? parseFloat(cartItem.price)
+              : cartItem.price;
+          const cartItemQuantity =
+            typeof cartItem.quantity === "string"
+              ? parseInt(cartItem.quantity)
+              : cartItem.quantity;
+          return total + cartItemPrice * cartItemQuantity;
         }, 0);
 
         const isLastItem = index === cartItems.length - 1;
@@ -1129,12 +1189,20 @@ export function EInvoiceModal({
           let previousDiscounts = 0;
           for (let i = 0; i < cartItems.length - 1; i++) {
             const prevItem = cartItems[i];
-            const prevItemPrice = typeof prevItem.price === "string" ? parseFloat(prevItem.price) : prevItem.price;
-            const prevItemQuantity = typeof prevItem.quantity === "string" ? parseInt(prevItem.quantity) : prevItem.quantity;
+            const prevItemPrice =
+              typeof prevItem.price === "string"
+                ? parseFloat(prevItem.price)
+                : prevItem.price;
+            const prevItemQuantity =
+              typeof prevItem.quantity === "string"
+                ? parseInt(prevItem.quantity)
+                : prevItem.quantity;
             const prevItemTotal = prevItemPrice * prevItemQuantity;
             const prevItemDiscount =
               totalBeforeDiscount > 0
-                ? Math.round((orderDiscount * prevItemTotal) / totalBeforeDiscount)
+                ? Math.round(
+                    (orderDiscount * prevItemTotal) / totalBeforeDiscount,
+                  )
                 : 0;
             previousDiscounts += prevItemDiscount;
           }
@@ -1174,19 +1242,22 @@ export function EInvoiceModal({
       cartSubtotal += itemSubtotal;
       cartTaxAmount += Math.max(0, itemTax);
 
-      console.log(`💰 E-invoice Item ${index + 1} calculations (shopping-cart logic):`, {
-        name: item.name,
-        price: itemPrice,
-        quantity: itemQuantity,
-        discount: itemDiscountAmount,
-        taxRate: itemTaxRate,
-        subtotal: itemSubtotal,
-        tax: itemTax,
-        priceIncludeTax: priceIncludeTax,
-        adjustedPrice: priceIncludeTax ?
-          Math.max(0, itemPrice - (itemDiscountAmount / itemQuantity)) :
-          Math.max(0, itemPrice - (itemDiscountAmount / itemQuantity)),
-      });
+      console.log(
+        `💰 E-invoice Item ${index + 1} calculations (shopping-cart logic):`,
+        {
+          name: item.name,
+          price: itemPrice,
+          quantity: itemQuantity,
+          discount: itemDiscountAmount,
+          taxRate: itemTaxRate,
+          subtotal: itemSubtotal,
+          tax: itemTax,
+          priceIncludeTax: priceIncludeTax,
+          adjustedPrice: priceIncludeTax
+            ? Math.max(0, itemPrice - itemDiscountAmount / itemQuantity)
+            : Math.max(0, itemPrice - itemDiscountAmount / itemQuantity),
+        },
+      );
     });
 
     // Build invoice products array with calculated values
@@ -1204,9 +1275,15 @@ export function EInvoiceModal({
       let itemDiscountAmount = 0;
       if (orderDiscount > 0) {
         const totalBeforeDiscount = cartItems.reduce((total, cartItem) => {
-          const cartItemPrice = typeof cartItem.price === "string" ? parseFloat(cartItem.price) : cartItem.price;
-          const cartItemQuantity = typeof cartItem.quantity === "string" ? parseInt(cartItem.quantity) : cartItem.quantity;
-          return total + (cartItemPrice * cartItemQuantity);
+          const cartItemPrice =
+            typeof cartItem.price === "string"
+              ? parseFloat(cartItem.price)
+              : cartItem.price;
+          const cartItemQuantity =
+            typeof cartItem.quantity === "string"
+              ? parseInt(cartItem.quantity)
+              : cartItem.quantity;
+          return total + cartItemPrice * cartItemQuantity;
         }, 0);
 
         const isLastItem = index === cartItems.length - 1;
@@ -1215,12 +1292,20 @@ export function EInvoiceModal({
           let previousDiscounts = 0;
           for (let i = 0; i < cartItems.length - 1; i++) {
             const prevItem = cartItems[i];
-            const prevItemPrice = typeof prevItem.price === "string" ? parseFloat(prevItem.price) : prevItem.price;
-            const prevItemQuantity = typeof prevItem.quantity === "string" ? parseInt(prevItem.quantity) : prevItem.quantity;
+            const prevItemPrice =
+              typeof prevItem.price === "string"
+                ? parseFloat(prevItem.price)
+                : prevItem.price;
+            const prevItemQuantity =
+              typeof prevItem.quantity === "string"
+                ? parseInt(prevItem.quantity)
+                : prevItem.quantity;
             const prevItemTotal = prevItemPrice * prevItemQuantity;
             const prevItemDiscount =
               totalBeforeDiscount > 0
-                ? Math.round((orderDiscount * prevItemTotal) / totalBeforeDiscount)
+                ? Math.round(
+                    (orderDiscount * prevItemTotal) / totalBeforeDiscount,
+                  )
                 : 0;
             previousDiscounts += prevItemDiscount;
           }
@@ -1520,7 +1605,10 @@ export function EInvoiceModal({
       // Update existing order status if orderId is provided
       if (orderId) {
         try {
-          console.log("🔄 Updating existing order status after e-invoice publish:", orderId);
+          console.log(
+            "🔄 Updating existing order status after e-invoice publish:",
+            orderId,
+          );
 
           const orderUpdateData = {
             einvoiceStatus: 1, // 1 = Đã phát hành
@@ -1543,13 +1631,22 @@ export function EInvoiceModal({
 
           if (updateResponse.ok) {
             const updatedOrder = await updateResponse.json();
-            console.log("✅ Order updated successfully after e-invoice publish:", updatedOrder);
+            console.log(
+              "✅ Order updated successfully after e-invoice publish:",
+              updatedOrder,
+            );
           } else {
             const errorText = await updateResponse.text();
-            console.error("❌ Failed to update order after e-invoice publish:", errorText);
+            console.error(
+              "❌ Failed to update order after e-invoice publish:",
+              errorText,
+            );
           }
         } catch (updateError) {
-          console.error("❌ Error updating order after e-invoice publish:", updateError);
+          console.error(
+            "❌ Error updating order after e-invoice publish:",
+            updateError,
+          );
         }
       } else {
         // Create new order for POS orders without orderId
