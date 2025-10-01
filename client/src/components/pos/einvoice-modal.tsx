@@ -212,8 +212,43 @@ export function EInvoiceModal({
     enabled: isOpen,
   });
 
-  const { data: products, isLoading: productsLoading } = useQuery({
+  // Query all products to get tax rates
+  const { data: products = [] } = useQuery({
     queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"],
+    queryFn: async () => {
+      try {
+        const response = await apiRequest("GET", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        return [];
+      }
+    },
+    staleTime: 300000, // Cache for 5 minutes
+  });
+
+  // Query order data to get priceIncludeTax setting
+  const { data: orderData } = useQuery({
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders", orderId],
+    queryFn: async () => {
+      if (!orderId) return null;
+      try {
+        const response = await apiRequest("GET", `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${orderId}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+      } catch (error) {
+        console.error("Error fetching order data:", error);
+        return null;
+      }
+    },
+    enabled: !!orderId,
+    staleTime: 300000,
   });
 
   // Filter templates to only show ones that are in use (useCK: true)
@@ -489,40 +524,136 @@ export function EInvoiceModal({
         return;
       }
 
-      // Calculate subtotal and tax with proper type conversion
-      const calculatedSubtotal = cartItems.reduce((sum, item) => {
-        const itemPrice =
-          typeof item.price === "string" ? parseFloat(item.price) : item.price;
-        const itemQuantity =
-          typeof item.quantity === "string"
-            ? parseInt(item.quantity)
-            : item.quantity;
-        console.log(
-          `💰 Item calculation: ${item.name} - Price: ${itemPrice}, Qty: ${itemQuantity}, Subtotal: ${itemPrice * itemQuantity}`,
-        );
-        return sum + itemPrice * itemQuantity;
-      }, 0);
+      // Calculate subtotal, tax and discount with proper type conversion
+      let calculatedSubtotal = 0;
+      let calculatedTax = 0;
+      let calculatedDiscount = 0;
 
-      const calculatedTax = cartItems.reduce((sum, item) => {
-        const itemPrice =
-          typeof item.price === "string" ? parseFloat(item.price) : item.price;
-        const itemQuantity =
-          typeof item.quantity === "string"
-            ? parseInt(item.quantity)
-            : item.quantity;
-        const itemTaxRate =
-          typeof item.taxRate === "string"
-            ? parseFloat(item.taxRate || "0")
-            : item.taxRate || 0;
-        const itemTax = (itemPrice * itemQuantity * itemTaxRate) / 100;
-        console.log(
-          `💰 Tax calculation: ${item.name} - Tax rate: ${itemTaxRate}%, Tax: ${itemTax}`,
-        );
-        return sum + itemTax;
-      }, 0);
+      // Get discount from orderData if available
+      if (orderData?.discount) {
+        calculatedDiscount = parseFloat(orderData.discount);
+      } else {
+        // Calculate discount from cart items if available
+        calculatedDiscount = cartItems.reduce((sum, item) => {
+          const itemDiscount = typeof item.discount === "string" ? parseFloat(item.discount || "0") : (item.discount || 0);
+          return sum + itemDiscount;
+        }, 0);
+      }
+
+      // Calculate totals using same logic as the main publish function
+      const priceIncludeTax = orderData?.priceIncludeTax ?? false;
+
+      cartItems.forEach((item, index) => {
+          const itemPrice =
+            typeof item.price === "string"
+              ? parseFloat(item.price)
+              : item.price;
+          const itemQuantity =
+            typeof item.quantity === "string"
+              ? parseInt(item.quantity)
+              : item.quantity;
+          const product = products?.find((p: any) => p.id === item.id);
+          const itemTaxRate = product?.taxRate ? parseFloat(product.taxRate) : 0;
+
+          // Calculate discount for this item (same logic as main publish)
+          let itemDiscountAmount = 0;
+          if (calculatedDiscount > 0) {
+            const totalBeforeDiscount = cartItems.reduce((total, cartItem) => {
+              const cartItemPrice = typeof cartItem.price === "string" ? parseFloat(cartItem.price) : cartItem.price;
+              const cartItemQuantity = typeof cartItem.quantity === "string" ? parseInt(cartItem.quantity) : cartItem.quantity;
+              return total + (cartItemPrice * cartItemQuantity);
+            }, 0);
+
+            const isLastItem = index === cartItems.length - 1;
+
+            if (isLastItem) {
+              let previousDiscounts = 0;
+              for (let i = 0; i < cartItems.length - 1; i++) {
+                const prevItem = cartItems[i];
+                const prevItemPrice = typeof prevItem.price === "string" ? parseFloat(prevItem.price) : prevItem.price;
+                const prevItemQuantity = typeof prevItem.quantity === "string" ? parseInt(prevItem.quantity) : prevItem.quantity;
+                const prevItemTotal = prevItemPrice * prevItemQuantity;
+                const prevItemDiscount =
+                  totalBeforeDiscount > 0
+                    ? Math.round((calculatedDiscount * prevItemTotal) / totalBeforeDiscount)
+                    : 0;
+                previousDiscounts += prevItemDiscount;
+              }
+              itemDiscountAmount = calculatedDiscount - previousDiscounts;
+            } else {
+              const itemTotal = itemPrice * itemQuantity;
+              itemDiscountAmount =
+                totalBeforeDiscount > 0
+                  ? Math.round((calculatedDiscount * itemTotal) / totalBeforeDiscount)
+                  : 0;
+            }
+          }
+
+          let itemSubtotal = 0;
+
+          if (priceIncludeTax && itemTaxRate > 0) {
+            // When priceIncludeTax = true: use beforeTaxPrice or calculate from formula (same as sales-orders)
+            if (
+              product?.beforeTaxPrice &&
+              product.beforeTaxPrice !== null &&
+              product.beforeTaxPrice !== ""
+            ) {
+              const beforeTaxPrice = parseFloat(product.beforeTaxPrice);
+              itemSubtotal = beforeTaxPrice * itemQuantity;
+            } else {
+              // Fallback: calculate using sales-orders formula
+              const taxRate = itemTaxRate / 100;
+              const giaGomThue = itemPrice * itemQuantity;
+              const tamTinh = Math.round(giaGomThue / (1 + taxRate));
+              itemSubtotal = tamTinh;
+            }
+          } else {
+            // When priceIncludeTax = false: use base price as subtotal (same as sales-orders)
+            itemSubtotal = itemPrice * itemQuantity;
+          }
+
+          // Calculate tax using EXACT same logic as sales-orders
+          let itemTax = 0;
+          if (itemTaxRate > 0) {
+            if (priceIncludeTax) {
+              if (
+                product?.beforeTaxPrice &&
+                product.beforeTaxPrice !== null &&
+                product.beforeTaxPrice !== ""
+              ) {
+                const beforeTaxPrice = parseFloat(product.beforeTaxPrice);
+                itemTax = Math.max(0, (itemPrice - beforeTaxPrice) * itemQuantity);
+              } else {
+                const taxRate = itemTaxRate / 100;
+                const giaGomThue = itemPrice * itemQuantity;
+                const tamTinh = Math.round(giaGomThue / (1 + taxRate));
+                itemTax = giaGomThue - tamTinh;
+              }
+            } else {
+              if (
+                product?.afterTaxPrice &&
+                product.afterTaxPrice !== null &&
+                product.afterTaxPrice !== ""
+              ) {
+                const afterTaxPrice = parseFloat(product.afterTaxPrice);
+                const taxPerUnit = afterTaxPrice - itemPrice;
+                itemTax = Math.max(0, taxPerUnit * itemQuantity);
+              } else {
+                itemTax = Math.round(itemSubtotal * (itemTaxRate / 100));
+              }
+            }
+          }
+
+          calculatedSubtotal += itemSubtotal;
+          calculatedTax += itemTax;
+
+          console.log(
+            `💰 Publish Later Item calculation (sales-orders logic): ${item.name} - Price: ${itemPrice}, Qty: ${itemQuantity}, Discount: ${itemDiscountAmount}, Subtotal: ${itemSubtotal}, Tax: ${itemTax}`,
+          );
+        });
 
       console.log(
-        `💰 Total calculations: Subtotal: ${calculatedSubtotal}, Tax: ${calculatedTax}, Total: ${total}`,
+        `💰 Total calculations: Subtotal: ${calculatedSubtotal}, Tax: ${calculatedTax}, Discount: ${calculatedDiscount}, Total: ${total}`,
       );
 
       // Lấy thông tin mẫu số hóa đơn được chọn
@@ -545,16 +676,17 @@ export function EInvoiceModal({
         customerEmail: formData.email || null,
         subtotal: calculatedSubtotal.toFixed(2),
         tax: calculatedTax.toFixed(2),
+        discount: calculatedDiscount.toFixed(2), // Add discount to invoice payload
         total: (typeof total === "number" && !isNaN(total)
           ? total
-          : calculatedSubtotal + calculatedTax
+          : calculatedSubtotal + calculatedTax - calculatedDiscount
         ).toFixed(2),
         paymentMethod: paymentMethodCode, // Sử dụng mã phương thức thanh toán thực tế
         invoiceDate: new Date(),
         status: "draft",
         einvoiceStatus: 0, // 0 = Chưa phát hành
-        notes: `E-Invoice draft - MST: ${formData.taxCode || "N/A"}, Template: ${selectedTemplate?.name || "N/A"}, Đợi phát hành sau`,
-        items: cartItems.map((item) => {
+        notes: `E-Invoice draft - MST: ${formData.taxCode || "N/A"}, Template: ${selectedTemplate?.name || "N/A"}, Giảm giá: ${calculatedDiscount.toLocaleString('vi-VN')} ₫, Đợi phát hành sau`,
+        items: cartItems.map((item, index) => {
           const itemPrice =
             typeof item.price === "string"
               ? parseFloat(item.price)
@@ -563,20 +695,90 @@ export function EInvoiceModal({
             typeof item.quantity === "string"
               ? parseInt(item.quantity)
               : item.quantity;
-          const itemTaxRate =
-            typeof item.taxRate === "string"
-              ? parseFloat(item.taxRate || "0")
-              : item.taxRate || 0;
-          const itemSubtotal = itemPrice * itemQuantity;
-          const itemTax = (itemSubtotal * itemTaxRate) / 100;
+          const product = products?.find((p: any) => p.id === item.id);
+          const itemTaxRate = product?.taxRate ? parseFloat(product.taxRate) : 0;
+
+          // Calculate proportional discount for this item
+          const itemBeforeDiscountTotal = itemPrice * itemQuantity;
+          const totalBeforeDiscount = cartItems.reduce((sum, cartItem) => {
+            const cartItemPrice = typeof cartItem.price === "string" ? parseFloat(cartItem.price) : cartItem.price;
+            const cartItemQuantity = typeof cartItem.quantity === "string" ? parseInt(cartItem.quantity) : cartItem.quantity;
+            return sum + (cartItemPrice * cartItemQuantity);
+          }, 0);
+
+          let itemDiscountAmount = 0;
+          if (calculatedDiscount > 0 && totalBeforeDiscount > 0) {
+            itemDiscountAmount = (calculatedDiscount * itemBeforeDiscountTotal) / totalBeforeDiscount;
+          }
+
+          // Calculate item subtotal and tax using same logic as main function
+          let itemSubtotal = 0;
+          if (priceIncludeTax && itemTaxRate > 0) {
+            if (
+              product?.beforeTaxPrice &&
+              product.beforeTaxPrice !== null &&
+              product.beforeTaxPrice !== ""
+            ) {
+              const beforeTaxPrice = parseFloat(product.beforeTaxPrice);
+              itemSubtotal = beforeTaxPrice * itemQuantity;
+            } else {
+              const taxRate = itemTaxRate / 100;
+              const giaGomThue = itemPrice * itemQuantity;
+              const tamTinh = Math.round(giaGomThue / (1 + taxRate));
+              itemSubtotal = tamTinh;
+            }
+          } else {
+            itemSubtotal = itemPrice * itemQuantity;
+          }
+
+          let itemTax = 0;
+          if (itemTaxRate > 0) {
+            if (priceIncludeTax) {
+              if (
+                product?.beforeTaxPrice &&
+                product.beforeTaxPrice !== null &&
+                product.beforeTaxPrice !== ""
+              ) {
+                const beforeTaxPrice = parseFloat(product.beforeTaxPrice);
+                itemTax = Math.max(0, (itemPrice - beforeTaxPrice) * itemQuantity);
+              } else {
+                const taxRate = itemTaxRate / 100;
+                const giaGomThue = itemPrice * itemQuantity;
+                const tamTinh = Math.round(giaGomThue / (1 + taxRate));
+                itemTax = giaGomThue - tamTinh;
+              }
+            } else {
+              if (
+                product?.afterTaxPrice &&
+                product.afterTaxPrice !== null &&
+                product.afterTaxPrice !== ""
+              ) {
+                const afterTaxPrice = parseFloat(product.afterTaxPrice);
+                const taxPerUnit = afterTaxPrice - itemPrice;
+                itemTax = Math.max(0, taxPerUnit * itemQuantity);
+              } else {
+                itemTax = Math.round(itemSubtotal * (itemTaxRate / 100));
+              }
+            }
+          }
+
+          // Calculate final total after discount
+          let itemTotal;
+          if (priceIncludeTax) {
+            itemTotal = itemPrice * itemQuantity - itemDiscountAmount;
+          } else {
+            itemTotal = itemSubtotal + itemTax - itemDiscountAmount;
+          }
 
           return {
             productId: item.id,
             productName: item.name,
             quantity: itemQuantity,
             unitPrice: itemPrice.toFixed(2),
-            total: (itemSubtotal + itemTax).toFixed(2),
+            total: itemTotal.toFixed(2),
             taxRate: itemTaxRate.toFixed(2),
+            discount: itemDiscountAmount.toFixed(2), // Item-level discount
+            discountAmount: itemDiscountAmount.toFixed(2), // Same as discount for consistency
           };
         }),
       };
@@ -669,14 +871,6 @@ export function EInvoiceModal({
         invoiceNumber: savedInvoice.invoice?.invoiceNumber,
       };
 
-      console.log("📄 Receipt data created for publish later:", receiptData);
-
-      // Show success message
-      toast({
-        title: `${t("common.success")}`,
-        description: `${t("einvoice.savedForLaterPublish")}.${t("einvoice.displayingForPrint")}`,
-      });
-
       // Prepare comprehensive invoice data with receipt to display receipt modal
       const completeInvoiceData = {
         success: true, // Add success flag
@@ -699,12 +893,44 @@ export function EInvoiceModal({
         orderId: orderId,
       };
 
+      // Update existing order status for publish later if orderId is provided
+      if (orderId) {
+        try {
+          console.log("🔄 Updating existing order status for publish later:", orderId);
+
+          const orderUpdateData = {
+            einvoiceStatus: 0, // 0 = chưa phát hành (for publish later)
+            paymentStatus: "paid",
+            status: "paid",
+            invoiceNumber: null, // No invoice number yet for publish later
+            symbol: selectedTemplate?.symbol || null,
+            templateNumber: selectedTemplate?.templateNumber || null,
+            notes: `E-Invoice draft saved - MST: ${formData.taxCode || "N/A"}, Template: ${selectedTemplate?.name || "N/A"}, Đợi phát hành sau`,
+            paidAt: new Date().toISOString(),
+          };
+
+          const updateResponse = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${orderId}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(orderUpdateData),
+          });
+
+          if (updateResponse.ok) {
+            const updatedOrder = await updateResponse.json();
+            console.log("✅ Order updated successfully for publish later:", updatedOrder);
+          } else {
+            const errorText = await updateResponse.text();
+            console.error("❌ Failed to update order for publish later:", errorText);
+          }
+        } catch (updateError) {
+          console.error("❌ Error updating order for publish later:", updateError);
+        }
+      }
+
       console.log("✅ PUBLISH LATER: Prepared data for onConfirm");
-      console.log("📄 PUBLISH LATER: Receipt data to pass:", receiptData);
-      console.log(
-        "📦 PUBLISH LATER: Complete invoice data:",
-        completeInvoiceData,
-      );
+      console.log("📦 PUBLISH LATER: Complete invoice data:", completeInvoiceData);
 
       // Call onConfirm to trigger receipt modal display
       onConfirm(completeInvoiceData);
@@ -863,89 +1089,207 @@ export function EInvoiceModal({
       );
     };
 
-    // Calculate totals from real cart items
+    // Get order discount from orderData if available
+    const orderDiscount = orderData?.discount ? parseFloat(orderData.discount) : 0;
+
+    // Calculate totals using EXACT same logic as shopping-cart
     let cartSubtotal = 0;
     let cartTaxAmount = 0;
 
-    // Convert cart items to invoice products with real data from shopping cart
-    const invoiceProducts = cartItems.map((item, index) => {
-      console.log(`📦 Processing cart item ${index + 1} for e-invoice:`, item);
+    // Determine if tax should be included based on orderData
+    let priceIncludeTax = orderData?.priceIncludeTax ?? false;
 
-      // Ensure proper data types with robust parsing
-      const itemPrice = (() => {
-        if (typeof item.price === "string") {
-          const parsed = parseFloat(item.price);
-          return isNaN(parsed) ? 0 : parsed;
-        }
-        return typeof item.price === "number" ? item.price : 0;
-      })();
+    console.log("🔍 E-invoice: Starting calculation with order discount:", orderDiscount);
+    console.log("🔍 E-invoice: priceIncludeTax setting:", priceIncludeTax);
 
-      const itemQuantity = (() => {
-        if (typeof item.quantity === "string") {
-          const parsed = parseInt(item.quantity);
-          return isNaN(parsed) ? 1 : Math.max(1, parsed);
-        }
-        return typeof item.quantity === "number"
-          ? Math.max(1, item.quantity)
-          : 1;
-      })();
-
-      // Get taxRate from products database instead of cartItems
+    // Calculate totals using EXACT same logic as shopping-cart
+    cartItems.forEach((item, index) => {
+      const itemPrice =
+        typeof item.price === "string" ? parseFloat(item.price) : item.price;
+      const itemQuantity =
+        typeof item.quantity === "string"
+          ? parseInt(item.quantity)
+          : item.quantity;
       const product = products?.find((p: any) => p.id === item.id);
-      const itemTaxRate = (() => {
-        if (product?.taxRate) {
-          const parsed = parseFloat(product.taxRate);
-          return isNaN(parsed) ? 0 : parsed;
-        }
-        // Fallback to cart item taxRate if product not found
-        if (typeof item.taxRate === "string") {
-          const parsed = parseFloat(item.taxRate);
-          return isNaN(parsed) ? 0 : parsed;
-        }
-        return typeof item.taxRate === "number" ? item.taxRate : 0;
-      })();
+      const itemTaxRate = product?.taxRate ? parseFloat(product.taxRate) : 0;
 
-      // Calculate amounts
-      const itemSubtotal = itemPrice * itemQuantity;
-      const itemTax = (itemSubtotal * itemTaxRate) / 100;
-      const itemTotal = itemSubtotal + itemTax;
+      // Calculate discount for this item using EXACT same logic as shopping-cart
+      let itemDiscountAmount = 0;
+      if (orderDiscount > 0) {
+        const totalBeforeDiscount = cartItems.reduce((total, cartItem) => {
+          const cartItemPrice = typeof cartItem.price === "string" ? parseFloat(cartItem.price) : cartItem.price;
+          const cartItemQuantity = typeof cartItem.quantity === "string" ? parseInt(cartItem.quantity) : cartItem.quantity;
+          return total + (cartItemPrice * cartItemQuantity);
+        }, 0);
+
+        const isLastItem = index === cartItems.length - 1;
+
+        if (isLastItem) {
+          // Last item: total discount - sum of all previous discounts
+          let previousDiscounts = 0;
+          for (let i = 0; i < cartItems.length - 1; i++) {
+            const prevItem = cartItems[i];
+            const prevItemPrice = typeof prevItem.price === "string" ? parseFloat(prevItem.price) : prevItem.price;
+            const prevItemQuantity = typeof prevItem.quantity === "string" ? parseInt(prevItem.quantity) : prevItem.quantity;
+            const prevItemTotal = prevItemPrice * prevItemQuantity;
+            const prevItemDiscount =
+              totalBeforeDiscount > 0
+                ? Math.round((orderDiscount * prevItemTotal) / totalBeforeDiscount)
+                : 0;
+            previousDiscounts += prevItemDiscount;
+          }
+          itemDiscountAmount = orderDiscount - previousDiscounts;
+        } else {
+          // Regular calculation for non-last items
+          const itemTotal = itemPrice * itemQuantity;
+          itemDiscountAmount =
+            totalBeforeDiscount > 0
+              ? Math.round((orderDiscount * itemTotal) / totalBeforeDiscount)
+              : 0;
+        }
+      }
+
+      let itemSubtotal = 0;
+      let itemTax = 0;
+
+      if (priceIncludeTax && itemTaxRate > 0) {
+        // When price includes tax: use same logic as shopping-cart
+        const discountPerUnit = itemDiscountAmount / itemQuantity;
+        const adjustedPrice = Math.max(0, itemPrice - discountPerUnit);
+        const giaGomThue = adjustedPrice * itemQuantity;
+        // subtotal = giá bao gồm thuế / (1 + (taxRate / 100)) (làm tròn)
+        const taxRate = itemTaxRate / 100;
+        itemSubtotal = Math.round(giaGomThue / (1 + taxRate));
+        // tax = giá bao gồm thuế - subtotal
+        itemTax = giaGomThue - itemSubtotal;
+      } else {
+        // When price doesn't include tax: use same logic as shopping-cart
+        const discountPerUnit = itemDiscountAmount / itemQuantity;
+        const adjustedPrice = Math.max(0, itemPrice - discountPerUnit);
+        itemSubtotal = adjustedPrice * itemQuantity;
+        // tax = subtotal * (taxRate / 100) (làm tròn)
+        itemTax = Math.round(itemSubtotal * (itemTaxRate / 100));
+      }
 
       cartSubtotal += itemSubtotal;
-      cartTaxAmount += itemTax;
+      cartTaxAmount += Math.max(0, itemTax);
 
-      console.log(`💰 Item ${index + 1} calculations:`, {
+      console.log(`💰 E-invoice Item ${index + 1} calculations (shopping-cart logic):`, {
         name: item.name,
         price: itemPrice,
         quantity: itemQuantity,
+        discount: itemDiscountAmount,
         taxRate: itemTaxRate,
         subtotal: itemSubtotal,
         tax: itemTax,
-        total: itemTotal,
+        priceIncludeTax: priceIncludeTax,
+        adjustedPrice: priceIncludeTax ?
+          Math.max(0, itemPrice - (itemDiscountAmount / itemQuantity)) :
+          Math.max(0, itemPrice - (itemDiscountAmount / itemQuantity)),
       });
+    });
+
+    // Build invoice products array with calculated values
+    const invoiceProducts = cartItems.map((item, index) => {
+      const itemPrice =
+        typeof item.price === "string" ? parseFloat(item.price) : item.price;
+      const itemQuantity =
+        typeof item.quantity === "string"
+          ? parseInt(item.quantity)
+          : item.quantity;
+      const product = products?.find((p: any) => p.id === item.id);
+      const itemTaxRate = product?.taxRate ? parseFloat(product.taxRate) : 0;
+
+      // Calculate discount for this item (same logic as above)
+      let itemDiscountAmount = 0;
+      if (orderDiscount > 0) {
+        const totalBeforeDiscount = cartItems.reduce((total, cartItem) => {
+          const cartItemPrice = typeof cartItem.price === "string" ? parseFloat(cartItem.price) : cartItem.price;
+          const cartItemQuantity = typeof cartItem.quantity === "string" ? parseInt(cartItem.quantity) : cartItem.quantity;
+          return total + (cartItemPrice * cartItemQuantity);
+        }, 0);
+
+        const isLastItem = index === cartItems.length - 1;
+
+        if (isLastItem) {
+          let previousDiscounts = 0;
+          for (let i = 0; i < cartItems.length - 1; i++) {
+            const prevItem = cartItems[i];
+            const prevItemPrice = typeof prevItem.price === "string" ? parseFloat(prevItem.price) : prevItem.price;
+            const prevItemQuantity = typeof prevItem.quantity === "string" ? parseInt(prevItem.quantity) : prevItem.quantity;
+            const prevItemTotal = prevItemPrice * prevItemQuantity;
+            const prevItemDiscount =
+              totalBeforeDiscount > 0
+                ? Math.round((orderDiscount * prevItemTotal) / totalBeforeDiscount)
+                : 0;
+            previousDiscounts += prevItemDiscount;
+          }
+          itemDiscountAmount = orderDiscount - previousDiscounts;
+        } else {
+          const itemTotal = itemPrice * itemQuantity;
+          itemDiscountAmount =
+            totalBeforeDiscount > 0
+              ? Math.round((orderDiscount * itemTotal) / totalBeforeDiscount)
+              : 0;
+        }
+      }
+
+      // Calculate subtotal and tax for this item
+      let itemSubtotal = 0;
+      let itemTax = 0;
+      let itemTotal = 0;
+
+      if (priceIncludeTax && itemTaxRate > 0) {
+        const discountPerUnit = itemDiscountAmount / itemQuantity;
+        const adjustedPrice = Math.max(0, itemPrice - discountPerUnit);
+        const giaGomThue = adjustedPrice * itemQuantity;
+        const taxRate = itemTaxRate / 100;
+        itemSubtotal = Math.round(giaGomThue / (1 + taxRate));
+        itemTax = giaGomThue - itemSubtotal;
+        itemTotal = giaGomThue; // Total after discount for priceIncludeTax
+      } else {
+        const discountPerUnit = itemDiscountAmount / itemQuantity;
+        const adjustedPrice = Math.max(0, itemPrice - discountPerUnit);
+        itemSubtotal = adjustedPrice * itemQuantity;
+        itemTax = Math.round(itemSubtotal * (itemTaxRate / 100));
+        itemTotal = itemSubtotal + itemTax; // Total after discount for non-priceIncludeTax
+      }
 
       return {
-        itmCd: item.sku || `SP${String(item.id || index + 1).padStart(3, "0")}`, // Sử dụng SKU thực tế từ cart
-        itmName: item.name, // Sử dụng tên sản phẩm thực tế từ cart
-        itmKnd: 1, // Loại sản phẩm (1 = hàng hóa)
-        unitNm: "Cái", // Đơn vị tính
-        qty: itemQuantity, // Số lượng thực tế từ cart
-        unprc: itemPrice, // Đơn giá thực tế từ cart
-        amt: Math.round(itemSubtotal), // Thành tiền chưa thuế
-        discRate: 0, // Tỷ lệ chiết khấu
-        discAmt: 0, // Tiền chiết khấu
-        vatRt: itemTaxRate.toString(), // Thuế suất từ bảng products theo productId
-        vatAmt: Math.round(itemTax), // Tiền thuế tính từ dữ liệu thực tế
-        totalAmt: Math.round(itemTotal), // Tổng tiền có thuế tính từ dữ liệu thực tế
+        itmCd: item.sku || `SP${String(item.id || index + 1).padStart(3, "0")}`,
+        itmName: item.name,
+        itmKnd: 1,
+        unitNm: "Cái",
+        qty: itemQuantity,
+        unprc: itemPrice,
+        amt: Math.round(itemSubtotal),
+        discRate:
+          itemDiscountAmount > 0
+            ? Math.round(
+                (itemDiscountAmount / (itemPrice * itemQuantity)) * 100,
+              )
+            : 0,
+        discAmt: Math.round(itemDiscountAmount),
+        vatRt: itemTaxRate.toString(),
+        vatAmt: Math.round(Math.max(0, itemTax)),
+        totalAmt: Math.round(itemTotal),
       };
     });
 
-    const cartTotal = cartSubtotal + cartTaxAmount;
+    // Calculate final totals
+    const invSubTotal = Math.round(cartSubtotal);
+    const invTotalAmount = Math.round(cartSubtotal + cartTaxAmount);
+    const discountAmount = Math.round(orderDiscount);
 
-    console.log("💰 E-invoice totals calculated from real cart data:", {
+    console.log("💰 E-invoice totals calculated using sales-orders logic:", {
       subtotal: cartSubtotal,
       tax: cartTaxAmount,
-      total: cartTotal,
+      invSubTotal: invSubTotal,
+      invTotalAmount: invTotalAmount,
+      priceIncludeTax: priceIncludeTax,
       itemsCount: invoiceProducts.length,
+      totalDiscount: discountAmount,
+      calculationMethod: "sales-orders_compatible",
     });
 
     // Get selected template data for API mapping
@@ -969,11 +1313,11 @@ export function EInvoiceModal({
       },
       transactionID: generateGuid(),
       invRef: `INV-${Date.now()}`,
-      invSubTotal: Math.round(cartSubtotal),
-      invVatRate: 10, // Default VAT rate
+      invSubTotal: invSubTotal,
+      invVatRate: 0, // Default VAT rate
       invVatAmount: Math.round(cartTaxAmount),
-      invDiscAmount: 0, // Chiết khấu
-      invTotalAmount: Math.round(cartTotal),
+      invDiscAmount: discountAmount, // Tổng chiết khấu từ tất cả sản phẩm
+      invTotalAmount: invTotalAmount,
       paidTp: "TM", // Cash payment
       note: "",
       hdNo: "",
@@ -1000,7 +1344,7 @@ export function EInvoiceModal({
         email: formData.email || "",
         emailCC: "",
       },
-      products: invoiceProducts,
+      products: invoiceProducts, // Đã được tính discount đúng trong invoiceProducts ở trên
     };
 
     console.log(
@@ -1075,6 +1419,7 @@ export function EInvoiceModal({
               total: (itemSubtotal + itemTax).toFixed(2),
               sku: item.sku || `FOOD${String(item.id).padStart(5, "0")}`,
               taxRate: itemTaxRate,
+              discount: item.discount || "0", // Include discount
             };
           }),
           subtotal: cartSubtotal.toFixed(2),
@@ -1095,7 +1440,7 @@ export function EInvoiceModal({
       // Map order totals to variables for invoice saving
       const orderSubtotal = cartSubtotal;
       const orderTax = cartTaxAmount;
-      const orderTotal = cartTotal;
+      const orderTotal = invTotalAmount;
 
       // Lưu thông tin hóa đơn vào bảng invoices với mapping phương thức thanh toán
       try {
@@ -1142,6 +1487,8 @@ export function EInvoiceModal({
               unitPrice: itemPrice.toFixed(2),
               total: (itemSubtotal + itemTax).toFixed(2),
               taxRate: itemTaxRate.toFixed(2),
+              discount: item.discount || 0, // Add discount here
+              discountAmount: (itemSubtotal * (item.discount || 0)) / 100, // Calculate discount amount
             };
           }),
         };
@@ -1170,54 +1517,93 @@ export function EInvoiceModal({
         console.error("❌ Error saving invoice to database:", invoiceSaveError);
       }
 
-      // Lưu đơn hàng vào bảng orders với trạng thái "đã phát hành"
-      try {
-        const orderStatus = "paid";
-        const publishType = "publish"; // Indicate that this is a direct publish
-        const einvoiceStatus = 1; // 1 = Đã phát hành
+      // Update existing order status if orderId is provided
+      if (orderId) {
+        try {
+          console.log("🔄 Updating existing order status after e-invoice publish:", orderId);
 
-        // Create order data for POS E-invoice order
-        const orderData = {
-          orderNumber: `ORD-${Date.now()}`,
-          tableId: null, // No table for POS orders
-          salesChannel: "pos", // ALWAYS pos for POS e-invoice orders
-          customerName: formData.customerName,
-          customerPhone: formData.phoneNumber || null,
-          customerEmail: formData.email || null,
-          subtotal: orderSubtotal.toFixed(2),
-          tax: orderTax.toFixed(2),
-          total: orderTotal.toFixed(2),
-          status: orderStatus,
-          paymentMethod: publishType === "publish" ? "cash" : null, // Use 'cash' for published, null for draft
-          paymentStatus: publishType === "publish" ? "paid" : "pending",
-          einvoiceStatus: einvoiceStatus,
-          notes: `E-Invoice published - Tax Code: ${formData.taxCode || "N/A"}, Address: ${formData.address || "N/A"}`,
-          orderedAt: new Date(),
-          employeeId: null, // Can be set if employee info is available
-          salesChannel: "pos",
-        };
+          const orderUpdateData = {
+            einvoiceStatus: 1, // 1 = Đã phát hành
+            paymentStatus: "paid",
+            status: "paid",
+            invoiceNumber: result.data?.invoiceNo || null,
+            symbol: selectedTemplate.symbol || null,
+            templateNumber: selectedTemplate.templateNumber || null,
+            notes: `E-Invoice published - Invoice No: ${result.data?.invoiceNo || "N/A"}, Symbol: ${selectedTemplate.symbol || "N/A"}, Template: ${selectedTemplate.templateNumber || "N/A"}`,
+            paidAt: new Date().toISOString(),
+          };
 
-        console.log("💾 Saving published order to database:", orderData);
+          const updateResponse = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${orderId}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(orderUpdateData),
+          });
 
-        const saveResponse = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(orderData),
-        });
-
-        if (saveResponse.ok) {
-          const savedOrder = await saveResponse.json();
-          console.log("✅ Order saved to database successfully:", savedOrder);
-        } else {
-          console.error(
-            "❌ Failed to save order to database:",
-            await saveResponse.text(),
-          );
+          if (updateResponse.ok) {
+            const updatedOrder = await updateResponse.json();
+            console.log("✅ Order updated successfully after e-invoice publish:", updatedOrder);
+          } else {
+            const errorText = await updateResponse.text();
+            console.error("❌ Failed to update order after e-invoice publish:", errorText);
+          }
+        } catch (updateError) {
+          console.error("❌ Error updating order after e-invoice publish:", updateError);
         }
-      } catch (saveError) {
-        console.error("❌ Error saving order to database:", saveError);
+      } else {
+        // Create new order for POS orders without orderId
+        try {
+          const orderStatus = "paid";
+          const publishType = "publish"; // Indicate that this is a direct publish
+          const einvoiceStatus = 1; // 1 = Đã phát hành
+
+          // Create order data for POS E-invoice order
+          const orderData = {
+            orderNumber: `ORD-${Date.now()}`,
+            tableId: null, // No table for POS orders
+            salesChannel: "pos", // ALWAYS pos for POS e-invoice orders
+            customerName: formData.customerName,
+            customerPhone: formData.phoneNumber || null,
+            customerEmail: formData.email || null,
+            subtotal: orderSubtotal.toFixed(2),
+            tax: orderTax.toFixed(2),
+            total: orderTotal.toFixed(2),
+            status: orderStatus,
+            paymentMethod: publishType === "publish" ? "cash" : null, // Use 'cash' for published, null for draft
+            paymentStatus: publishType === "publish" ? "paid" : "pending",
+            einvoiceStatus: einvoiceStatus,
+            invoiceNumber: result.data?.invoiceNo || null,
+            symbol: selectedTemplate.symbol || null,
+            templateNumber: selectedTemplate.templateNumber || null,
+            notes: `E-Invoice published - Tax Code: ${formData.taxCode || "N/A"}, Address: ${formData.address || "N/A"}, Invoice No: ${result.data?.invoiceNo || "N/A"}`,
+            orderedAt: new Date(),
+            employeeId: null, // Can be set if employee info is available
+            salesChannel: "pos",
+          };
+
+          console.log("💾 Saving published order to database:", orderData);
+
+          const saveResponse = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(orderData),
+          });
+
+          if (saveResponse.ok) {
+            const savedOrder = await saveResponse.json();
+            console.log("✅ Order saved to database successfully:", savedOrder);
+          } else {
+            console.error(
+              "❌ Failed to save order to database:",
+              await saveResponse.text(),
+            );
+          }
+        } catch (saveError) {
+          console.error("❌ Error saving order to database:", saveError);
+        }
       }
 
       toast({
@@ -1250,7 +1636,7 @@ export function EInvoiceModal({
             productName: item.name,
             price: itemPrice.toFixed(2),
             quantity: itemQuantity,
-            discount: item.discount || "0",
+            discount: item.discount || "0", // Include discount
             total: (itemSubtotal + itemTax).toFixed(2),
             sku: item.sku || `FOOD${String(item.id).padStart(5, "0")}`,
             taxRate: itemTaxRate,

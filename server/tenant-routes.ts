@@ -48,7 +48,7 @@ export function registerTenantRoutes(app: Express) {
   });
 
   // Health check endpoint for tenant
-  app.get('https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tenant/info', async (req: any, res) => {
+  app.get('/api/tenant/info', async (req: any, res) => {
     try {
       if (!req.tenant) {
         return res.status(400).json({ error: 'No tenant information' });

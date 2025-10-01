@@ -494,11 +494,13 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     service: "서비스",
     create: "생성",
     update: "업데이트",
+    summary: "요약",
     confimremote:
       "상품 productname 데이터베이스에서 영구적으로 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",
 
     // Unit indicators
     perUnit: "개당",
+    totalAmountSubtotal: "소계 금액",
     invoiceprintingcompleted:
       "송장 인쇄가 완료되었습니다. 데이터가 업데이트되었습니다.",
     newPaymentMethod: "새 결제 방법",
@@ -928,6 +930,8 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     invalidFloorData: "Invalid floor data",
     urlInput: "URL Input",
     fileUpload: "File Upload",
+    totalAmountSubtotal: "Subtotal Amount",
+    summary: "Summary",
   },
   vi: {
     save: "Lưu",
@@ -1009,7 +1013,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     unit: "ĐVT",
     quantity: "SL",
     unitPrice: "Đơn giá",
-    totalAmount: "Thành tiền",
+    totalAmountSubtotal: "Thành tiền",
     taxVAT: "Thuế GTGT",
     totalPayment: "Tổng tiền thanh toán",
     subtotalAmount: "Thành tiền trước thuế",
@@ -1231,6 +1235,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
       days90: "90 ngày",
       days180: "180 ngày",
       days365: "365 ngày",
+      summary: "Tóm tắt",
 
       // Sales channels
       pos: "Bán tại quầy",

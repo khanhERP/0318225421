@@ -3,11 +3,6 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import WebSocket from "ws";
 import {
-  tenantMiddleware,
-  getTenantDatabase,
-  TenantRequest,
-} from "./tenant-middleware";
-import {
   insertProductSchema,
   insertTransactionSchema,
   insertTransactionItemSchema,
@@ -20,6 +15,9 @@ import {
   insertSupplierSchema,
   insertCustomerSchema,
   insertPointTransactionSchema,
+  insertPurchaseReceiptSchema,
+  insertPurchaseReceiptItemSchema,
+  insertPurchaseReceiptDocumentSchema,
   attendanceRecords,
   products,
   inventoryTransactions,
@@ -28,9 +26,22 @@ import {
   invoiceItems,
   customers,
   printerConfigs,
+  storeSettings,
+  orders,
+  orderItems as orderItemsTable,
+  categories,
+  transactions as transactionsTable,
+  transactionItems as transactionItemsTable,
+  tables,
+  employees,
 } from "@shared/schema";
 import { initializeSampleData, db } from "./db";
 import { registerTenantRoutes } from "./tenant-routes";
+import {
+  tenantMiddleware,
+  type TenantRequest,
+  getTenantDatabase,
+} from "./tenant-middleware";
 import { z } from "zod";
 import {
   eq,
@@ -48,6 +59,67 @@ import {
   ne,
 } from "drizzle-orm";
 import { sql } from "drizzle-orm";
+
+// Helper function to get payment method display name
+function getPaymentMethodName(method: string | number | null): string {
+  // Handle null/undefined cases explicitly
+  if (method === null || method === undefined) {
+    return "Chưa thanh toán";
+  }
+  
+  switch (method) {
+    case 1:
+    case "cash":
+      return "Tiền mặt";
+    case 2:
+    case "creditCard":
+    case "debitCard":
+      return "Chuyển khoản";
+    case 3:
+      return "TM/CK";
+    case 4:
+    case "qrCode":
+    case "momo":
+    case "zalopay":
+    case "vnpay":
+    case "grabpay":
+      return "QR Code";
+    case "einvoice":
+      return "Hóa đơn điện tử";
+    case "unpaid":
+      return "Chưa thanh toán";
+    default:
+      return "Chưa thanh toán"; // Changed default from "Tiền mặt" to "Chưa thanh toán"
+  }
+}
+
+// Helper function to get e-invoice status display name
+function getEInvoiceStatusName(status: number): string {
+  const statusNames = {
+    0: "Chưa phát hành",
+    1: "Đã phát hành",
+    2: "Tạo nháp",
+    3: "Đã duyệt",
+    4: "Đã bị thay thế (hủy)",
+    5: "Thay thế tạm",
+    6: "Thay thế",
+    7: "Đã bị điều chỉnh",
+    8: "Điều chỉnh tạm",
+    9: "Điều chỉnh",
+    10: "Đã hủy",
+  };
+  return statusNames[status as keyof typeof statusNames] || "Chưa phát hành";
+}
+
+// Helper function to get invoice status display name
+function getInvoiceStatusName(status: number): string {
+  const statusNames = {
+    1: "Hoàn thành",
+    2: "Đang phục vụ",
+    3: "Đã hủy",
+  };
+  return statusNames[status as keyof typeof statusNames] || "Hoàn thành";
+}
 
 // Function to calculate discount distribution among order items
 function calculateDiscountDistribution(items: any[], totalDiscount: number) {
@@ -95,22 +167,61 @@ function calculateDiscountDistribution(items: any[], totalDiscount: number) {
   );
   return result;
 }
-import {
-  orders,
-  orderItems as orderItemsTable,
-  products,
-  categories,
-  transactions as transactionsTable,
-  transactionItems as transactionItemsTable,
-  tables,
-} from "@shared/schema";
+
+// Helper function to get store settings (used in product creation)
+const getStoreSettings = async (database: any) => {
+  const safeDatabase = database || db; // Always ensure we have a valid database connection
+
+  try {
+    const [settings] = await safeDatabase
+      .select({ priceIncludesTax: storeSettings.priceIncludesTax })
+      .from(storeSettings)
+      .limit(1);
+    return settings;
+  } catch (error) {
+    console.error("❌ Error getting store settings:", error);
+    // Return default settings if query fails
+    return { priceIncludesTax: false };
+  }
+};
+
+// Helper function to generate unique SKU
+const generateUniqueSKU = async (tenantDb: any): Promise<string> => {
+  let sku: string;
+  let isUnique = false;
+  let attempts = 0;
+  const maxAttempts = 100;
+
+  while (!isUnique && attempts < maxAttempts) {
+    // Generate 6 random characters (letters and numbers)
+    const randomChars = Math.random()
+      .toString(36)
+      .substring(2, 8)
+      .toUpperCase();
+    sku = `ITEM-${randomChars.padEnd(6, "0")}`;
+
+    // Check if SKU already exists using storage method
+    const existingProduct = await storage.getProductBySku(sku, tenantDb);
+
+    if (!existingProduct) {
+      isUnique = true;
+    }
+    attempts++;
+  }
+
+  if (!isUnique) {
+    throw new Error("Unable to generate unique SKU after maximum attempts");
+  }
+
+  return sku!;
+};
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register tenant management routes
   registerTenantRoutes(app);
 
   // Apply tenant middleware to all API routes
-  app.use("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api", tenantMiddleware);
+  app.use("/api", tenantMiddleware);
 
   // Initialize sample data
   await initializeSampleData();
@@ -138,7 +249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Categories
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories",
+    "/api/categories",
     tenantMiddleware,
     async (req: TenantRequest, res) => {
       try {
@@ -167,7 +278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories", async (req: TenantRequest, res) => {
+  app.post("/api/categories", async (req: TenantRequest, res) => {
     try {
       const { name, icon } = req.body;
       const tenantDb = await getTenantDatabase(req);
@@ -193,7 +304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories/:id", async (req: TenantRequest, res) => {
+  app.put("/api/categories/:id", async (req: TenantRequest, res) => {
     try {
       const categoryId = parseInt(req.params.id);
       const { name, icon } = req.body;
@@ -224,7 +335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories/:id", async (req: TenantRequest, res) => {
+  app.delete("/api/categories/:id", async (req: TenantRequest, res) => {
     try {
       const categoryId = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -266,7 +377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Products
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products",
+    "/api/products",
     tenantMiddleware,
     async (req: TenantRequest, res) => {
       try {
@@ -283,7 +394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tenantDb = null;
         }
 
-        const products = await storage.getProducts(tenantDb);
+        let products = await storage.getProducts(tenantDb);
         console.log(`✅ Successfully fetched ${products.length} products`);
         res.json(products);
       } catch (error) {
@@ -296,7 +407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Endpoint for POS to get only active products
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/active", async (req: TenantRequest, res) => {
+  app.get("/api/products/active", async (req: TenantRequest, res) => {
     try {
       const tenantDb = await getTenantDatabase(req);
       const products = await storage.getActiveProducts(tenantDb);
@@ -309,7 +420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get single product by ID
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/:id", async (req: TenantRequest, res) => {
+  app.get("/api/products/:id", async (req: TenantRequest, res) => {
     try {
       const productId = parseInt(req.params.id);
       if (isNaN(productId)) {
@@ -320,7 +431,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const tenantDb = await getTenantDatabase(req);
 
-      const [product] = await db
+      const [product] = await tenantDb
         .select({
           id: products.id,
           name: products.name,
@@ -336,6 +447,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           taxRate: products.taxRate,
           priceIncludesTax: products.priceIncludesTax,
           afterTaxPrice: products.afterTaxPrice,
+          beforeTaxPrice: products.beforeTaxPrice,
+          floor: products.floor,
         })
         .from(products)
         .leftJoin(categories, eq(products.categoryId, categories.id))
@@ -354,6 +467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Price: ${product.price}`);
       console.log(`Tax Rate: ${product.taxRate}`);
       console.log(`After Tax Price: ${product.afterTaxPrice}`);
+      console.log(`Before Tax Price: ${product.beforeTaxPrice}`);
 
       res.json(product);
     } catch (error) {
@@ -364,56 +478,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products", async (req: TenantRequest, res) => {
+  app.post("/api/products", async (req: TenantRequest, res) => {
     try {
-      console.log("Product creation request body:", req.body);
-      const tenantDb = await getTenantDatabase(req);
+      console.log("Creating product with data:", req.body);
 
-      // Ensure required fields are present
-      if (
-        !req.body.name ||
-        !req.body.sku ||
-        !req.body.price ||
-        !req.body.categoryId ||
-        req.body.taxRate === undefined
-      ) {
-        return res.status(400).json({
-          message:
-            "Missing required fields: name, sku, price, categoryId, and taxRate are required",
-        });
+      // Get tenant database connection with error handling
+      let tenantDb;
+      try {
+        tenantDb = await getTenantDatabase(req);
+        console.log(
+          "✅ Tenant database connection obtained for product creation",
+        );
+      } catch (dbError) {
+        console.error(
+          "❌ Failed to get tenant database for product creation:",
+          dbError,
+        );
+        tenantDb = null; // Will use default db as fallback
       }
 
-      // Validate and transform the data
+      // Get store settings to check price tax inclusion using storage method
+      let storeSettings;
+      try {
+        storeSettings = await storage.getStoreSettings(tenantDb);
+        console.log("✅ Store settings retrieved:", storeSettings);
+      } catch (error) {
+        console.error("❌ Error getting store settings from storage:", error);
+        // Use helper function as fallback
+        storeSettings = await getStoreSettings(tenantDb);
+      }
+      const storePriceIncludesTax = storeSettings?.priceIncludesTax || false;
+
+      // Auto-generate SKU if not provided or empty
+      let productSKU = req.body.sku;
+      if (!productSKU || productSKU.trim() === "") {
+        productSKU = await generateUniqueSKU(tenantDb);
+        console.log("Auto-generated SKU:", productSKU);
+      }
+
+      // Handle tax calculations
+      let beforeTaxPrice = null;
+
+      if (req.body.afterTaxPrice && req.body.afterTaxPrice.trim() !== "") {
+        const afterTax = parseFloat(req.body.afterTaxPrice);
+        const taxRate = parseFloat(req.body.taxRate || "0");
+
+        if (storePriceIncludesTax) {
+          // If store setting is true: prices include tax, calculate beforeTaxPrice
+          if (taxRate > 0) {
+            const price = afterTax / (1 + taxRate / 100);
+            beforeTaxPrice = price.toFixed(2);
+          }
+        } else {
+          // If store setting is false: prices exclude tax, beforeTaxPrice = 0
+          beforeTaxPrice = "0.00";
+        }
+      }
+
+      // Validate and transform the data - ensure strings for database
       const validatedData = insertProductSchema.parse({
         name: req.body.name,
-        sku: req.body.sku,
-        price: req.body.price.toString(),
+        sku: productSKU, // Use the potentially auto-generated SKU
+        price: String(req.body.price), // Convert to string for database
         stock: Number(req.body.stock) || 0,
         categoryId: Number(req.body.categoryId),
         productType: Number(req.body.productType) || 1,
         trackInventory: req.body.trackInventory !== false,
         imageUrl: req.body.imageUrl || null,
-        taxRate: req.body.taxRate.toString(),
+        taxRate: req.body.taxRate ? String(req.body.taxRate) : "0", // Preserve exact user input, only use fallback if not provided
+        priceIncludesTax: Boolean(
+          req.body.priceIncludesTax || storePriceIncludesTax,
+        ),
         afterTaxPrice:
           req.body.afterTaxPrice && req.body.afterTaxPrice.trim() !== ""
-            ? req.body.afterTaxPrice.toString()
+            ? String(req.body.afterTaxPrice) // Convert to string for database
             : null,
+        beforeTaxPrice: beforeTaxPrice ? String(beforeTaxPrice) : null, // Convert to string for database
+        floor: String(req.body.floor || "1"), // Convert to string for database
       });
 
       console.log("Validated product data:", validatedData);
+      console.log("Tax rate processing debug:", {
+        originalTaxRate: req.body.taxRate,
+        validatedTaxRate: validatedData.taxRate,
+        taxRateType: typeof validatedData.taxRate,
+      });
 
-      // Check if SKU already exists (including inactive products)
-      const [existingProduct] = await db
-        .select()
-        .from(products)
-        .where(eq(products.sku, validatedData.sku));
-
-      if (existingProduct) {
-        console.log("SKU already exists:", validatedData.sku);
-        return res.status(409).json({
-          message: `SKU "${validatedData.sku}" đã tồn tại trong hệ thống`,
-          code: "DUPLICATE_SKU",
-        });
+      // SKU uniqueness check is now handled by generateUniqueSKU,
+      // but we still check if a manually provided SKU already exists.
+      if (req.body.sku && req.body.sku.trim() !== "") {
+        const existingProduct = await storage.getProductBySku(
+          validatedData.sku,
+          tenantDb,
+        );
+        if (existingProduct) {
+          console.log("Provided SKU already exists:", validatedData.sku);
+          return res.status(409).json({
+            message: `SKU "${validatedData.sku}" đã tồn tại trong hệ thống`,
+            code: "DUPLICATE_SKU",
+          });
+        }
       }
 
       const product = await storage.createProduct(validatedData, tenantDb);
@@ -436,22 +600,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/:id", async (req: TenantRequest, res) => {
+  app.put("/api/products/:id", async (req: TenantRequest, res) => {
     try {
+      const tenantDb = await getTenantDatabase(req);
       const id = parseInt(req.params.id);
       console.log("Product update request:", id, req.body);
 
-      // Transform data to ensure proper types
+      // Get store settings to check price_includes_tax
+      const [storeSettingsData] = await tenantDb
+        .select({ priceIncludesTax: storeSettings.priceIncludesTax })
+        .from(storeSettings)
+        .limit(1);
+      const storePriceIncludesTax =
+        storeSettingsData?.priceIncludesTax || false;
+
+      // Calculate beforeTaxPrice based on store setting
+      let beforeTaxPrice = req.body.beforeTaxPrice; // Initialize with value from body if provided
+      if (req.body.price && req.body.taxRate) {
+        const price = parseFloat(req.body.price.toString());
+        const taxRate = parseFloat(req.body.taxRate.toString());
+
+        if (storePriceIncludesTax) {
+          // If store setting is true: prices include tax, calculate beforeTaxPrice
+          if (taxRate > 0) {
+            beforeTaxPrice = (price / (1 + taxRate / 100)).toFixed(2);
+          } else {
+            beforeTaxPrice = price.toFixed(2);
+          }
+        } else {
+          // If store setting is false: prices exclude tax, beforeTaxPrice = 0
+          beforeTaxPrice = "0.00";
+        }
+      }
+
+      // Transform data keeping string types for Zod validation
       const transformedData = {
         ...req.body,
         price: req.body.price ? req.body.price.toString() : undefined,
         taxRate: req.body.taxRate ? req.body.taxRate.toString() : undefined,
         afterTaxPrice:
-          req.body.afterTaxPrice && req.body.afterTaxPrice.trim() !== ""
+          req.body.afterTaxPrice &&
+          req.body.afterTaxPrice.toString().trim() !== ""
             ? req.body.afterTaxPrice.toString()
             : null,
-        priceIncludesTax: req.body.priceIncludesTax || false,
+        beforeTaxPrice: beforeTaxPrice ? beforeTaxPrice.toString() : null,
+        priceIncludesTax: Boolean(
+          req.body.priceIncludesTax || storePriceIncludesTax,
+        ),
         trackInventory: req.body.trackInventory !== false,
+        floor:
+          req.body.floor !== undefined ? String(req.body.floor) : undefined, // Add floor to transformed data
       };
 
       // Remove undefined fields
@@ -466,7 +664,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertProductSchema
         .partial()
         .parse(transformedData);
-      const tenantDb = await getTenantDatabase(req);
       const product = await storage.updateProduct(id, validatedData, tenantDb);
 
       if (!product) {
@@ -492,7 +689,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/:id", async (req: TenantRequest, res) => {
+  app.delete("/api/products/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -527,7 +724,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // New endpoint to cleanup inactive products
   app.delete(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/cleanup/inactive",
+    "/api/products/cleanup/inactive",
     async (req: TenantRequest, res) => {
       try {
         const tenantDb = await getTenantDatabase(req);
@@ -544,7 +741,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/barcode/:sku", async (req: TenantRequest, res) => {
+  app.get("/api/products/barcode/:sku", async (req: TenantRequest, res) => {
     try {
       const sku = req.params.sku;
       const tenantDb = await getTenantDatabase(req);
@@ -565,7 +762,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Transactions - Now creates orders instead for unified data storage
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/transactions", async (req: TenantRequest, res) => {
+  app.post("/api/transactions", async (req: TenantRequest, res) => {
     try {
       const { transaction, items } = req.body;
       const tenantDb = await getTenantDatabase(req);
@@ -631,7 +828,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (
           product.afterTaxPrice &&
           product.afterTaxPrice !== null &&
-          product.afterTaxPrice !== ""
+          product?.afterTaxPrice.toString() !== ""
         ) {
           const afterTaxPrice = parseFloat(product.afterTaxPrice);
           const price = parseFloat(product.price);
@@ -661,6 +858,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const total = subtotal + tax;
 
+      // Get store settings for price_include_tax
+      const database = tenantDb || db;
+      const [storeSettingsData] = await database
+        .select({ priceIncludesTax: storeSettings.priceIncludesTax })
+        .from(storeSettings)
+        .limit(1);
+      const priceIncludeTax = storeSettingsData?.priceIncludesTax || false;
+
       // Create order data for POS transaction
       const orderData = {
         orderNumber: validatedTransaction.transactionId, // Use transaction ID as order number
@@ -675,6 +880,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentMethod: validatedTransaction.paymentMethod,
         paymentStatus: "paid",
         salesChannel: "pos", // Mark as POS order
+        priceIncludeTax: priceIncludeTax,
         einvoiceStatus: 0, // Default e-invoice status
         invoiceId: validatedTransaction.invoiceId || null,
         invoiceNumber: validatedTransaction.invoiceNumber || null,
@@ -743,7 +949,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/transactions", async (req: TenantRequest, res) => {
+  app.get("/api/transactions", async (req: TenantRequest, res) => {
     try {
       const tenantDb = await getTenantDatabase(req);
       const transactions = await storage.getTransactions(tenantDb);
@@ -757,7 +963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Get transactions by date range
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/transactions/:startDate/:endDate",
+    "/api/transactions/:startDate/:endDate",
     async (req: TenantRequest, res) => {
       try {
         const { startDate, endDate } = req.params;
@@ -790,7 +996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // API lấy danh sách đơn hàng với filter và pagination
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/list", async (req: TenantRequest, res) => {
+  app.get("/api/orders/list", async (req: TenantRequest, res) => {
     try {
       const {
         startDate,
@@ -800,15 +1006,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerCode,
         status,
         salesChannel,
+        einvoiceStatus,
+        invoiceStatus,
+        paymentMethod,
         page = "1",
-        limit = "20",
+        limit,
         sortBy = "orderedAt",
         sortOrder = "desc",
       } = req.query;
 
       const pageNum = parseInt(page as string);
-      const limitNum = parseInt(limit as string);
-      const offset = (pageNum - 1) * limitNum;
+      const limitNum = limit ? parseInt(limit as string) : null;
+      const offset = limitNum ? (pageNum - 1) * limitNum : 0;
 
       console.log("🔍 GET /api/orders/list - Filter params:", {
         startDate,
@@ -818,6 +1027,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerCode,
         status,
         salesChannel,
+        einvoiceStatus,
+        invoiceStatus,
+        paymentMethod,
         page: pageNum,
         limit: limitNum,
       });
@@ -828,12 +1040,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Build where conditions
       const whereConditions = [];
 
-      // Date range filter
+      // Date range filter - support yyyyMMdd format
       if (startDate && endDate) {
-        const start = new Date(startDate as string);
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(endDate as string);
-        end.setHours(23, 59, 59, 999);
+        let start: Date;
+        let end: Date;
+
+        if (
+          typeof startDate === "string" &&
+          startDate.length === 8 &&
+          /^\d{8}$/.test(startDate)
+        ) {
+          // Parse yyyyMMdd format
+          const year = parseInt(startDate.substring(0, 4));
+          const month = parseInt(startDate.substring(4, 6)) - 1; // Month is 0-indexed
+          const day = parseInt(startDate.substring(6, 8));
+          start = new Date(year, month, day, 0, 0, 0, 0);
+        } else {
+          // Parse standard date format
+          start = new Date(startDate as string);
+          start.setHours(0, 0, 0, 0);
+        }
+
+        if (
+          typeof endDate === "string" &&
+          endDate.length === 8 &&
+          /^\d{8}$/.test(endDate)
+        ) {
+          // Parse yyyyMMdd format
+          const year = parseInt(endDate.substring(0, 4));
+          const month = parseInt(endDate.substring(4, 6)) - 1; // Month is 0-indexed
+          const day = parseInt(endDate.substring(6, 8));
+          end = new Date(year, month, day, 23, 59, 59, 999);
+        } else {
+          // Parse standard date format
+          end = new Date(endDate as string);
+          end.setHours(23, 59, 59, 999);
+        }
 
         whereConditions.push(
           gte(orders.orderedAt, start),
@@ -861,6 +1103,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         whereConditions.push(eq(orders.salesChannel, salesChannel as string));
       }
 
+      // E-invoice status filter
+      if (einvoiceStatus !== undefined && einvoiceStatus !== "all") {
+        whereConditions.push(
+          eq(orders.einvoiceStatus, parseInt(einvoiceStatus as string)),
+        );
+      }
+
+      // Invoice status filter
+      if (invoiceStatus !== undefined && invoiceStatus !== "all") {
+        whereConditions.push(
+          eq(orders.invoiceStatus, parseInt(invoiceStatus as string)),
+        );
+      }
+
+      // Payment method filter - include null values (unpaid orders)
+      if (paymentMethod && paymentMethod !== "all") {
+        if (paymentMethod === "null" || paymentMethod === "unpaid") {
+          // Filter for unpaid orders (paymentMethod is null)
+          whereConditions.push(sql`${orders.paymentMethod} IS NULL`);
+        } else {
+          // Filter for specific payment method
+          whereConditions.push(
+            eq(orders.paymentMethod, paymentMethod as string),
+          );
+        }
+      }
+
       // Get total count for pagination
       const [totalCountResult] = await database
         .select({
@@ -872,55 +1141,147 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
 
       const totalCount = totalCountResult?.count || 0;
-      const totalPages = Math.ceil(totalCount / limitNum);
+      const totalPages = limitNum ? Math.ceil(totalCount / limitNum) : 1;
 
-      // Get paginated orders
+      // Get paginated orders - simplified query without JOIN
       const orderBy =
-        sortOrder === "asc"
-          ? asc(orders[sortBy as keyof typeof orders] || orders.orderedAt)
-          : desc(orders[sortBy as keyof typeof orders] || orders.orderedAt);
+        sortOrder === "asc" ? asc(orders.orderedAt) : desc(orders.orderedAt);
 
-      const ordersResult = await database
-        .select({
-          id: orders.id,
-          orderNumber: orders.orderNumber,
-          tableId: orders.tableId,
-          employeeId: orders.employeeId,
-          status: orders.status,
-          customerName: orders.customerName,
-          customerCount: orders.customerCount,
-          subtotal: orders.subtotal,
-          tax: orders.tax,
-          total: orders.total,
-          paymentMethod: orders.paymentMethod,
-          paymentStatus: orders.paymentStatus,
-          salesChannel: orders.salesChannel,
-          einvoiceStatus: orders.einvoiceStatus,
-          templateNumber: orders.templateNumber,
-          symbol: orders.symbol,
-          invoiceNumber: orders.invoiceNumber,
-          notes: orders.notes,
-          orderedAt: orders.orderedAt,
-          paidAt: orders.paidAt,
-        })
+      let ordersQuery = database
+        .select()
         .from(orders)
         .where(whereConditions.length > 0 ? and(...whereConditions) : undefined)
-        .orderBy(orderBy)
-        .limit(limitNum)
-        .offset(offset);
+        .orderBy(orderBy);
+
+      // Apply pagination only if limit is specified
+      if (limitNum) {
+        ordersQuery = ordersQuery.limit(limitNum).offset(offset);
+      }
+
+      const ordersResult = await ordersQuery;
 
       console.log(
-        `✅ Orders list API - Found ${ordersResult.length} orders (page ${pageNum}/${totalPages})`,
+        `✅ Orders list API - Found ${ordersResult.length} orders${limitNum ? ` (page ${pageNum}/${totalPages})` : " (all orders)"}`,
+      );
+
+      // Get employee data separately for all orders
+      const employeeIds = [
+        ...new Set(
+          ordersResult.map((order) => order.employeeId).filter(Boolean),
+        ),
+      ];
+      let employeeMap = new Map();
+
+      if (employeeIds.length > 0) {
+        try {
+          const employeeData = await database
+            .select({
+              id: employees.id,
+              employeeId: employees.employeeId,
+              name: employees.name,
+            })
+            .from(employees)
+            .where(sql`${employees.id} = ANY(${employeeIds})`);
+
+          employeeMap = new Map(employeeData.map((emp) => [emp.id, emp]));
+        } catch (empError) {
+          console.warn(
+            "⚠️ Error fetching employee data, continuing without:",
+            empError,
+          );
+        }
+      }
+
+      // Process orders to ensure consistent field structure
+      const processedOrders = ordersResult.map((order, index) => {
+        const employee = order.employeeId
+          ? employeeMap.get(order.employeeId)
+          : null;
+
+        return {
+          ...order,
+          customerCode:
+            order.customerTaxCode ||
+            `KH000${String(index + 1).padStart(3, "0")}`,
+          customerName: order.customerName || "Khách hàng lẻ",
+          discount: order.discount || "0.00",
+          // Employee info with fallbacks
+          employeeCode: employee?.employeeId || "NV0001",
+          employeeName: employee?.name || "Nhân viên",
+          // Payment method details
+          paymentMethodName: getPaymentMethodName(order.paymentMethod),
+          // Invoice status details
+          einvoiceStatusName: getEInvoiceStatusName(order.einvoiceStatus || 0),
+          invoiceStatusName: getInvoiceStatusName(order.invoiceStatus || 1),
+        };
+      });
+
+      // Fetch order items for each order
+      const ordersWithItems = await Promise.all(
+        processedOrders.map(async (order, index) => {
+          try {
+            const items = await database
+              .select({
+                // Order item fields
+                id: orderItemsTable.id,
+                orderId: orderItemsTable.orderId,
+                productId: orderItemsTable.productId,
+                quantity: orderItemsTable.quantity,
+                unitPrice: orderItemsTable.unitPrice,
+                total: orderItemsTable.total,
+                discount: orderItemsTable.discount,
+                notes: orderItemsTable.notes,
+                // Product fields with safe handling
+                productName: sql<string>`COALESCE(${products.name}, 'Unknown Product')`,
+                productSku: sql<string>`COALESCE(${products.sku}, '')`,
+              })
+              .from(orderItemsTable)
+              .leftJoin(products, eq(orderItemsTable.productId, products.id))
+              .where(eq(orderItemsTable.orderId, order.id));
+
+            const processedItems = items.map((item) => ({
+              id: item.id,
+              orderId: item.orderId,
+              productId: item.productId,
+              quantity: item.quantity,
+              unit: "cái", // Default unit
+              unitPrice: item.unitPrice,
+              total: item.total,
+              discount: item.discount || "0.00",
+              notes: item.notes,
+              productName: item.productName || "Unknown Product",
+              productSku: item.productSku || "",
+            }));
+
+            return {
+              ...order,
+              items: processedItems,
+            };
+          } catch (itemError) {
+            console.error(
+              `❌ Error fetching items for order ${order.id}:`,
+              itemError,
+            );
+            return {
+              ...order,
+              items: [],
+            };
+          }
+        }),
+      );
+
+      console.log(
+        `✅ Orders list API with items - Found ${ordersWithItems.length} orders with complete details`,
       );
 
       res.json({
-        orders: ordersResult,
+        orders: ordersWithItems,
         pagination: {
           currentPage: pageNum,
           totalPages,
           totalCount,
           limit: limitNum,
-          hasNext: pageNum < totalPages,
+          hasNext: limitNum ? pageNum < totalPages : false,
           hasPrev: pageNum > 1,
         },
       });
@@ -935,63 +1296,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Get orders by date range
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range/:startDate/:endDate",
+    "/api/orders/date-range/:startDate/:endDate/:floor?",
     async (req: TenantRequest, res) => {
       try {
-        const { startDate, endDate } = req.params;
+        const { startDate, endDate, floor } = req.params;
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 1000; // Increase limit to get all data
+        const floorFilter = floor || "all";
 
         const tenantDb = await getTenantDatabase(req);
 
-        // Parse dates with proper timezone handling
-        const start = new Date(startDate);
-        start.setHours(0, 0, 0, 0); // Start of day in local timezone
-
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999); // End of day in local timezone
-
-        console.log("Date range filter:", {
+        console.log("Date range API called with params:", {
           startDate,
           endDate,
-          startParsed: start.toISOString(),
-          endParsed: end.toISOString(),
+          rawStartDate: startDate,
+          rawEndDate: endDate,
+          floorFilter: floorFilter,
         });
 
-        // Get ALL orders and filter by date range properly
-        const allOrdersInDb = await db
-          .select()
-          .from(orders)
-          .orderBy(desc(orders.orderedAt), desc(orders.id));
+        // Improve date parsing to handle both date-only and datetime formats
+        let start: Date;
+        let end: Date;
 
-        // Filter orders by date range in application layer for better control
-        const filteredOrders = allOrdersInDb.filter((order) => {
-          if (!order.orderedAt) return false;
+        // Check if startDate includes time (has 'T' or contains time format)
+        if (startDate.includes("T") || startDate.includes(":")) {
+          // DateTime format - parse as is (ISO datetime or time included)
+          start = new Date(startDate);
+          console.log(
+            `📅 Parsed start datetime: ${startDate} -> ${start} (Local: ${start.toLocaleString()})`,
+          );
+        } else {
+          // Date-only format - set to start of day (00:00:00)
+          start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          console.log(
+            `📅 Parsed start date-only: ${startDate} -> ${start} (Local: ${start.toLocaleString()})`,
+          );
+        }
 
-          const orderDate = new Date(order.orderedAt);
+        // Check if endDate includes time (has 'T' or contains time format)
+        if (endDate.includes("T") || endDate.includes(":")) {
+          // DateTime format - parse as is (ISO datetime or time included)
+          end = new Date(endDate);
+          console.log(
+            `📅 Parsed end datetime: ${endDate} -> ${end} (Local: ${end.toLocaleString()})`,
+          );
+        } else {
+          // Date-only format - set to end of day (23:59:59)
+          end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          console.log(
+            `📅 Parsed end date-only: ${endDate} -> ${end} (Local: ${end.toLocaleString()})`,
+          );
+        }
 
-          // Normalize dates for comparison (remove time component)
-          const orderDateOnly = new Date(orderDate);
-          orderDateOnly.setHours(0, 0, 0, 0);
-
-          const startDateOnly = new Date(start);
-          startDateOnly.setHours(0, 0, 0, 0);
-
-          const endDateOnly = new Date(end);
-          endDateOnly.setHours(0, 0, 0, 0);
-
-          return orderDateOnly >= startDateOnly && orderDateOnly <= endDateOnly;
+        console.log("Date range filter with parsed dates:", {
+          startDate,
+          endDate,
+          startParsed: start,
+          endParsed: end,
+          startLocal: start.toLocaleString(),
+          endLocal: end.toLocaleString(),
         });
 
-        console.log("Orders by date range - Filter results:", {
-          totalOrdersInDb: allOrdersInDb.length,
+        // Use database query with proper date filtering on orderedAt field
+        let database = tenantDb || db;
+
+        let filteredOrders;
+
+        if (floorFilter && floorFilter !== "all") {
+          // Join with tables to filter by floor
+          filteredOrders = await database
+            .select({
+              ...orders,
+            })
+            .from(orders)
+            .leftJoin(tables, eq(orders.tableId, tables.id))
+            .where(
+              and(
+                gte(orders.orderedAt, start),
+                lte(orders.orderedAt, end),
+                eq(tables.floor, floorFilter),
+              ),
+            )
+            .orderBy(desc(orders.orderedAt), desc(orders.id));
+        } else {
+          filteredOrders = await database
+            .select()
+            .from(orders)
+            .where(
+              and(gte(orders.orderedAt, start), lte(orders.orderedAt, end)),
+            )
+            .orderBy(desc(orders.orderedAt), desc(orders.id));
+        }
+
+        console.log("Orders by date range - Database filter results:", {
           filteredCount: filteredOrders.length,
           dateRange: `${startDate} to ${endDate}`,
+          queryUsed: `createdAt >= '${start.toISOString()}' AND createdAt <= '${end.toISOString()}'`,
           sampleFilteredOrder: filteredOrders[0]
             ? {
                 id: filteredOrders[0].id,
                 orderNumber: filteredOrders[0].orderNumber,
-                orderedAt: filteredOrders[0].orderedAt,
+                createdAt: filteredOrders[0].createdAt,
+                createdAtLocal: new Date(
+                  filteredOrders[0].createdAt,
+                ).toLocaleString(),
                 status: filteredOrders[0].status,
               }
             : null,
@@ -1010,7 +1420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Get invoices by date range
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices/date-range/:startDate/:endDate",
+    "/api/invoices/date-range/:startDate/:endDate",
     async (req: TenantRequest, res) => {
       try {
         const { startDate, endDate } = req.params;
@@ -1072,7 +1482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/transactions/:transactionId",
+    "/api/transactions/:transactionId",
     async (req: TenantRequest, res) => {
       try {
         const transactionId = req.params.transactionId;
@@ -1098,7 +1508,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Get next employee ID
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees/next-id", async (req: TenantRequest, res) => {
+  app.get("/api/employees/next-id", async (req: TenantRequest, res) => {
     try {
       const tenantDb = await getTenantDatabase(req);
       const nextId = await storage.getNextEmployeeId(tenantDb);
@@ -1112,8 +1522,869 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get next PO number for purchase receipts
+  app.get(
+    "/api/purchase-orders/next-po-number",
+    async (req: TenantRequest, res) => {
+      try {
+        console.log("🔍 API: Getting next purchase receipt number");
+        const tenantDb = await getTenantDatabase(req);
+        const nextPONumber = await storage.getNextPONumber(tenantDb);
+        console.log(
+          "✅ API: Generated next purchase receipt number:",
+          nextPONumber,
+        );
+        res.json({
+          nextPONumber,
+        });
+      } catch (error) {
+        console.error(
+          "❌ API: Failed to generate purchase receipt number:",
+          error,
+        );
+        res.status(500).json({
+          message: "Failed to generate purchase receipt number",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+
+  // Get single Purchase Receipt by ID
+  app.get("/api/purchase-receipts/:id", async (req: TenantRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      console.log("🔍 API: Getting purchase receipt with ID:", id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({
+          error: "Invalid purchase receipt ID",
+        });
+      }
+
+      const tenantDb = await getTenantDatabase(req);
+      const receipt = await storage.getPurchaseOrder(id, tenantDb);
+
+      if (!receipt) {
+        console.log("❌ Purchase receipt not found:", id);
+        return res.status(404).json({
+          error: "Purchase receipt not found",
+        });
+      }
+
+      console.log("✅ API: Purchase receipt fetched:", receipt.id);
+      res.json(receipt);
+    } catch (error) {
+      console.error("❌ API: Failed to fetch purchase receipt:", error);
+      res.status(500).json({
+        error: "Failed to fetch purchase receipt",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  // Get Purchase Receipt Items
+  app.get(
+    "/api/purchase-receipts/:id/items",
+    async (req: TenantRequest, res) => {
+      try {
+        const purchaseReceiptId = parseInt(req.params.id);
+        console.log(
+          "🔍 API: Getting purchase receipt items for ID:",
+          purchaseReceiptId,
+        );
+
+        if (isNaN(purchaseReceiptId)) {
+          return res.status(400).json({
+            error: "Invalid purchase receipt ID",
+          });
+        }
+
+        const tenantDb = await getTenantDatabase(req);
+        const items = await storage.getPurchaseOrderItems(
+          purchaseReceiptId,
+          tenantDb,
+        );
+
+        console.log("✅ API: Purchase receipt items fetched:", items.length);
+        res.json(items);
+      } catch (error) {
+        console.error("❌ API: Failed to fetch purchase receipt items:", error);
+        res.status(500).json({
+          error: "Failed to fetch purchase receipt items",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+
+  // Product Analysis API
+  app.get(
+    "/api/product-analysis/:startDate/:endDate/:floor?",
+    async (req: TenantRequest, res) => {
+      try {
+        const { startDate, endDate, floor } = req.params;
+        const { categoryId, productType, productSearch } = req.query;
+        const floorFilter = floor || "all";
+
+        console.log("🔍 Product Analysis API called with params:", {
+          startDate,
+          endDate,
+          floorFilter,
+          categoryId,
+          productType,
+          productSearch,
+        });
+
+        const tenantDb = await getTenantDatabase(req);
+
+        // Parse dates
+        let start: Date;
+        let end: Date;
+
+        if (startDate.includes("T") || startDate.includes(":")) {
+          start = new Date(startDate);
+        } else {
+          start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+        }
+
+        if (endDate.includes("T") || endDate.includes(":")) {
+          end = new Date(endDate);
+        } else {
+          end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+        }
+
+        const database = tenantDb || db;
+
+        // Build category conditions for products
+        let categoryConditions = [];
+        if (categoryId && categoryId !== "all") {
+          categoryConditions.push(
+            eq(products.categoryId, parseInt(categoryId as string)),
+          );
+        }
+
+        // Build product type conditions
+        let typeConditions = [];
+        if (productType && productType !== "all") {
+          const typeMap = {
+            combo: 3,
+            product: 1,
+            service: 2,
+          };
+          const typeValue = typeMap[productType as keyof typeof typeMap];
+          if (typeValue) {
+            typeConditions.push(eq(products.productType, value));
+          }
+        }
+
+        // Build search conditions
+        let searchConditions = [];
+        if (productSearch && productSearch !== "" && productSearch !== "all") {
+          const searchTerm = `%${productSearch}%`;
+          searchConditions.push(
+            or(
+              ilike(products.name, searchTerm),
+              ilike(products.sku, searchTerm),
+            ),
+          );
+        }
+
+        // Get orders with items in the date range
+        let ordersQuery = database
+          .select({
+            productId: orderItemsTable.productId,
+            productName: products.name,
+            productSku: products.sku,
+            categoryId: products.categoryId,
+            categoryName: categories.name,
+            unitPrice: orderItemsTable.unitPrice, // This is the pre-tax price
+            quantity: orderItemsTable.quantity,
+            total: orderItemsTable.total, // This should also be pre-tax total
+            orderId: orderItemsTable.orderId,
+            orderDate: orders.orderedAt,
+            discount: orderItemsTable.discount,
+            orderStatus: orders.status,
+            tableId: orders.tableId,
+            priceIncludeTax: orders.priceIncludeTax,
+          })
+          .from(orders)
+          .innerJoin(orderItemsTable, eq(orders.id, orderItemsTable.orderId))
+          .leftJoin(products, eq(orderItemsTable.productId, products.id))
+          .leftJoin(categories, eq(products.categoryId, categories.id))
+          .where(
+            and(
+              gte(orders.orderedAt, start),
+              lte(orders.orderedAt, end),
+              or(eq(orders.status, "paid"), eq(orders.status, "completed")),
+              ...categoryConditions,
+              ...typeConditions,
+              ...searchConditions,
+            ),
+          )
+          .orderBy(desc(orders.orderedAt));
+
+        // Add floor filter if specified
+        if (floorFilter && floorFilter !== "all") {
+          ordersQuery = ordersQuery
+            .leftJoin(tables, eq(orders.tableId, tables.id))
+            .where(and(eq(tables.floor, floorFilter)));
+        }
+
+        const orderItems = await ordersQuery;
+
+        // Group and aggregate data by product
+        const productMap = new Map();
+
+        orderItems.forEach((item) => {
+          const productId = item.productId;
+          const quantity = Number(item.quantity || 0);
+          const revenue = Number(item.unitPrice || 0) * quantity;
+          const discount = Number(item.discount || 0);
+
+          if (productMap.has(productId)) {
+            const existing = productMap.get(productId);
+            existing.totalQuantity += quantity;
+            existing.totalRevenue += revenue;
+            existing.discount += discount;
+            existing.orderCount += 1;
+          } else {
+            productMap.set(productId, {
+              productId: item.productId,
+              productName: item.productName,
+              productSku: item.productSku,
+              categoryId: item.categoryId,
+              categoryName: item.categoryName,
+              productType: item.productType,
+              unitPrice: item.unitPrice, // This is the pre-tax price
+              quantity: item.quantity,
+              total: item.total,
+              discount: item.discount,
+              totalQuantity: quantity,
+              totalRevenue: revenue,
+              totalDiscount: discount,
+              averagePrice: Number(item.unitPrice || 0),
+              orderCount: 1,
+            });
+          }
+        });
+
+        // Convert to array and calculate final metrics
+        const productStats = Array.from(productMap.values()).map((product) => ({
+          ...product,
+          averageOrderValue:
+            product.orderCount > 0
+              ? product.totalRevenue / product.orderCount
+              : 0,
+        }));
+
+        // Calculate totals
+        const totalRevenue = productStats.reduce(
+          (sum, product) => sum + product.totalRevenue,
+          0,
+        );
+        const totalQuantity = productStats.reduce(
+          (sum, product) => sum + product.totalQuantity,
+          0,
+        );
+        const totalDiscount = productStats.reduce(
+          (sum, product) => sum + product.totalDiscount,
+          0,
+        );
+        const totalProducts = productStats.length;
+
+        console.log(
+          `✅ Product Analysis API - Found ${productStats.length} products, Total Revenue: ${totalRevenue}`,
+        );
+
+        // Sort by revenue (descending)
+        productStats.sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+        const result = {
+          productStats,
+          totalRevenue,
+          totalQuantity,
+          totalDiscount,
+          totalProducts,
+          summary: {
+            topSellingProduct: productStats[0] || null,
+            averageRevenuePerProduct:
+              totalProducts > 0 ? totalRevenue / totalProducts : 0,
+          },
+        };
+
+        console.log("Product Analysis Results:", {
+          totalRevenue,
+          totalQuantity,
+          totalDiscount,
+          totalProducts,
+          topProduct: result.summary.topSellingProduct?.productName,
+        });
+
+        res.json(result);
+      } catch (error) {
+        console.error("❌ Product Analysis API error:", error);
+        res.status(500).json({
+          error: "Failed to fetch product analysis",
+          message: error instanceof Error ? error.message : String(error),
+          summary: {
+            totalProducts: 0,
+            totalRevenue: 0,
+            totalQuantity: 0,
+            totalOrders: 0,
+            averageOrderValue: 0,
+          },
+          productStats: [],
+          categoryStats: [],
+          topSellingProducts: [],
+          topRevenueProducts: [],
+        });
+      }
+    },
+  );
+
+  // Get Purchase Receipts
+  app.get("/api/purchase-receipts", async (req: TenantRequest, res) => {
+    try {
+      console.log("🔍 API: Getting purchase receipts with query:", req.query);
+      const tenantDb = await getTenantDatabase(req);
+
+      const options = {
+        supplierId: req.query.supplierId
+          ? Number(req.query.supplierId)
+          : undefined,
+        status: req.query.status as string,
+        search: req.query.search as string,
+        startDate: req.query.startDate as string,
+        endDate: req.query.endDate as string,
+        page: req.query.page ? Number(req.query.page) : 1,
+        limit: req.query.limit ? Number(req.query.limit) : undefined,
+      };
+
+      const receipts = await storage.getPurchaseReceipts(options, tenantDb);
+      console.log("✅ API: Purchase receipts fetched:", receipts.length);
+
+      // Transform receipts to match C# class structure
+      const transformedReceipts = await Promise.all(
+        receipts.map(async (receipt) => {
+          // Get receipt items
+          const items = await storage.getPurchaseOrderItems(
+            receipt.id,
+            tenantDb,
+          );
+
+          // Get supplier details
+          const supplier = await storage.getSupplier(receipt.supplierId);
+
+          // Get employee details if available
+          let employee = null;
+          if (receipt.employeeId) {
+            employee = await storage.getEmployee(receipt.employeeId, tenantDb);
+          }
+
+          // Calculate summary statistics
+          const totalItems = items.length;
+          const totalQuantityOrdered = items.reduce(
+            (sum, item) => sum + item.quantity,
+            0,
+          );
+          const totalQuantityReceived = items.reduce(
+            (sum, item) => sum + (item.receivedQuantity || 0),
+            0,
+          );
+          const isFullyReceived =
+            totalQuantityOrdered > 0 &&
+            totalQuantityReceived >= totalQuantityOrdered;
+          const receivedPercentage =
+            totalQuantityOrdered > 0
+              ? Math.round((totalQuantityReceived / totalQuantityOrdered) * 100)
+              : 0;
+
+          // Transform items with product details and receiving info
+          const transformedItems = await Promise.all(
+            items.map(async (item) => {
+              // Get current product details
+              let product = null;
+              let productDetail = {
+                currentName: item.productName,
+                currentPrice: parseFloat(item.unitPrice) || 0,
+                currentStock: 0,
+                isActive: false,
+                trackInventory: false,
+                priceChanged: false,
+                priceChangePercentage: 0,
+              };
+
+              if (item.productId) {
+                try {
+                  product = await storage.getProduct(item.productId, tenantDb);
+                  if (product) {
+                    const originalPrice = parseFloat(item.unitPrice);
+                    const currentPrice = parseFloat(product.price);
+                    const priceChanged =
+                      Math.abs(originalPrice - currentPrice) > 0.01;
+                    const priceChangePercentage =
+                      originalPrice > 0
+                        ? ((currentPrice - originalPrice) / originalPrice) * 100
+                        : 0;
+
+                    productDetail = {
+                      currentName: product.name,
+                      currentPrice: currentPrice || 0,
+                      currentStock: product.stock || 0,
+                      isActive: product.isActive || false,
+                      trackInventory: product.trackInventory || false,
+                      priceChanged,
+                      priceChangePercentage:
+                        Math.round(priceChangePercentage * 100) / 100,
+                    };
+                  }
+                } catch (productError) {
+                  console.warn(
+                    `Could not fetch product ${item.productId}:`,
+                    productError,
+                  );
+                }
+              }
+
+              // Calculate receiving info
+              const receivedPercentage =
+                item.quantity > 0
+                  ? ((item.receivedQuantity || 0) / item.quantity) * 100
+                  : 0;
+              const isPartiallyReceived =
+                (item.receivedQuantity || 0) > 0 &&
+                (item.receivedQuantity || 0) < item.quantity;
+
+              return {
+                id: item.id,
+                productId: item.productId,
+                productName: item.productName,
+                sku: item.sku || "",
+                quantity: item.quantity,
+                receivedQuantity: item.receivedQuantity || 0,
+                unitPrice: item.unitPrice ? parseFloat(item.unitPrice) : 0,
+                total: item.total ? parseFloat(item.total) : 0,
+                taxRate: parseFloat(item.taxRate || "0"),
+                notes: item.notes || "",
+                product: productDetail,
+                receiving: {
+                  isPartiallyReceived,
+                  receivedPercentage:
+                    Math.round(receivedPercentage * 100) / 100,
+                },
+              };
+            }),
+          );
+
+          return {
+            id: receipt.id,
+            receiptNumber: receipt.receiptNumber,
+            status: receipt.status || "pending",
+            purchaseDate: receipt.purchaseDate || receipt.createdAt,
+            actualDeliveryDate: receipt.actualDeliveryDate || null,
+            subtotal: receipt.subtotal ? parseFloat(receipt.subtotal) : 0,
+            tax: receipt.tax ? parseFloat(receipt.tax) : 0,
+            total: receipt.total ? parseFloat(receipt.total) : 0,
+            notes: receipt.notes || "",
+            createdAt: receipt.createdAt,
+            updatedAt: receipt.updatedAt,
+            supplier: supplier
+              ? {
+                  id: supplier.id,
+                  name: supplier.name,
+                  code: supplier.code,
+                  contactPerson: supplier.contactPerson || "",
+                  phone: supplier.phone || "",
+                  email: supplier.email || "",
+                  address: supplier.address || "",
+                  status: supplier.status || "active",
+                }
+              : null,
+            employee: employee
+              ? {
+                  id: employee.id,
+                  name: employee.name,
+                }
+              : null,
+            summary: {
+              total_items: totalItems,
+              total_quantity_ordered: totalQuantityOrdered,
+              total_quantity_received: totalQuantityReceived,
+              is_fully_received: isFullyReceived,
+              received_percentage: receivedPercentage,
+            },
+            items: transformedItems,
+          };
+        }),
+      );
+
+      // Return in standardized format matching C# classes
+      res.json({
+        success: true,
+        message: "OK",
+        data: transformedReceipts,
+      });
+    } catch (error) {
+      console.error("❌ API: Failed to fetch purchase receipts:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch purchase receipts",
+        data: [],
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  // Create Purchase Receipt
+  app.post("/api/purchase-receipts", async (req: TenantRequest, res) => {
+    try {
+      console.log("🔍 API: Creating purchase receipt with data:", req.body);
+      const tenantDb = await getTenantDatabase(req);
+
+      const { items = [], ...receiptData } = req.body;
+
+      // Validate required fields
+      if (!receiptData.supplierId) {
+        return res.status(400).json({
+          message: "Missing required field: supplierId is required",
+        });
+      }
+
+      // Generate receipt number if not provided
+      if (
+        !receiptData.receiptNumber ||
+        receiptData.receiptNumber.trim() === ""
+      ) {
+        console.log("🔢 No receipt number provided, generating one");
+        receiptData.receiptNumber = await storage.getNextPONumber(tenantDb);
+        console.log("🔢 Generated receipt number:", receiptData.receiptNumber);
+      } else {
+        // Check for duplicates only
+        const receiptNumber = receiptData.receiptNumber.trim();
+        const exists = await storage.checkReceiptNumberExists(receiptNumber, undefined, tenantDb);
+        if (exists) {
+          return res.status(400).json({
+            message: `Số phiếu nhập "${receiptNumber}" đã tồn tại. Vui lòng sử dụng số khác.`,
+          });
+        }
+
+        receiptData.receiptNumber = receiptNumber;
+      }
+
+      console.log("📝 Creating purchase receipt with:", {
+        receiptData,
+        itemsCount: items.length,
+      });
+
+      const purchaseReceipt = await storage.createPurchaseReceipt(
+        receiptData,
+        items,
+        tenantDb,
+      );
+      console.log("✅ API: Purchase receipt created:", purchaseReceipt);
+
+      res.status(201).json(purchaseReceipt);
+    } catch (error) {
+      console.error("❌ API: Failed to create purchase receipt:", error);
+      res.status(500).json({
+        message: "Failed to create purchase receipt",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  // Update Purchase Receipt
+  app.put("/api/purchase-receipts/:id", async (req: TenantRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      console.log("🔍 API: Updating purchase receipt:", id, req.body);
+      const tenantDb = await getTenantDatabase(req);
+
+      const { items = [], ...receiptData } = req.body;
+
+      // Validate receipt number if provided
+      if (receiptData.receiptNumber && receiptData.receiptNumber.trim() !== "") {
+        const receiptNumber = receiptData.receiptNumber.trim();
+        
+        // Check if format matches PNxxxxxx/YY
+        const formatMatch = receiptNumber.match(/^PN\d{6}\/\d{2}$/);
+        if (!formatMatch) {
+          return res.status(400).json({
+            message: "Số phiếu nhập không đúng định dạng. Định dạng đúng: PNxxxxxx/YY (ví dụ: PN000001/25)",
+          });
+        }
+
+        // Check for duplicates (exclude current record)
+        const exists = await storage.checkReceiptNumberExists(receiptNumber, id, tenantDb);
+        if (exists) {
+          return res.status(400).json({
+            message: `Số phiếu nhập "${receiptNumber}" đã tồn tại. Vui lòng sử dụng số khác.`,
+          });
+        }
+
+        receiptData.receiptNumber = receiptNumber;
+      }
+
+      const updatedReceipt = await storage.updatePurchaseOrder(id, receiptData, tenantDb);
+      
+      if (!updatedReceipt) {
+        return res.status(404).json({
+          message: "Purchase receipt not found",
+        });
+      }
+
+      console.log("✅ API: Purchase receipt updated:", updatedReceipt);
+      res.json(updatedReceipt);
+    } catch (error) {
+      console.error("❌ API: Failed to update purchase receipt:", error);
+      res.status(500).json({
+        message: "Failed to update purchase receipt",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  // Bulk delete Purchase Receipts
+  app.post(
+    "/api/purchase-receipts/bulk-delete",
+    async (req: TenantRequest, res) => {
+      try {
+        console.log("🗑️ API: Bulk delete purchase receipts:", req.body);
+        const tenantDb = await getTenantDatabase(req);
+        const { orderIds } = req.body;
+
+        if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+          return res.status(400).json({
+            message: "Missing or invalid orderIds array",
+          });
+        }
+
+        let deletedCount = 0;
+        let failedCount = 0;
+        const errors = [];
+
+        for (const id of orderIds) {
+          try {
+            const deleted = await storage.deletePurchaseOrder(id, tenantDb);
+            if (deleted) {
+              deletedCount++;
+            } else {
+              failedCount++;
+              errors.push(`Purchase receipt ${id} not found`);
+            }
+          } catch (error) {
+            failedCount++;
+            errors.push(
+              `Failed to delete purchase receipt ${id}: ${error.message}`,
+            );
+          }
+        }
+
+        console.log("✅ API: Bulk delete completed:", {
+          deletedCount,
+          failedCount,
+        });
+
+        res.json({
+          deletedCount,
+          failedCount,
+          errors: errors.length > 0 ? errors : undefined,
+        });
+      } catch (error) {
+        console.error(
+          "❌ API: Failed to bulk delete purchase receipts:",
+          error,
+        );
+        res.status(500).json({
+          message: "Failed to bulk delete purchase receipts",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+
+  // Create Purchase Order (legacy endpoint for backward compatibility)
+  app.post("/api/purchase-orders", async (req: TenantRequest, res) => {
+    try {
+      console.log("🔍 API: Creating purchase receipt with data:", req.body);
+      const tenantDb = await getTenantDatabase(req);
+
+      const { items = [], ...orderData } = req.body;
+
+      // Validate required fields
+      if (!orderData.supplierId) {
+        return res.status(400).json({
+          message: "Missing required field: supplierId is required",
+        });
+      }
+
+      // Generate PO number if not provided
+      if (!orderData.poNumber || orderData.poNumber.trim() === "") {
+        console.log("🔢 No PO number provided, generating one");
+        orderData.poNumber = await storage.getNextPONumber(tenantDb);
+        console.log("🔢 Generated PO number:", orderData.poNumber);
+      }
+
+      console.log("📝 Creating purchase receipt with:", {
+        orderData,
+        itemsCount: items.length,
+      });
+
+      const purchaseOrder = await storage.createPurchaseOrder(
+        orderData,
+        items,
+        tenantDb,
+      );
+      console.log("✅ API: Purchase receipt created:", purchaseOrder);
+
+      res.status(201).json(purchaseOrder);
+    } catch (error) {
+      console.error("❌ API: Failed to create purchase receipt:", error);
+      res.status(500).json({
+        message: "Failed to create purchase receipt",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  // Expense Vouchers API
+  app.get("/api/expense-vouchers", async (req: TenantRequest, res) => {
+    try {
+      const tenantDb = await getTenantDatabase(req);
+      const vouchers = await storage.getExpenseVouchers(tenantDb);
+      res.json(vouchers);
+    } catch (error) {
+      console.error("Error fetching expense vouchers:", error);
+      res.status(500).json({
+        error: "Failed to fetch expense vouchers",
+      });
+    }
+  });
+
+  app.get("/api/expense-vouchers/next-sequence", async (req: TenantRequest, res) => {
+    try {
+      const tenantDb = await getTenantDatabase(req);
+      const nextSequence = await storage.getNextExpenseVoucherSequence(tenantDb);
+      res.json({ nextSequence });
+    } catch (error) {
+      console.error("Error getting next expense voucher sequence:", error);
+      res.status(500).json({
+        error: "Failed to get next sequence number",
+      });
+    }
+  });
+
+  app.post("/api/expense-vouchers", async (req: TenantRequest, res) => {
+    try {
+      const tenantDb = await getTenantDatabase(req);
+      const voucherData = req.body;
+
+      console.log("Creating expense voucher with data:", voucherData);
+
+      // Validate required fields
+      if (
+        !voucherData.voucherNumber ||
+        !voucherData.recipient ||
+        !voucherData.amount ||
+        voucherData.amount <= 0
+      ) {
+        console.error("Validation failed:", {
+          voucherNumber: voucherData.voucherNumber,
+          recipient: voucherData.recipient,
+          amount: voucherData.amount,
+        });
+        return res.status(400).json({
+          error:
+            "Missing required fields: voucherNumber, recipient, and amount > 0 are required",
+        });
+      }
+
+      const voucher = await storage.createExpenseVoucher(voucherData, tenantDb);
+      console.log("Expense voucher created successfully:", voucher);
+      res.status(201).json(voucher);
+    } catch (error) {
+      console.error("Error creating expense voucher:", error);
+      res.status(500).json({
+        error: "Failed to create expense voucher",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.put("/api/expense-vouchers/:id", async (req: TenantRequest, res) => {
+    try {
+      const tenantDb = await getTenantDatabase(req);
+      const id = req.params.id;
+      const voucherData = req.body;
+
+      console.log("Updating expense voucher:", id, voucherData);
+
+      // Validate required fields
+      if (
+        !voucherData.voucherNumber ||
+        !voucherData.recipient ||
+        !voucherData.amount ||
+        voucherData.amount <= 0
+      ) {
+        console.error("Update validation failed:", {
+          voucherNumber: voucherData.voucherNumber,
+          recipient: voucherData.recipient,
+          amount: voucherData.amount,
+        });
+        return res.status(400).json({
+          error:
+            "Missing required fields: voucherNumber, recipient, and amount > 0 are required",
+        });
+      }
+
+      // Clean the voucher data to remove timestamp fields that cause issues
+      const cleanVoucherData = {
+        voucherNumber: voucherData.voucherNumber,
+        date: voucherData.date,
+        amount: voucherData.amount,
+        account: voucherData.account,
+        recipient: voucherData.recipient,
+        receiverName: voucherData.receiverName || null,
+        phone: voucherData.phone || null,
+        category: voucherData.category,
+        description: voucherData.description || null,
+      };
+
+      const voucher = await storage.updateExpenseVoucher(
+        id,
+        cleanVoucherData,
+        tenantDb,
+      );
+      console.log("Expense voucher updated successfully:", voucher);
+      res.json(voucher);
+    } catch (error) {
+      console.error("Error updating expense voucher:", error);
+      res.status(500).json({
+        error: "Failed to update expense voucher",
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.delete("/api/expense-vouchers/:id", async (req: TenantRequest, res) => {
+    try {
+      const tenantDb = await getTenantDatabase(req);
+      const id = req.params.id;
+      await storage.deleteExpenseVoucher(id, tenantDb);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting expense voucher:", error);
+      res.status(500).json({
+        error: "Failed to delete expense voucher",
+      });
+    }
+  });
+
   // POS QR Payment API Routes - Proxy for external CreateQRPos API
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/pos/create-qr-proxy", async (req, res) => {
+  app.post("/api/pos/create-qr-proxy", async (req, res) => {
     try {
       const { bankCode, clientID, ...qrRequest } = req.body;
 
@@ -1222,7 +2493,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Fallback route for CreateQRPos API
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/pos/create-qr", async (req, res) => {
+  app.post("/api/pos/create-qr", async (req, res) => {
     try {
       const { bankCode, clientID } = req.query;
       const qrRequest = req.body;
@@ -1308,7 +2579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Employees
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees",
+    "/api/employees",
     tenantMiddleware,
     async (req: TenantRequest, res) => {
       try {
@@ -1337,7 +2608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees/:id", async (req: TenantRequest, res) => {
+  app.get("/api/employees/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -1357,7 +2628,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees", async (req: TenantRequest, res) => {
+  app.post("/api/employees", async (req: TenantRequest, res) => {
     try {
       const validatedData = insertEmployeeSchema.parse(req.body);
       const tenantDb = await getTenantDatabase(req);
@@ -1393,7 +2664,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees/:id", async (req: TenantRequest, res) => {
+  app.put("/api/employees/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertEmployeeSchema.partial().parse(req.body);
@@ -1440,7 +2711,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees/:id", async (req: TenantRequest, res) => {
+  app.delete("/api/employees/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -1463,7 +2734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Attendance routes
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance", async (req: TenantRequest, res) => {
+  app.get("/api/attendance", async (req: TenantRequest, res) => {
     try {
       const { date, startDate, endDate, employeeId } = req.query;
       const tenantDb = await getTenantDatabase(req);
@@ -1528,7 +2799,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance/today/:employeeId",
+    "/api/attendance/today/:employeeId",
     async (req: TenantRequest, res) => {
       try {
         const employeeId = parseInt(req.params.employeeId);
@@ -1543,7 +2814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance/clock-in", async (req: TenantRequest, res) => {
+  app.post("/api/attendance/clock-in", async (req: TenantRequest, res) => {
     try {
       const { employeeId, notes } = req.body;
 
@@ -1585,7 +2856,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance/clock-out/:id", async (req: TenantRequest, res) => {
+  app.post("/api/attendance/clock-out/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -1606,7 +2877,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance/break-start/:id",
+    "/api/attendance/break-start/:id",
     async (req: TenantRequest, res) => {
       try {
         const id = parseInt(req.params.id);
@@ -1628,7 +2899,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance/break-end/:id", async (req: TenantRequest, res) => {
+  app.post("/api/attendance/break-end/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -1648,7 +2919,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance/:id/status", async (req: TenantRequest, res) => {
+  app.put("/api/attendance/:id/status", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const { status } = req.body;
@@ -1670,7 +2941,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Tables
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables", tenantMiddleware, async (req: TenantRequest, res) => {
+  app.get("/api/tables", tenantMiddleware, async (req: TenantRequest, res) => {
     try {
       console.log("🔍 GET /api/tables - Starting request processing");
       let tenantDb;
@@ -1693,7 +2964,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables/:id", async (req: TenantRequest, res) => {
+  app.get("/api/tables/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -1713,7 +2984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables", async (req: TenantRequest, res) => {
+  app.post("/api/tables", async (req: TenantRequest, res) => {
     try {
       const tableData = insertTableSchema.parse(req.body);
       const tenantDb = await getTenantDatabase(req);
@@ -1726,7 +2997,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables/:id", async (req: TenantRequest, res) => {
+  app.put("/api/tables/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tableData = insertTableSchema.partial().parse(req.body);
@@ -1747,7 +3018,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables/:id/status", async (req: TenantRequest, res) => {
+  app.put("/api/tables/:id/status", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const { status } = req.body;
@@ -1768,7 +3039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables/:id", async (req: TenantRequest, res) => {
+  app.delete("/api/tables/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -1791,7 +3062,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Orders
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders", tenantMiddleware, async (req: TenantRequest, res) => {
+  app.get("/api/orders", tenantMiddleware, async (req: TenantRequest, res) => {
     try {
       console.log("🔍 GET /api/orders - Starting request processing");
       const { salesChannel } = req.query;
@@ -1824,7 +3095,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/:id", async (req: TenantRequest, res) => {
+  app.get("/api/orders/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -1845,7 +3116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders", async (req: TenantRequest, res) => {
+  app.post("/api/orders", async (req: TenantRequest, res) => {
     try {
       const { order, items } = req.body;
       const tenantDb = await getTenantDatabase(req);
@@ -1860,6 +3131,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           2,
         ),
       );
+
+      // Get store settings for price_include_tax
+      const database = tenantDb || db;
+      const [storeSettingsData] = await database
+        .select({ priceIncludesTax: storeSettings.priceIncludesTax })
+        .from(storeSettings)
+        .limit(1);
+      const priceIncludeTax = storeSettingsData?.priceIncludesTax || false;
 
       // If no order object is provided, create a default one for POS orders
       let orderData;
@@ -1906,19 +3185,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const total = subtotal + tax;
 
         orderData = {
-          orderNumber: `ORD-${Date.now()}`,
+          orderNumber: `ORD-${new Date()}`,
           tableId: null,
           employeeId: null,
           status: "pending",
           customerName: "Khách hàng",
           customerCount: 1,
-          subtotal: subtotal.toFixed(2),
-          tax: tax.toFixed(2),
-          discount: "0.00",
-          total: total.toFixed(2),
+          subtotal: Number(subtotal.toFixed(2)),
+          tax: Number(tax.toFixed(2)),
+          discount: 0,
+          total: Number(total.toFixed(2)),
           paymentMethod: null,
           paymentStatus: "pending",
           salesChannel: "pos",
+          priceIncludeTax: priceIncludeTax,
           notes: "POS Order",
           orderedAt: new Date(),
         };
@@ -1930,19 +3210,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!orderData.salesChannel) {
           orderData.salesChannel = orderData.tableId ? "table" : "pos";
         }
+        // Set priceIncludeTax from store settings if not explicitly provided
+        if (orderData.priceIncludeTax === undefined) {
+          orderData.priceIncludeTax = priceIncludeTax;
+        }
       }
 
       // Parse and prepare items with discount distribution
-      let itemsData = items.map((item) => insertOrderItemSchema.parse(item));
+      let itemsData = items.map((item) => {
+        const parsedItem = insertOrderItemSchema.parse(item);
 
-      // Calculate discount distribution if order has discount
+        // If item already has discount amount, use it directly
+        if (item.discountAmount && parseFloat(item.discountAmount) > 0) {
+          parsedItem.discount = item.discountAmount;
+          console.log(
+            `💰 Using pre-calculated discount for item ${item.productName}: ${item.discountAmount}`,
+          );
+        }
+
+        return parsedItem;
+      });
+
+      // Calculate discount distribution if order has discount and items don't already have discounts
       const orderDiscount = Number(orderData.discount || 0);
-      if (orderDiscount > 0) {
-        itemsData = calculateDiscountDistribution(itemsData, orderDiscount);
-        console.log(
-          `💰 Order Creation: Distributed discount ${orderDiscount} among ${itemsData.length} items`,
-        );
-      }
+      const hasPreCalculatedDiscounts = itemsData.some(
+        (item) => parseFloat(item.discount || "0") > 0,
+      );
 
       console.log(
         "Parsed order data with discount distribution:",
@@ -1986,7 +3279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/:id", async (req: TenantRequest, res) => {
+  app.put("/api/orders/:id", async (req: TenantRequest, res) => {
     try {
       const { id: rawId } = req.params;
       const orderData = req.body; // Use raw body to preserve all fields
@@ -2008,7 +3301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Return a mock success response to allow E-invoice flow to continue
         const mockOrder = {
           id: rawId,
-          orderNumber: `TEMP-${Date.now()}`,
+          orderNumber: `TEMP-${new Date()}`,
           tableId: null,
           customerName: orderData.customerName || "Khách hàng",
           status: orderData.status || "paid",
@@ -2017,7 +3310,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           paidAt: orderData.paidAt || new Date(),
           updatedAt: new Date(),
           updated: true,
-          updateTimestamp: new Date().toISOString(),
+          updateTimestamp: new Date(),
         };
 
         console.log(
@@ -2060,69 +3353,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentDiscount: existingOrder.discount,
       });
 
-      // Use EXACT values from frontend - NO CALCULATION AT ALL
+      // Use EXACT values from frontend - ZERO calculation, ZERO validation
       console.log(
-        `💰 Using EXACT values from frontend for order ${id} - NO recalculation, NO validation`,
+        `💰 Using PURE frontend values for order ${id} - NO calculation, NO validation, NO modification`,
       );
 
-      // Simply use whatever frontend sends, no fallback to existing values
-      if (orderData.subtotal !== undefined && orderData.subtotal !== null) {
-        console.log(
-          `💰 Frontend subtotal: ${orderData.subtotal} (saving as-is)`,
-        );
-      }
-
-      if (orderData.tax !== undefined && orderData.tax !== null) {
-        console.log(`💰 Frontend tax: ${orderData.tax} (saving as-is)`);
-      }
-
-      if (orderData.total !== undefined && orderData.total !== null) {
-        console.log(`💰 Frontend total: ${orderData.total} (saving as-is)`);
-      }
-
-      if (orderData.discount !== undefined && orderData.discount !== null) {
-        console.log(
-          `💰 Frontend discount: ${orderData.discount} (saving as-is)`,
-        );
-      }
-
-      console.log(`💰 Final data (pure frontend values):`, {
+      // Log what frontend sent but DO NOT modify anything
+      console.log(`💰 Frontend values (saving exactly as received):`, {
         subtotal: orderData.subtotal,
         tax: orderData.tax,
         discount: orderData.discount,
         total: orderData.total,
-        source: "pure_frontend_no_calculation",
+        source: "pure_frontend_exact_save",
       });
-
-      // Ensure total = subtotal + tax (discount stored separately)
-      if (orderData.subtotal && orderData.tax) {
-        const expectedTotal =
-          Number(orderData.subtotal) + Number(orderData.tax);
-
-        // If total is provided, validate it matches subtotal + tax
-        if (orderData.total) {
-          const actualTotal = Number(orderData.total);
-          if (Math.abs(expectedTotal - actualTotal) > 0.01) {
-            console.warn(
-              `⚠️ Storage: Total inconsistency detected, correcting:`,
-              {
-                subtotal: orderData.subtotal,
-                tax: orderData.tax,
-                providedTotal: orderData.total,
-                correctedTotal: expectedTotal.toFixed(2),
-              },
-            );
-            orderData.total = expectedTotal.toFixed(2);
-          }
-        } else {
-          // Calculate total if not provided
-          orderData.total = expectedTotal.toFixed(2);
-        }
-
-        console.log(
-          `✅ Storage: Total calculation: ${orderData.subtotal} + ${orderData.tax} = ${orderData.total}`,
-        );
-      }
 
       // Fetch existing items to compare quantities and calculate discount distribution
       const existingOrderItems = await db
@@ -2144,14 +3387,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             unitPrice: item.unitPrice.toString(),
             total: item.total
               ? item.total.toString()
-              : (parseFloat(item.unitPrice) * parseInt(item.quantity)).toString(),
+              : (
+                  parseFloat(item.unitPrice) * parseInt(item.quantity)
+                ).toString(),
             discount: "0.00",
             notes: item.notes || null,
           }));
 
-          await db
-            .insert(orderItemsTable)
-            .values(validatedItems);
+          await db.insert(orderItemsTable).values(validatedItems);
 
           console.log("✅ Items added successfully via direct storage");
         } catch (addError) {
@@ -2199,10 +3442,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Step 2: Fix timestamp handling before updating order
-      if (orderData.paidAt && typeof orderData.paidAt === 'string') {
+      if (orderData.paidAt && typeof orderData.paidAt === "string") {
         orderData.paidAt = new Date(orderData.paidAt);
       }
-      if (orderData.orderedAt && typeof orderData.orderedAt === 'string') {
+      if (orderData.orderedAt && typeof orderData.orderedAt === "string") {
         orderData.orderedAt = new Date(orderData.orderedAt);
       }
 
@@ -2232,7 +3475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         ...order,
         updated: true,
-        updateTimestamp: new Date().toISOString(),
+        updateTimestamp: new Date(),
       });
     } catch (error) {
       console.error("❌ PUT Order API error:", error);
@@ -2249,7 +3492,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/:id/status", async (req: TenantRequest, res) => {
+  app.put("/api/orders/:id/status", async (req: TenantRequest, res) => {
     try {
       const { id } = req.params;
       const { status } = req.body;
@@ -2264,7 +3507,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get tenant database first
       const tenantDb = await getTenantDatabase(req);
 
-      // Handle both numeric IDs and temporary string IDs
+      // Handle both numeric IDs and temporary IDs
       let orderId: number | string = id;
       const isTemporaryId = id.startsWith("temp-");
 
@@ -2286,7 +3529,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: status,
           updated: true,
           previousStatus: "served",
-          updateTimestamp: new Date().toISOString(),
+          updateTimestamp: new Date(),
           success: true,
           temporary: true,
         });
@@ -2318,7 +3561,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tableId: foundOrder.tableId,
         currentStatus: foundOrder.status,
         requestedStatus: status,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
       });
 
       // Direct database update for better reliability
@@ -2360,7 +3603,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         previousStatus: foundOrder.status,
         newStatus: updatedOrder.status,
         paidAt: updatedOrder.paidAt,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
       });
 
       // If status was updated to 'paid', check if table should be released
@@ -2416,7 +3659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...updatedOrder,
         updated: true,
         previousStatus: foundOrder.status,
-        updateTimestamp: new Date().toISOString(),
+        updateTimestamp: new Date(),
         success: true,
       });
     } catch (error) {
@@ -2424,12 +3667,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         message: "Failed to update order status",
         error: error instanceof Error ? error.message : String(error),
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
       });
     }
   });
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/:id/payment", async (req: TenantRequest, res) => {
+  app.post("/api/orders/:id/payment", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const { paymentMethod, amountReceived, change } = req.body;
@@ -2443,7 +3686,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updateData = {
         status: "paid",
         paymentMethod,
-        paidAt: new Date().toISOString(),
+        paidAt: new Date(),
       };
 
       // Add cash payment specific data if provided
@@ -2478,7 +3721,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get ALL order items
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", async (req: TenantRequest, res) => {
+  app.get("/api/order-items", async (req: TenantRequest, res) => {
     try {
       console.log("=== GET ALL ORDER ITEMS API CALLED ===");
 
@@ -2529,594 +3772,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         message: "Failed to fetch all order items",
         details: error instanceof Error ? error.message : "Unknown error",
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
       });
     }
   });
 
-  // Enhanced POS print-receipt endpoint with printer configuration support
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/pos/print-receipt", async (req: TenantRequest, res) => {
-    try {
-      const {
-        content,
-        type,
-        orderId,
-        transactionId,
-        printerConfigs,
-        preferredConfig,
-        deviceInfo,
-      } = req.body;
+  // Get order items by date range
+  app.get(
+    "/api/order-items/date-range/:startDate/:endDate/:floor?",
+    async (req: TenantRequest, res) => {
+      try {
+        const { startDate, endDate, floor } = req.params;
+        const floorFilter = floor || "all";
 
-      console.log(`🖨️ Enhanced POS print request:`, {
-        type,
-        orderId,
-        transactionId,
-        devicePlatform: deviceInfo?.platform,
-        deviceBrowser: deviceInfo?.browser,
-        configuredPrinters: printerConfigs?.length || 0,
-        preferredPrinter: preferredConfig?.name,
-      });
-
-      if (!content) {
-        return res.status(400).json({
-          success: false,
-          error: "Thiếu nội dung in",
-        });
-      }
-
-      let printResults = [];
-      let hasSuccessfulPrint = false;
-
-      // Try to print to configured printers if available
-      if (printerConfigs && printerConfigs.length > 0) {
-        const net = require("net");
-
-        for (const config of printerConfigs) {
-          if (!config.isActive) continue;
-
-          try {
-            console.log(
-              `🖨️ Attempting to print to ${config.name} (${config.connectionType})`,
-            );
-
-            if (config.connectionType === "network" && config.ipAddress) {
-              // Network printer
-              const printPromise = new Promise((resolve, reject) => {
-                const client = new net.Socket();
-                client.setTimeout(5000);
-
-                client.connect(config.port || 9100, config.ipAddress, () => {
-                  console.log(
-                    `🔗 Connected to printer ${config.name} at ${config.ipAddress}:${config.port}`,
-                  );
-
-                  // Convert HTML content to ESC/POS commands (simplified)
-                  const escPosData = convertHtmlToEscPos(content, config);
-
-                  client.write(escPosData, (error) => {
-                    if (error) {
-                      console.error(
-                        `❌ Print data send error for ${config.name}:`,
-                        error,
-                      );
-                      reject(
-                        new Error(`Lỗi gửi dữ liệu in đến ${config.name}`),
-                      );
-                    } else {
-                      console.log(
-                        `✅ Print data sent successfully to ${config.name}`,
-                      );
-                      client.end();
-                      resolve({
-                        printer: config.name,
-                        success: true,
-                        message: `In thành công trên ${config.name}`,
-                      });
-                    }
-                  });
-                });
-
-                client.on("timeout", () => {
-                  console.error(`⏰ Printer ${config.name} connection timeout`);
-                  client.destroy();
-                  reject(new Error(`${config.name} không phản hồi`));
-                });
-
-                client.on("error", (error) => {
-                  console.error(
-                    `❌ Printer ${config.name} connection error:`,
-                    error,
-                  );
-                  reject(
-                    new Error(
-                      `Không thể kết nối tới ${config.name}: ${error.message}`,
-                    ),
-                  );
-                });
-              });
-
-              try {
-                const result = await printPromise;
-                printResults.push(result);
-                hasSuccessfulPrint = true;
-
-                // If this is the preferred printer and it succeeded, we can return early
-                if (config.id === preferredConfig?.id) {
-                  break;
-                }
-              } catch (printError) {
-                console.log(
-                  `⚠️ Failed to print to ${config.name}:`,
-                  printError.message,
-                );
-                printResults.push({
-                  printer: config.name,
-                  success: false,
-                  error: printError.message,
-                });
-              }
-            } else if (config.connectionType === "usb") {
-              // USB printer - would need additional USB printing library
-              console.log(
-                `📝 USB printer ${config.name} detected - would require USB printing library`,
-              );
-              printResults.push({
-                printer: config.name,
-                success: false,
-                error: "USB printing not yet implemented",
-              });
-            } else if (config.connectionType === "bluetooth") {
-              // Bluetooth printer - would need additional Bluetooth printing library
-              console.log(
-                `📱 Bluetooth printer ${config.name} detected - would require Bluetooth printing library`,
-              );
-              printResults.push({
-                printer: config.name,
-                success: false,
-                error: "Bluetooth printing not yet implemented",
-              });
-            }
-          } catch (configError) {
-            console.error(
-              `❌ Error processing printer config ${config.name}:`,
-              configError,
-            );
-            printResults.push({
-              printer: config.name,
-              success: false,
-              error: configError.message,
-            });
-          }
-        }
-      }
-
-      // Log print job completion
-      if (hasSuccessfulPrint) {
-        console.log(
-          `📝 Print job completed for ${type} ${orderId || transactionId}`,
-        );
-
-        res.json({
-          success: true,
-          message: "In thành công",
-          results: printResults,
-          deviceInfo,
-          timestamp: new Date().toISOString(),
-        });
-      } else {
-        console.log(
-          `⚠️ No successful prints for ${type} ${orderId || transactionId}`,
-        );
-
-        // Return error but with specific guidance based on device
-        const fallbackMessage = deviceInfo?.isMobile
-          ? "Không có máy in POS khả dụng. Vui lòng sử dụng chức năng tải file để in."
-          : "Không có máy in POS khả dụng. Vui lòng kiểm tra cấu hình máy in.";
-
-        res.status(503).json({
-          success: false,
-          error: fallbackMessage,
-          results: printResults,
-          deviceInfo,
-          timestamp: new Date().toISOString(),
-        });
-      }
-    } catch (error) {
-      console.error("🖨️ Enhanced POS print error:", error);
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : "Lỗi in không xác định",
-      });
-    }
-  });
-
-  // Helper function to convert HTML content to ESC/POS commands
-  function convertHtmlToEscPos(
-    htmlContent: string,
-    printerConfig: any,
-  ): Buffer {
-    // This is a simplified conversion - in production you'd want a proper HTML to ESC/POS library
-    const text = htmlContent
-      .replace(/<[^>]*>/g, "") // Strip HTML tags
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"');
-
-    // ESC/POS commands
-    const ESC = "\x1B";
-    const INIT = ESC + "@"; // Initialize printer
-    const ALIGN_CENTER = ESC + "a" + "\x01";
-    const ALIGN_LEFT = ESC + "a" + "\x00";
-    const BOLD_ON = ESC + "E" + "\x01";
-    const BOLD_OFF = ESC + "E" + "\x00";
-    const CUT_PAPER = "\x1D" + "V" + "A" + "\x00"; // Cut paper
-    const FEED_LINES = "\n\n\n";
-
-    // Build ESC/POS command sequence
-    let escPosData = INIT;
-    escPosData += ALIGN_CENTER;
-    escPosData += BOLD_ON;
-    escPosData += "HOA DON THANH TOAN\n";
-    escPosData += BOLD_OFF;
-    escPosData += ALIGN_LEFT;
-    escPosData += "================================\n";
-    escPosData += text;
-    escPosData += "\n================================\n";
-    escPosData += ALIGN_CENTER;
-    escPosData += "Cam on quy khach!\n";
-    escPosData += FEED_LINES;
-    escPosData += CUT_PAPER;
-
-    return Buffer.from(escPosData, "utf8");
-  }
-
-  // API in qua máy in mạng (legacy endpoint, kept for compatibility)
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/print/network", async (req: TenantRequest, res) => {
-    try {
-      const { printerIP, printerPort = 9100, data, orderId } = req.body;
-
-      if (!printerIP || !data) {
-        return res.status(400).json({
-          success: false,
-          error: "Thiếu thông tin máy in hoặc dữ liệu in",
-        });
-      }
-
-      console.log(
-        `🖨️ Attempting to print to network printer ${printerIP}:${printerPort}`,
-      );
-
-      // Sử dụng node.js net module để kết nối tới máy in
-      const net = require("net");
-
-      const printPromise = new Promise((resolve, reject) => {
-        const client = new net.Socket();
-
-        client.setTimeout(5000); // 5 giây timeout
-
-        client.connect(printerPort, printerIP, () => {
-          console.log(`🔗 Connected to printer ${printerIP}:${printerPort}`);
-
-          // Gửi dữ liệu ESC/POS
-          client.write(data, (error) => {
-            if (error) {
-              console.error("❌ Print data send error:", error);
-              reject(new Error("Lỗi gửi dữ liệu in"));
-            } else {
-              console.log("✅ Print data sent successfully");
-              client.end();
-              resolve(true);
-            }
-          });
+        console.log("=== GET ORDER ITEMS BY DATE RANGE API CALLED ===");
+        console.log("Date range requested:", {
+          startDate,
+          endDate,
+          floorFilter,
         });
 
-        client.on("timeout", () => {
-          console.error("⏰ Printer connection timeout");
-          client.destroy();
-          reject(new Error("Máy in không phản hồi trong thời gian quy định"));
-        });
-
-        client.on("error", (error) => {
-          console.error("❌ Printer connection error:", error);
-          reject(new Error(`Không thể kết nối tới máy in: ${error.message}`));
-        });
-
-        client.on("close", () => {
-          console.log("🔌 Printer connection closed");
-        });
-      });
-
-      await printPromise;
-
-      // Log hoạt động in
-      console.log(
-        `📝 Print job completed for order ${orderId} on printer ${printerIP}`,
-      );
-
-      res.json({
-        success: true,
-        message: "In thành công",
-        printer: `${printerIP}:${printerPort}`,
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      console.error("🖨️ Network print error:", error);
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : "Lỗi in không xác định",
-      });
-    }
-  });
-
-  // Printer Configurations API
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs", async (req: TenantRequest, res) => {
-    try {
-      const tenantDb = await getTenantDatabase(req);
-      const configs = await db
-        .select()
-        .from(printerConfigs)
-        .orderBy(printerConfigs.name);
-      console.log(`✅ Fetched ${configs.length} printer configurations`);
-      res.json(configs);
-    } catch (error) {
-      console.error("❌ Error fetching printer configurations:", error);
-      res.status(500).json({
-        error: "Failed to fetch printer configurations",
-      });
-    }
-  });
-
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs", async (req: TenantRequest, res) => {
-    try {
-      const tenantDb = await getTenantDatabase(req);
-      const configData = req.body;
-
-      // Validate that only one printer can be active for each type
-      if (
-        configData.isActive &&
-        (configData.isEmployee || configData.isKitchen)
-      ) {
-        const existingConfigs = await db.select().from(printerConfigs);
-
-        const conflictingConfig = existingConfigs.find(
-          (config) =>
-            config.isActive &&
-            ((configData.isEmployee && config.isEmployee) ||
-              (configData.isKitchen && config.isKitchen)),
-        );
-
-        if (conflictingConfig) {
-          const printerType = configData.isEmployee ? "nhân viên" : "bếp";
-          return res.status(400).json({
-            error: `Đã có máy in ${printerType} đang hoạt động: ${conflictingConfig.name}. Vui lòng tắt máy in đó trước.`,
-          });
-        }
-      }
-
-      const [newConfig] = await db
-        .insert(printerConfigs)
-        .values(configData)
-        .returning();
-      console.log(`✅ Created printer configuration: ${newConfig.name}`);
-      res.status(201).json(newConfig);
-    } catch (error) {
-      console.error("❌ Error creating printer configuration:", error);
-      res.status(500).json({
-        error: "Failed to create printer configuration",
-      });
-    }
-  });
-
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs/:id", async (req: TenantRequest, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const tenantDb = await getTenantDatabase(req);
-      const updateData = req.body;
-
-      // Validate that only one printer can be active for each type
-      if (
-        updateData.isActive &&
-        (updateData.isEmployee || updateData.isKitchen)
-      ) {
-        const existingConfigs = await db.select().from(printerConfigs);
-
-        const conflictingConfig = existingConfigs.find(
-          (config) =>
-            config.id !== id &&
-            config.isActive &&
-            ((updateData.isEmployee && config.isEmployee) ||
-              (updateData.isKitchen && config.isKitchen)),
-        );
-
-        if (conflictingConfig) {
-          // Auto-disable the conflicting printer
-          await db
-            .update(printerConfigs)
-            .set({ isActive: false })
-            .where(eq(printerConfigs.id, conflictingConfig.id));
-
-          console.log(
-            `🔄 Auto-disabled conflicting printer: ${conflictingConfig.name}`,
-          );
-        }
-      }
-
-      const [updatedConfig] = await db
-        .update(printerConfigs)
-        .set({ ...updateData, updatedAt: new Date() })
-        .where(eq(printerConfigs.id, id))
-        .returning();
-
-      if (!updatedConfig) {
-        return res.status(404).json({
-          error: "Printer configuration not found",
-        });
-      }
-
-      console.log(`✅ Updated printer configuration: ${updatedConfig.name}`);
-      res.json(updatedConfig);
-    } catch (error) {
-      console.error("❌ Error updating printer configuration:", error);
-      res.status(500).json({
-        error: "Failed to update printer configuration",
-      });
-    }
-  });
-
-  app.delete("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs/:id", async (req: TenantRequest, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const tenantDb = await getTenantDatabase(req);
-
-      const [deletedConfig] = await db
-        .delete(printerConfigs)
-        .where(eq(printerConfigs.id, id))
-        .returning();
-
-      if (!deletedConfig) {
-        return res.status(404).json({
-          error: "Printer configuration not found",
-        });
-      }
-
-      console.log(`✅ Deleted printer configuration: ${deletedConfig.name}`);
-      res.json({
-        message: "Printer configuration deleted successfully",
-      });
-    } catch (error) {
-      console.error("❌ Error deleting printer configuration:", error);
-      res.status(500).json({
-        error: "Failed to delete printer configuration",
-      });
-    }
-  });
-
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs/:id/test", async (req: TenantRequest, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const tenantDb = await getTenantDatabase(req);
-
-      const [config] = await db
-        .select()
-        .from(printerConfigs)
-        .where(eq(printerConfigs.id, id))
-        .limit(1);
-
-      if (!config) {
-        return res.status(404).json({
-          success: false,
-          message: "Printer configuration not found",
-        });
-      }
-
-      if (config.connectionType === "network" && config.ipAddress) {
-        const net = require("net");
-
-        const testPromise = new Promise((resolve, reject) => {
-          const client = new net.Socket();
-          client.setTimeout(5000);
-
-          client.connect(config.port || 9100, config.ipAddress, () => {
-            // Send test print command
-            const testData = Buffer.from(
-              "\x1B@Test Print from EDPOS\n\n\n\x1DV\x41\x00",
-              "utf8",
-            );
-
-            client.write(testData, (error) => {
-              if (error) {
-                reject(new Error("Failed to send test data"));
-              } else {
-                client.end();
-                resolve({
-                  success: true,
-                  message: `Kết nối thành công đến ${config.name}`,
-                });
-              }
-            });
-          });
-
-          client.on("timeout", () => {
-            client.destroy();
-            reject(new Error("Connection timeout"));
-          });
-
-          client.on("error", (error) => {
-            reject(error);
-          });
-        });
-
+        let tenantDb;
         try {
-          const result = await testPromise;
-          console.log(`✅ Test print successful for ${config.name}`);
-          res.json(result);
-        } catch (error) {
-          console.log(`❌ Test print failed for ${config.name}:`, error);
-          res.json({
-            success: false,
-            message: `Kết nối thất bại: ${error.message}`,
-          });
+          tenantDb = await getTenantDatabase(req);
+          console.log(
+            "✅ Tenant database connection obtained for order items by date",
+          );
+        } catch (dbError) {
+          console.error(
+            "❌ Failed to get tenant database for order items by date:",
+            dbError,
+          );
+          tenantDb = null;
         }
-      } else {
-        res.json({
-          success: false,
-          message: "Chỉ hỗ trợ test máy in mạng",
+
+        const database = tenantDb || db;
+
+        // Parse dates
+        let start: Date;
+        let end: Date;
+
+        if (startDate.includes("T") || startDate.includes(":")) {
+          start = new Date(startDate);
+        } else {
+          start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+        }
+
+        if (endDate.includes("T") || endDate.includes(":")) {
+          end = new Date(endDate);
+        } else {
+          end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+        }
+
+        // Base query to get order items with order data
+        let query = database
+          .select({
+            id: orderItemsTable.id,
+            orderId: orderItemsTable.orderId,
+            productId: orderItemsTable.productId,
+            quantity: orderItemsTable.quantity,
+            unitPrice: orderItemsTable.unitPrice,
+            total: orderItemsTable.total,
+            discount: orderItemsTable.discount,
+            notes: orderItemsTable.notes,
+            // Product info
+            productName: products.name,
+            productSku: products.sku,
+            // Order info
+            orderDate: orders.orderedAt,
+            orderNumber: orders.orderNumber,
+            tableId: orders.tableId,
+          })
+          .from(orderItemsTable)
+          .innerJoin(orders, eq(orderItemsTable.orderId, orders.id))
+          .leftJoin(products, eq(orderItemsTable.productId, products.id))
+          .where(
+            and(
+              gte(orders.orderedAt, start),
+              lte(orders.orderedAt, end),
+              or(eq(orders.status, "paid"), eq(orders.status, "completed")),
+            ),
+          );
+
+        // Add floor filter if specified
+        if (floorFilter && floorFilter !== "all") {
+          query = query
+            .leftJoin(tables, eq(orders.tableId, tables.id))
+            .where(
+              and(
+                gte(orders.orderedAt, start),
+                lte(orders.orderedAt, end),
+                or(eq(orders.status, "paid"), eq(orders.status, "completed")),
+                eq(tables.floor, floorFilter),
+              ),
+            );
+        }
+
+        const items = await query.orderBy(
+          desc(orders.orderedAt),
+          desc(orderItemsTable.id),
+        );
+
+        console.log(`✅ Found ${items.length} order items by date range`);
+
+        // Ensure items is always an array, even if empty
+        const safeItems = Array.isArray(items) ? items : [];
+        res.json(safeItems);
+      } catch (error) {
+        console.error("=== GET ORDER ITEMS BY DATE RANGE ERROR ===");
+        console.error("Error type:", error?.constructor?.name || "Unknown");
+        console.error("Error message:", error?.message || "Unknown error");
+        console.error("Error stack:", error?.stack || "No stack trace");
+
+        res.status(500).json({
+          message: "Failed to fetch order items by date range",
+          details: error instanceof Error ? error.message : "Unknown error",
+          timestamp: new Date(),
         });
       }
-    } catch (error) {
-      console.error("❌ Error testing printer:", error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to test printer connection",
-      });
-    }
-  });
-
-  // API kiểm tra trạng thái máy in (legacy endpoint)
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/print/status/:ip/:port?", async (req: TenantRequest, res) => {
-    try {
-      const { ip, port = 9100 } = req.params;
-      const net = require("net");
-
-      const checkPromise = new Promise((resolve, reject) => {
-        const client = new net.Socket();
-        client.setTimeout(3000);
-
-        client.connect(parseInt(port as string), ip, () => {
-          client.end();
-          resolve({
-            status: "connected",
-            ip: ip,
-            port: port,
-            timestamp: new Date().toISOString(),
-          });
-        });
-
-        client.on("timeout", () => {
-          client.destroy();
-          reject(new Error("timeout"));
-        });
-
-        client.on("error", (error) => {
-          reject(error);
-        });
-      });
-
-      const result = await checkPromise;
-      res.json({ success: true, printer: result });
-    } catch (error) {
-      res.json({
-        success: false,
-        status: "disconnected",
-        error: error instanceof Error ? error.message : "Connection failed",
-      });
-    }
-  });
+    },
+  );
 
   // Get order items for a specific order
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/:orderId", async (req: TenantRequest, res) => {
+  app.get("/api/order-items/:orderId", async (req: TenantRequest, res) => {
     try {
       console.log("=== GET ORDER ITEMS API CALLED ===");
       const orderId = parseInt(req.params.orderId);
@@ -3158,13 +3938,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         message: "Failed to fetch order items",
         details: error instanceof Error ? error.message : "Unknown error",
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
       });
     }
   });
 
   // Update a specific order item
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/:itemId", async (req: TenantRequest, res) => {
+  app.put("/api/order-items/:itemId", async (req: TenantRequest, res) => {
     try {
       console.log("=== UPDATE ORDER ITEM API CALLED ===");
       const itemId = parseInt(req.params.itemId);
@@ -3245,13 +4025,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         error: "Failed to update order item",
         details: error instanceof Error ? error.message : "Unknown error",
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
       });
     }
   });
 
   // Delete a specific order item
-  app.delete("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/:itemId", async (req: TenantRequest, res) => {
+  app.delete("/api/order-items/:itemId", async (req: TenantRequest, res) => {
     try {
       console.log("=== DELETE ORDER ITEM API CALLED ===");
       const itemId = parseInt(req.params.itemId);
@@ -3288,14 +4068,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         error: "Failed to delete order item",
         details: error instanceof Error ? error.message : "Unknown error",
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
+      });
+    }
+  });
+
+  // Income Vouchers API Routes
+  app.get("/api/income-vouchers", async (req: TenantRequest, res) => {
+    try {
+      const tenantDb = await getTenantDatabase(req);
+      const vouchers = await storage.getIncomeVouchers(tenantDb);
+      res.json(vouchers);
+    } catch (error) {
+      console.error("Error fetching income vouchers:", error);
+      res.status(500).json({
+        error: "Failed to fetch income vouchers",
+      });
+    }
+  });
+
+  app.post("/api/income-vouchers", async (req: TenantRequest, res) => {
+    try {
+      const tenantDb = await getTenantDatabase(req);
+      const voucher = await storage.createIncomeVoucher(req.body, tenantDb);
+      res.status(201).json(voucher);
+    } catch (error) {
+      console.error("Error creating income voucher:", error);
+      res.status(500).json({
+        error: "Failed to create income voucher",
+      });
+    }
+  });
+
+  app.put("/api/income-vouchers/:id", async (req: TenantRequest, res) => {
+    try {
+      const { id } = req.params;
+      const tenantDb = await getTenantDatabase(req);
+      const voucher = await storage.updateIncomeVoucher(id, req.body, tenantDb);
+      res.json(voucher);
+    } catch (error) {
+      console.error("Error updating income voucher:", error);
+      res.status(500).json({
+        error: "Failed to update income voucher",
+      });
+    }
+  });
+
+  app.delete("/api/income-vouchers/:id", async (req: TenantRequest, res) => {
+    try {
+      const { id } = req.params;
+      const tenantDb = await getTenantDatabase(req);
+      await storage.deleteIncomeVoucher(id, tenantDb);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting income voucher:", error);
+      res.status(500).json({
+        error: "Failed to delete income voucher",
       });
     }
   });
 
   // Get POS orders specifically
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/pos",
+    "/api/orders/pos",
     tenantMiddleware,
     async (req: TenantRequest, res) => {
       try {
@@ -3321,7 +4156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Get table orders specifically
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/table",
+    "/api/orders/table",
     tenantMiddleware,
     async (req: TenantRequest, res) => {
       try {
@@ -3348,7 +4183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Add order items to existing order
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/:orderId/items", async (req: TenantRequest, res) => {
+  app.post("/api/orders/:orderId/items", async (req: TenantRequest, res) => {
     try {
       const orderId = parseInt(req.params.orderId);
       const { items } = req.body;
@@ -3416,7 +4251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           total: item.total
             ? item.total.toString()
             : (parseFloat(item.unitPrice) * parseInt(item.quantity)).toString(),
-          discount: "0.00", // Default discount, will be recalculated below
+          discount: item.discount, // Default discount, will be recalculated below
           notes: item.notes || null,
         };
       });
@@ -3433,120 +4268,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `✅ Successfully added ${insertedItems.length} items to order ${orderId}`,
       );
 
-      // Recalculate discount distribution for all items in the order
-      const orderDiscount = Number(existingOrder.discount || 0);
-      if (orderDiscount > 0) {
-        console.log(
-          `🔄 Recalculating discount distribution for order ${orderId} with total discount ${orderDiscount}`,
-        );
-
-        // Get all order items after insertion
-        const updatedOrderItems = await database
-          .select()
-          .from(orderItemsTable)
-          .where(eq(orderItemsTable.orderId, orderId));
-
-        // Calculate new discount distribution
-        const itemsWithNewDiscount = calculateDiscountDistribution(
-          updatedOrderItems,
-          orderDiscount,
-        );
-
-        // Update each item's discount
-        for (const item of itemsWithNewDiscount) {
-          await database
-            .update(orderItemsTable)
-            .set({ discount: item.discount })
-            .where(eq(orderItemsTable.id, item.id));
-        }
-
-        console.log(
-          `✅ Updated discount distribution for ${itemsWithNewDiscount.length} items`,
-        );
-      }
-
-      // Fetch ALL order items to recalculate totals using order-dialog logic
-      const allOrderItems = await database
-        .select()
-        .from(orderItemsTable)
-        .where(eq(orderItemsTable.orderId, orderId));
-
-      console.log(
-        `📦 Found ${allOrderItems.length} total items for order ${orderId}`,
-      );
-
-      // Get products for tax calculation (same as order-dialog)
-      const allProducts = await database.select().from(products);
-      const productMap = new Map(allProducts.map((p) => [p.id, p]));
-
-      // EXACT same logic as order-dialog calculateTotal()
-      let calculatedSubtotal = 0; // Tiền tạm tính (trước thuế)
-
-      allOrderItems.forEach((item) => {
-        const unitPrice = Number(item.unitPrice || 0); // Giá trước thuế
-        const quantity = Number(item.quantity || 0);
-
-        // Calculate subtotal (base price * quantity) - EXACT same as order-dialog
-        const itemSubtotal = unitPrice * quantity;
-        calculatedSubtotal += itemSubtotal;
-      });
-
-      // EXACT same logic as order-dialog calculateTax()
-      let calculatedTax = 0; // Tổng thuế
-
-      allOrderItems.forEach((item) => {
-        const unitPrice = Number(item.unitPrice || 0);
-        const quantity = Number(item.quantity || 0);
-        const product = productMap.get(item.productId);
-
-        let itemTax = 0;
-        // Thuế = (after_tax_price - price) * quantity - EXACT same as order-dialog
-        if (
-          product?.afterTaxPrice &&
-          product.afterTaxPrice !== null &&
-          product.afterTaxPrice !== ""
-        ) {
-          const afterTaxPrice = parseFloat(product.afterTaxPrice); // Giá sau thuế
-          const preTaxPrice = unitPrice; // Giá trước thuế
-          const taxPerUnit = Math.max(0, afterTaxPrice - preTaxPrice); // Thuế trên đơn vị
-          itemTax = taxPerUnit * quantity;
-        }
-        // Không có thuế nếu không có afterTaxPrice
-        calculatedTax += itemTax;
-      });
-
-      // EXACT same logic as order-dialog calculateGrandTotal()
-      const calculatedTotal = calculatedSubtotal + calculatedTax;
-
-      console.log(`💰 Calculated new totals using order-dialog logic:`, {
-        subtotal: calculatedSubtotal,
-        tax: calculatedTax,
-        total: calculatedTotal,
-        itemsCount: allOrderItems.length,
-        calculationMethod: "order-dialog-exact",
-      });
-
-      // Update order totals with calculated values using tenant database
-      const [updatedOrder] = await database
-        .update(orders)
-        .set({
-          subtotal: calculatedSubtotal.toString(),
-          tax: calculatedTax.toString(),
-          total: calculatedTotal.toString(),
-          updatedAt: new Date().toISOString(),
-        })
-        .where(eq(orders.id, orderId))
-        .returning();
-
-      console.log(
-        `✅ Order ${orderId} totals updated successfully using order-dialog calculation`,
-      );
-
       res.json({
         success: true,
-        insertedItems,
-        updatedOrder,
-        message: `Added ${insertedItems.length} items and updated order totals using order-dialog logic`,
+        validatedItems,
+        message: `Added ${validatedItems.length} items and updated order totals using order-dialog logic`,
       });
     } catch (error) {
       console.error(
@@ -3567,7 +4292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Inventory Management
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/inventory/update-stock", async (req: TenantRequest, res) => {
+  app.post("/api/inventory/update-stock", async (req: TenantRequest, res) => {
     try {
       const { productId, quantity, type, notes, trackInventory } = req.body;
       const tenantDb = await getTenantDatabase(req);
@@ -3613,7 +4338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create inventory transaction record using raw SQL to match exact schema
       await db.execute(sql`
         INSERT INTO inventory_transactions (product_id, type, quantity, previous_stock, new_stock, notes, created_at)
-        VALUES (${productId}, ${type}, ${quantity}, ${product.stock}, ${newStock}, ${notes || null}, ${new Date().toISOString()})
+        VALUES (${productId}, ${type}, ${quantity}, ${product.stock}, ${newStock}, ${notes || null}, ${new Date()})
       `);
 
       res.json({
@@ -3628,8 +4353,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk update stock by SKU
+  app.post(
+    "/api/inventory/bulk-update-stock",
+    async (req: TenantRequest, res) => {
+      try {
+        const { items } = req.body;
+        const tenantDb = await getTenantDatabase(req);
+        const database = tenantDb || db;
+
+        console.log("🔄 Bulk stock update request:", {
+          itemsCount: items?.length,
+        });
+
+        if (!items || !Array.isArray(items) || items.length === 0) {
+          return res.status(400).json({
+            error: "Items array is required and must not be empty",
+          });
+        }
+
+        const results = [];
+        const errors = [];
+
+        for (const item of items) {
+          try {
+            const { sku, stock } = item;
+
+            if (!sku || stock === undefined || stock === null) {
+              errors.push({
+                sku: sku || "unknown",
+                error: "SKU and stock are required",
+              });
+              continue;
+            }
+
+            // Find product by SKU
+            const [product] = await database
+              .select()
+              .from(products)
+              .where(eq(products.sku, sku))
+              .limit(1);
+
+            if (!product) {
+              errors.push({
+                sku,
+                error: "Product not found",
+              });
+              continue;
+            }
+
+            const previousStock = product.stock;
+            const newStock = Math.max(0, parseInt(stock));
+
+            // Update product stock
+            await database
+              .update(products)
+              .set({ stock: newStock })
+              .where(eq(products.sku, sku));
+
+            // Create inventory transaction record
+            await database.execute(sql`
+            INSERT INTO inventory_transactions (product_id, type, quantity, previous_stock, new_stock, notes, created_at)
+            VALUES (${product.id}, 'set', ${newStock}, ${previousStock}, ${newStock}, 'Bulk stock update via API', ${new Date()})
+          `);
+
+            results.push({
+              sku,
+              productId: product.id,
+              productName: product.name,
+              previousStock,
+              newStock,
+              success: true,
+            });
+
+            console.log(
+              `✅ Updated stock for ${sku}: ${previousStock} → ${newStock}`,
+            );
+          } catch (itemError) {
+            console.error(
+              `❌ Error updating stock for ${item.sku}:`,
+              itemError,
+            );
+            errors.push({
+              sku: item.sku || "unknown",
+              error:
+                itemError instanceof Error
+                  ? itemError.message
+                  : "Unknown error",
+            });
+          }
+        }
+
+        console.log(
+          `🎯 Bulk stock update completed: ${results.length} success, ${errors.length} errors`,
+        );
+
+        // Log the actual stock values that were updated
+        console.log(
+          "📊 Stock update results:",
+          results.map((r) => ({
+            sku: r.sku,
+            previousStock: r.previousStock,
+            newStock: r.newStock,
+            productId: r.productId,
+          })),
+        );
+
+        res.json({
+          success: true,
+          message: `Updated ${results.length} products successfully`,
+          results,
+          errors: errors.length > 0 ? errors : undefined,
+          summary: {
+            totalItems: items.length,
+            successCount: results.length,
+            errorCount: errors.length,
+          },
+          timestamp: new Date(),
+        });
+      } catch (error) {
+        console.error("❌ Bulk stock update error:", error);
+        res.status(500).json({
+          error: "Failed to update stock",
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    },
+  );
+
   // Store Settings
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings", async (req: TenantRequest, res) => {
+  app.get("/api/store-settings", async (req: TenantRequest, res) => {
     try {
       const settings = await storage.getStoreSettings();
       res.json(settings);
@@ -3641,10 +4494,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Current cart state for customer display
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/current-cart", async (req, res) => {
+  app.put("/api/store-settings", async (req: TenantRequest, res) => {
     try {
-      console.log("📱 Customer Display: Current cart API called");
+      const validatedData = insertStoreSettingsSchema.partial().parse(req.body);
+      const tenantDb = await getTenantDatabase(req);
+      const settings = await storage.updateStoreSettings(
+        validatedData,
+        tenantDb,
+      );
+      res.json(settings);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          message: "Invalid store settings data",
+          errors: error.errors,
+        });
+      }
+      res.status(500).json({
+        message: "Failed to update store settings",
+      });
+    }
+  });
+
+  // Current cart state for customer display
+  app.get("/api/current-cart", async (req, res) => {
+    try {
+      console.log("n Customer Display: Current cart API called");
 
       // Get store settings for customer display
       const storeSettings = await storage.getStoreSettings();
@@ -3676,31 +4551,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings", async (req: TenantRequest, res) => {
-    try {
-      const validatedData = insertStoreSettingsSchema.partial().parse(req.body);
-      const tenantDb = await getTenantDatabase(req);
-      const settings = await storage.updateStoreSettings(
-        validatedData,
-        tenantDb,
-      );
-      res.json(settings);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({
-          message: "Invalid store settings data",
-          errors: error.errors,
-        });
-      }
-      res.status(500).json({
-        message: "Failed to update store settings",
-      });
-    }
-  });
-
   // Suppliers
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/suppliers",
+    "/api/suppliers",
     tenantMiddleware,
     async (req: TenantRequest, res) => {
       try {
@@ -3741,7 +4594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/suppliers/:id", async (req: TenantRequest, res) => {
+  app.get("/api/suppliers/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -3761,7 +4614,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/suppliers", async (req: TenantRequest, res) => {
+  app.post("/api/suppliers", async (req: TenantRequest, res) => {
     try {
       const validatedData = insertSupplierSchema.parse(req.body);
       const tenantDb = await getTenantDatabase(req);
@@ -3780,7 +4633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/suppliers/:id", async (req: TenantRequest, res) => {
+  app.put("/api/suppliers/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const validatedData = insertSupplierSchema.partial().parse(req.body);
@@ -3811,7 +4664,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/suppliers/:id", async (req: TenantRequest, res) => {
+  app.delete("/api/suppliers/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -3833,8 +4686,561 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Purchase Receipts Management API
+  app.get("/api/purchase-orders", async (req: Request, res) => {
+    try {
+      console.log("🔍 GET /api/purchase-orders - Starting request processing");
+      console.log("✅ Using global database connection for purchase receipts");
+
+      const { status, supplierId, search, startDate, endDate, page, limit } =
+        req.query;
+
+      console.log("🔍 Purchase receipts query parameters:", {
+        status,
+        supplierId,
+        search,
+        startDate,
+        endDate,
+        page,
+        limit,
+      });
+
+      const options = {
+        status: status as string,
+        supplierId: supplierId ? parseInt(supplierId as string) : undefined,
+        search: search as string,
+        startDate: startDate as string,
+        endDate: endDate as string,
+        page: page ? parseInt(page as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+      };
+
+      const result = await storage.getPurchaseReceipts(options, db);
+      console.log(
+        `✅ Successfully fetched ${Array.isArray(result) ? result.length : result.orders?.length || 0} purchase receipts`,
+      );
+      res.json(result);
+    } catch (error) {
+      console.error("❌ Error fetching purchase receipts:", error);
+      res.status(500).json({ message: "Failed to fetch purchase receipts" });
+    }
+  });
+
+  app.get(
+    "/api/purchase-orders/:id",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const tenantDb = await getTenantDatabase(req);
+        const purchaseOrder = await storage.getPurchaseOrder(id, tenantDb);
+
+        if (!purchaseOrder) {
+          return res.status(404).json({ message: "Purchase order not found" });
+        }
+
+        res.json(purchaseOrder);
+      } catch (error) {
+        console.error("❌ Error fetching purchase order:", error);
+        res.status(500).json({ message: "Failed to fetch purchase order" });
+      }
+    },
+  );
+
+  app.post("/api/purchase-orders", async (req: Request, res) => {
+    try {
+      console.log("📝 Creating purchase receipt with data:", req.body);
+
+      const { items = [], attachedFiles = [], ...orderData } = req.body;
+
+      // Basic validation
+      if (!orderData.supplierId) {
+        return res.status(400).json({
+          message: "Supplier ID is required",
+        });
+      }
+
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({
+          message: "At least one item is required",
+        });
+      }
+
+      // Validate purchase receipt data
+      const validatedOrderData = insertPurchaseReceiptSchema.parse({
+        ...orderData,
+        supplierId: Number(orderData.supplierId),
+        receiptNumber:
+          orderData.poNumber || orderData.receiptNumber || `PR-${new Date()}`,
+        subtotal: orderData.subtotal || "0.00",
+        tax: orderData.tax || "0.00",
+        total: orderData.total || "0.00",
+      });
+
+      // Validate items array
+      const validatedItems = items.map((item) =>
+        insertPurchaseReceiptItemSchema.parse({
+          ...item,
+          productId: Number(item.productId),
+          quantity: Number(item.quantity),
+          unitPrice: String(item.unitPrice),
+          total: String(item.total),
+          receivedQuantity: Number(item.receivedQuantity || 0),
+        }),
+      );
+
+      console.log(
+        "✅ Using global database connection for purchase receipt creation",
+      );
+      console.log("✅ Validated receipt data:", validatedOrderData);
+      console.log("✅ Validated items:", validatedItems);
+
+      const result = await storage.createPurchaseReceipt(
+        validatedOrderData,
+        validatedItems,
+        db,
+      );
+
+      // Handle file attachments if any
+      if (attachedFiles && attachedFiles.length > 0) {
+        console.log(`📎 Processing ${attachedFiles.length} file attachments`);
+
+        for (const file of attachedFiles) {
+          try {
+            const documentData = {
+              purchaseReceiptId: result.id,
+              fileName: file.fileName,
+              originalFileName: file.originalFileName,
+              fileType: file.fileType,
+              fileSize: file.fileSize,
+              filePath: `/uploads/purchase-receipts/${result.id}/${file.fileName}`,
+              description: file.description || null,
+              uploadedBy: null,
+            };
+
+            // Create document record
+            await storage.uploadPurchaseReceiptDocument(documentData, db);
+            console.log(`✅ File attachment saved: ${file.originalFileName}`);
+          } catch (fileError) {
+            console.error(
+              `❌ Error saving file ${file.originalFileName}:`,
+              fileError,
+            );
+          }
+        }
+      }
+
+      console.log(
+        `✅ Successfully created purchase receipt: ${result.receiptNumber}`,
+      );
+      res.status(201).json(result);
+    } catch (error) {
+      console.error("❌ Error creating purchase receipt:", error);
+      if (error instanceof z.ZodError) {
+        console.error("❌ Validation errors:", error.errors);
+        return res.status(400).json({
+          message: "Invalid purchase receipt data",
+          errors: error.errors,
+        });
+      }
+
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to create purchase receipt";
+      res.status(500).json({
+        message: errorMessage,
+        details: error instanceof Error ? error.stack : String(error),
+      });
+    }
+  });
+
+  app.put(
+    "/api/purchase-orders/:id",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const validatedData = insertPurchaseOrderSchema
+          .partial()
+          .parse(req.body);
+        const tenantDb = await getTenantDatabase(req);
+
+        const purchaseOrder = await storage.updatePurchaseOrder(
+          id,
+          validatedData,
+          tenantDb,
+        );
+
+        if (!purchaseOrder) {
+          return res.status(404).json({ message: "Purchase order not found" });
+        }
+
+        console.log(`✅ Successfully updated purchase order: ${id}`);
+        res.json(purchaseOrder);
+      } catch (error) {
+        console.error("❌ Error updating purchase order:", error);
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({
+            message: "Invalid purchase order data",
+            errors: error.errors,
+          });
+        }
+        res.status(500).json({ message: "Failed to update purchase order" });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/purchase-orders/:id",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const tenantDb = await getTenantDatabase(req);
+        const deleted = await storage.deletePurchaseOrder(id, tenantDb);
+
+        if (!deleted) {
+          return res.status(404).json({ message: "Purchase order not found" });
+        }
+
+        console.log(`✅ Successfully deleted purchase order: ${id}`);
+        res.json({ message: "Purchase order deleted successfully" });
+      } catch (error) {
+        console.error("❌ Error deleting purchase order:", error);
+        res.status(500).json({ message: "Failed to delete purchase order" });
+      }
+    },
+  );
+
+  // Bulk delete purchase orders
+  app.post(
+    "/api/purchase-orders/bulk-delete",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        const { orderIds } = req.body;
+
+        if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+          return res.status(400).json({
+            message: "Order IDs array is required and must not be empty",
+          });
+        }
+
+        console.log(
+          `🗑️ Bulk deleting ${orderIds.length} purchase orders:`,
+          orderIds,
+        );
+
+        const tenantDb = await getTenantDatabase(req);
+        let deletedCount = 0;
+        const errors = [];
+
+        for (const orderId of orderIds) {
+          try {
+            const deleted = await storage.deletePurchaseOrder(
+              parseInt(orderId),
+              tenantDb,
+            );
+            if (deleted) {
+              deletedCount++;
+            } else {
+              errors.push(`Purchase order ${orderId} not found`);
+            }
+          } catch (error) {
+            console.error(
+              `❌ Error deleting purchase order ${orderId}:`,
+              error,
+            );
+            errors.push(
+              `Failed to delete purchase order ${orderId}: ${error.message}`,
+            );
+          }
+        }
+
+        console.log(
+          `🎯 Bulk delete completed: ${deletedCount}/${orderIds.length} orders deleted`,
+        );
+
+        res.json({
+          success: true,
+          deletedCount,
+          totalRequested: orderIds.length,
+          errors: errors.length > 0 ? errors : undefined,
+          message: `Successfully deleted ${deletedCount} purchase order(s)`,
+        });
+      } catch (error) {
+        console.error("❌ Error in bulk delete purchase orders:", error);
+        res.status(500).json({
+          message: "Failed to delete purchase orders",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+  );
+
+  // Purchase Order Items Management
+  app.get(
+    "/api/purchase-orders/:id/items",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        const purchaseOrderId = parseInt(req.params.id);
+        const tenantDb = await getTenantDatabase(req);
+        const items = await storage.getPurchaseOrderItems(
+          purchaseOrderId,
+          tenantDb,
+        );
+
+        console.log(
+          `✅ Successfully fetched ${items.length} purchase order items`,
+        );
+        res.json(items);
+      } catch (error) {
+        console.error("❌ Error fetching purchase order items:", error);
+        res
+          .status(500)
+          .json({ message: "Failed to fetch purchase order items" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/purchase-orders/:id/items",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        const purchaseOrderId = parseInt(req.params.id);
+        const items = Array.isArray(req.body) ? req.body : [req.body];
+        const validatedItems = items.map((item) =>
+          insertPurchaseOrderItemSchema.parse({
+            ...item,
+            purchaseOrderId,
+          }),
+        );
+
+        const tenantDb = await getTenantDatabase(req);
+        const result = await storage.addPurchaseOrderItems(
+          purchaseOrderId,
+          validatedItems,
+          tenantDb,
+        );
+
+        console.log(
+          `✅ Successfully added ${result.length} items to purchase order: ${purchaseOrderId}`,
+        );
+        res.status(201).json(result);
+      } catch (error) {
+        console.error("❌ Error adding purchase order items:", error);
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({
+            message: "Invalid purchase order item data",
+            errors: error.errors,
+          });
+        }
+        res.status(500).json({ message: "Failed to add purchase order items" });
+      }
+    },
+  );
+
+  app.put(
+    "/api/purchase-order-items/:id",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const validatedData = insertPurchaseOrderItemSchema
+          .partial()
+          .parse(req.body);
+        const tenantDb = await getTenantDatabase(req);
+
+        const item = await storage.updatePurchaseOrderItem(
+          id,
+          validatedData,
+          tenantDb,
+        );
+
+        if (!item) {
+          return res
+            .status(404)
+            .json({ message: "Purchase order item not found" });
+        }
+
+        console.log(`✅ Successfully updated purchase order item: ${id}`);
+        res.json(item);
+      } catch (error) {
+        console.error("❌ Error updating purchase order item:", error);
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({
+            message: "Invalid purchase order item data",
+            errors: error.errors,
+          });
+        }
+        res
+          .status(500)
+          .json({ message: "Failed to update purchase order item" });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/purchase-order-items/:id",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const tenantDb = await getTenantDatabase(req);
+        const deleted = await storage.deletePurchaseOrderItem(id, tenantDb);
+
+        if (!deleted) {
+          return res
+            .status(404)
+            .json({ message: "Purchase order item not found" });
+        }
+
+        console.log(`✅ Successfully deleted purchase order item: ${id}`);
+        res.json({ message: "Purchase order item deleted successfully" });
+      } catch (error) {
+        console.error("❌ Error deleting purchase order item:", error);
+        res
+          .status(500)
+          .json({ message: "Failed to delete purchase order item" });
+      }
+    },
+  );
+
+  // Receive Goods API
+  app.post(
+    "/api/purchase-orders/:id/receive",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        const purchaseOrderId = parseInt(req.params.id);
+        const { receivedItems } = req.body;
+
+        if (!Array.isArray(receivedItems) || receivedItems.length === 0) {
+          return res.status(400).json({
+            message: "receivedItems array is required and must not be empty",
+          });
+        }
+
+        // Define validation schema for receive items
+        const receiveItemSchema = z.object({
+          id: z.number().positive(),
+          receivedQuantity: z.number().min(0),
+          productId: z.number().positive().optional(),
+        });
+
+        // Validate each received item using Zod
+        const validatedItems = receivedItems.map((item) =>
+          receiveItemSchema.parse(item),
+        );
+
+        const tenantDb = await getTenantDatabase(req);
+        const result = await storage.receiveItems(
+          purchaseOrderId,
+          validatedItems,
+          tenantDb,
+        );
+
+        console.log(
+          `✅ Successfully processed receipt for purchase order: ${purchaseOrderId}, new status: ${result.status}`,
+        );
+        res.json(result);
+      } catch (error) {
+        console.error("❌ Error processing goods receipt:", error);
+        res.status(500).json({
+          message: "Failed to process goods receipt",
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    },
+  );
+
+  // Purchase Order Documents Management
+  app.get(
+    "/api/purchase-orders/:id/documents",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        const purchaseOrderId = parseInt(req.params.id);
+        const tenantDb = await getTenantDatabase(req);
+        const documents = await storage.getPurchaseOrderDocuments(
+          purchaseOrderId,
+          tenantDb,
+        );
+
+        console.log(
+          `✅ Successfully fetched ${documents.length} documents for purchase order: ${purchaseOrderId}`,
+        );
+        res.json(documents);
+      } catch (error) {
+        console.error("❌ Error fetching purchase order documents:", error);
+        res
+          .status(500)
+          .json({ message: "Failed to fetch purchase order documents" });
+      }
+    },
+  );
+
+  app.post(
+    "/api/purchase-orders/:id/documents",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        const purchaseOrderId = parseInt(req.params.id);
+        const validatedData = insertPurchaseReceiptDocumentSchema.parse({
+          ...req.body,
+          purchaseOrderId,
+        });
+
+        const tenantDb = await getTenantDatabase(req);
+        const document = await storage.uploadPurchaseOrderDocument(
+          validatedData,
+          tenantDb,
+        );
+
+        console.log(
+          `✅ Successfully uploaded document for purchase order: ${purchaseOrderId}`,
+        );
+        res.status(201).json(document);
+      } catch (error) {
+        console.error("❌ Error uploading purchase order document:", error);
+        if (error instanceof z.ZodError) {
+          return res.status(400).json({
+            message: "Invalid document data",
+            errors: error.errors,
+          });
+        }
+        res.status(500).json({ message: "Failed to upload document" });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/purchase-order-documents/:id",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        const tenantDb = await getTenantDatabase(req);
+        const deleted = await storage.deletePurchaseOrderDocument(id, tenantDb);
+
+        if (!deleted) {
+          return res.status(404).json({ message: "Document not found" });
+        }
+
+        console.log(`✅ Successfully deleted purchase order document: ${id}`);
+        res.json({ message: "Document deleted successfully" });
+      } catch (error) {
+        console.error("❌ Error deleting purchase order document:", error);
+        res.status(500).json({ message: "Failed to delete document" });
+      }
+    },
+  );
+
   // Get next customer ID
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/next-id", async (req: TenantRequest, res) => {
+  app.get("/api/customers/next-id", async (req: TenantRequest, res) => {
     try {
       const tenantDb = await getTenantDatabase(req);
       const nextId = await storage.getNextCustomerId(tenantDb);
@@ -3850,7 +5256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Customer management routes - Added Here
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers",
+    "/api/customers",
     tenantMiddleware,
     async (req: TenantRequest, res) => {
       try {
@@ -3879,7 +5285,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/:id", async (req: TenantRequest, res) => {
+  app.get("/api/customers/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -3898,7 +5304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create customer
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers", async (req: TenantRequest, res) => {
+  app.post("/api/customers", async (req: TenantRequest, res) => {
     try {
       const tenantDb = await getTenantDatabase(req);
 
@@ -3946,7 +5352,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/:id", async (req: TenantRequest, res) => {
+  app.put("/api/customers/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const customerData = req.body;
@@ -3971,7 +5377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/:id", async (req: TenantRequest, res) => {
+  app.delete("/api/customers/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -3991,7 +5397,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/:id/visit", async (req: TenantRequest, res) => {
+  app.post("/api/customers/:id/visit", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const { amount, points } = req.body;
@@ -4019,7 +5425,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Point Management API
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/:id/points", async (req: TenantRequest, res) => {
+  app.get("/api/customers/:id/points", async (req: TenantRequest, res) => {
     try {
       const customerId = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -4039,7 +5445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/:id/points", async (req: TenantRequest, res) => {
+  app.post("/api/customers/:id/points", async (req: TenantRequest, res) => {
     try {
       const customerId = parseInt(req.params.id);
       const pointUpdateSchema = z.object({
@@ -4092,7 +5498,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/:id/point-history",
+    "/api/customers/:id/point-history",
     async (req: TenantRequest, res) => {
       try {
         const customerId = parseInt(req.params.id);
@@ -4114,7 +5520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // New endpoints for points management modal
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/adjust-points", async (req: TenantRequest, res) => {
+  app.post("/api/customers/adjust-points", async (req: TenantRequest, res) => {
     try {
       const pointUpdateSchema = z.object({
         customerId: z.number().int().min(1),
@@ -4165,7 +5571,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/redeem-points", async (req: TenantRequest, res) => {
+  app.post("/api/customers/redeem-points", async (req: TenantRequest, res) => {
     try {
       const redeemSchema = z.object({
         customerId: z.number().int().min(1),
@@ -4212,7 +5618,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/point-transactions", async (req: TenantRequest, res) => {
+  app.get("/api/point-transactions", async (req: TenantRequest, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 100;
       const tenantDb = await getTenantDatabase(req);
@@ -4231,7 +5637,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Membership thresholds management
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/membership-thresholds", async (req: TenantRequest, res) => {
+  app.get("/api/membership-thresholds", async (req: TenantRequest, res) => {
     try {
       const tenantDb = await getTenantDatabase(req);
       const thresholds = await storage.getMembershipThresholds(tenantDb);
@@ -4243,7 +5649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/membership-thresholds", async (req: TenantRequest, res) => {
+  app.put("/api/membership-thresholds", async (req: TenantRequest, res) => {
     try {
       const thresholdSchema = z.object({
         GOLD: z.number().min(0),
@@ -4272,7 +5678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Supplier Reports APIs
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/supplier-debts", async (req: TenantRequest, res) => {
+  app.get("/api/supplier-debts", async (req: TenantRequest, res) => {
     try {
       const { startDate, endDate, supplierId } = req.query;
       const tenantDb = await getTenantDatabase(req);
@@ -4317,7 +5723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/supplier-purchases", async (req: TenantRequest, res) => {
+  app.get("/api/supplier-purchases", async (req: TenantRequest, res) => {
     try {
       const { startDate, endDate, supplierId } = req.query;
       const tenantDb = await getTenantDatabase(req);
@@ -4362,7 +5768,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Invoice templates management
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoice-templates",
+    "/api/invoice-templates",
     tenantMiddleware,
     async (req: TenantRequest, res) => {
       try {
@@ -4397,7 +5803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoice-templates/active", async (req: TenantRequest, res) => {
+  app.get("/api/invoice-templates/active", async (req: TenantRequest, res) => {
     try {
       const tenantDb = await getTenantDatabase(req);
       const activeTemplates = await storage.getActiveInvoiceTemplates();
@@ -4410,7 +5816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoice-templates", async (req: TenantRequest, res) => {
+  app.post("/api/invoice-templates", async (req: TenantRequest, res) => {
     try {
       const templateData = req.body;
       const tenantDb = await getTenantDatabase(req);
@@ -4427,7 +5833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoice-templates/:id", async (req: TenantRequest, res) => {
+  app.put("/api/invoice-templates/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const templateData = req.body;
@@ -4453,7 +5859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoice-templates/:id", async (req: TenantRequest, res) => {
+  app.delete("/api/invoice-templates/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -4478,7 +5884,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Invoices management
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices",
+    "/api/invoices",
     tenantMiddleware,
     async (req: TenantRequest, res) => {
       try {
@@ -4507,7 +5913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices", async (req: TenantRequest, res) => {
+  app.post("/api/invoices", async (req: TenantRequest, res) => {
     try {
       console.log("🔍 POST /api/invoices - Creating new invoice");
       const tenantDb = await getTenantDatabase(req);
@@ -4565,7 +5971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices/:id", async (req: TenantRequest, res) => {
+  app.get("/api/invoices/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -4593,7 +5999,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices/:id", async (req: TenantRequest, res) => {
+  app.put("/api/invoices/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -4622,7 +6028,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices/:id", async (req: TenantRequest, res) => {
+  app.delete("/api/invoices/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -4654,7 +6060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // E-invoice connections management
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/einvoice-connections",
+    "/api/einvoice-connections",
     tenantMiddleware,
     async (req: TenantRequest, res) => {
       try {
@@ -4689,7 +6095,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/einvoice-connections", async (req: TenantRequest, res) => {
+  app.post("/api/einvoice-connections", async (req: TenantRequest, res) => {
     try {
       const connectionData = req.body;
       const tenantDb = await getTenantDatabase(req);
@@ -4706,7 +6112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/einvoice-connections/:id", async (req: TenantRequest, res) => {
+  app.put("/api/einvoice-connections/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const connectionData = req.body;
@@ -4733,7 +6139,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/einvoice-connections/:id",
+    "/api/einvoice-connections/:id",
     async (req: TenantRequest, res) => {
       try {
         const id = parseInt(req.params.id);
@@ -4759,7 +6165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Menu Analysis API
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/menu-analysis", async (req, res) => {
+  app.get("/api/menu-analysis", async (req, res) => {
     try {
       const { startDate, endDate, categoryId, productType, productSearch } =
         req.query;
@@ -4997,7 +6403,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Printer configuration management APIs
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs",
+    "/api/printer-configs",
     tenantMiddleware,
     async (req: TenantRequest, res) => {
       try {
@@ -5032,7 +6438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs", async (req: TenantRequest, res) => {
+  app.post("/api/printer-configs", async (req: TenantRequest, res) => {
     try {
       const tenantDb = await getTenantDatabase(req);
       const configData = req.body;
@@ -5049,7 +6455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs/:id", async (req: TenantRequest, res) => {
+  app.put("/api/printer-configs/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -5062,7 +6468,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         configData,
         tenantDb,
       );
-
       if (!config) {
         return res.status(404).json({
           error: "Printer config not found",
@@ -5078,7 +6483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs/:id", async (req: TenantRequest, res) => {
+  app.delete("/api/printer-configs/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -5104,7 +6509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs/:id/test", async (req: TenantRequest, res) => {
+  app.post("/api/printer-configs/:id/test", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
@@ -5116,7 +6521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!config) {
         return res.status(404).json({
           success: false,
-          message: "Printer config not found",
+          message: "Printer configuration not found",
         });
       }
 
@@ -5192,7 +6597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Customer Reports APIs
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customer-debts", async (req: TenantRequest, res) => {
+  app.get("/api/customer-debts", async (req: TenantRequest, res) => {
     try {
       const { startDate, endDate, customerId } = req.query;
       const tenantDb = await getTenantDatabase(req);
@@ -5228,7 +6633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customer-sales", async (req: TenantRequest, res) => {
+  app.get("/api/customer-sales", async (req: TenantRequest, res) => {
     try {
       const { startDate, endDate, customerId } = req.query;
       const tenantDb = await getTenantDatabase(req);
@@ -5264,7 +6669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk create products
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/bulk", async (req: TenantRequest, res) => {
+  app.post("/api/products/bulk", async (req: TenantRequest, res) => {
     try {
       const { products: productList } = req.body;
       const tenantDb = await getTenantDatabase(req);
@@ -5364,7 +6769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Employee routes
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees",
+    "/api/employees",
     tenantMiddleware,
     async (req: TenantRequest, res) => {
       try {
@@ -5394,7 +6799,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Employee sales report data
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employee-sales", async (req: TenantRequest, res) => {
+  app.get("/api/employee-sales", async (req: TenantRequest, res) => {
     try {
       const { startDate, endDate, employeeId } = req.query;
       const tenantDb = await getTenantDatabase(req);
@@ -5433,10 +6838,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Server time endpoint for consistent timestamps
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/server-time", async (req: TenantRequest, res) => {
+  app.get("/api/server-time", async (req: TenantRequest, res) => {
     try {
       const serverTime = {
-        timestamp: new Date().toISOString(),
+        timestamp: new Date(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         localTime: new Date().toLocaleString("vi-VN", {
           timeZone: "Asia/Ho_Chi_Minh",
@@ -5457,7 +6862,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Product Analysis API - using orders and order_items data
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/product-analysis", async (req: TenantRequest, res) => {
+  app.get("/api/product-analysis", async (req: TenantRequest, res) => {
     try {
       const { startDate, endDate, categoryId, productType, productSearch } =
         req.query;
@@ -5501,7 +6906,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
         const typeValue = typeMap[productType as keyof typeof typeMap];
         if (typeValue) {
-          typeConditions.push(eq(products.productType, typeValue));
+          typeConditions.push(eq(products.productType, value));
         }
       }
 
@@ -5553,7 +6958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       productSalesData.forEach((item) => {
         const productId = item.productId;
         const quantity = Number(item.quantity || 0);
-        const revenue = Number(item.total || 0);
+        const revenue = Number(item.unitPrice || 0) * quantity;
         const discount = Number(item.discount || 0);
 
         if (productMap.has(productId)) {
@@ -5570,6 +6975,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             categoryId: item.categoryId,
             categoryName: item.categoryName,
             productType: item.productType,
+            unitPrice: item.unitPrice, // This is the pre-tax price
+            quantity: item.quantity,
+            total: item.total,
             discount: item.discount,
             totalQuantity: quantity,
             totalRevenue: revenue,
@@ -5591,15 +6999,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate totals
       const totalRevenue = productStats.reduce(
-        (sum, p) => sum + p.totalRevenue,
+        (sum, product) => sum + product.totalRevenue,
         0,
       );
       const totalQuantity = productStats.reduce(
-        (sum, p) => sum + p.totalQuantity,
+        (sum, product) => sum + product.totalQuantity,
         0,
       );
       const totalDiscount = productStats.reduce(
-        (sum, p) => sum + p.totalDiscount,
+        (sum, product) => sum + product.totalDiscount,
         0,
       );
       const totalProducts = productStats.length;
@@ -5640,7 +7048,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // // Enhanced API endpoints for sales chart report - using same data source as dashboard
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/dashboard-data/:startDate/:endDate",
+    "/api/dashboard-data/:startDate/:endDate",
     async (req: TenantRequest, res) => {
       try {
         const { startDate, endDate } = req.params;
@@ -5670,7 +7078,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               try {
                 if (!order) return false;
 
-                // Try multiple date fields - prioritize orderedAt, then paidAt, then createdAt
+                // Try multiple date fields - prioritize orderedAt, paidAt, createdAt
                 const orderDate = new Date(
                   order.orderedAt ||
                     order.paidAt ||
@@ -5802,7 +7210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Transactions API with enhanced filtering
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/transactions/:startDate/:endDate/:salesMethod/:salesChannel/:analysisType/:concernType/:selectedEmployee",
+    "/api/transactions/:startDate/:endDate/:salesMethod/:salesChannel/:analysisType/:concernType/:selectedEmployee",
     async (req: TenantRequest, res) => {
       try {
         const {
@@ -5911,7 +7319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/:startDate/:endDate/:selectedEmployee/:salesChannel/:salesMethod/:analysisType/:concernType",
+    "/api/orders/:startDate/:endDate/:selectedEmployee/:salesChannel/:salesMethod/:analysisType/:concernType",
     async (req: TenantRequest, res) => {
       try {
         const {
@@ -6027,7 +7435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/:selectedCategory/:productType/:productSearch?",
+    "/api/products/:selectedCategory/:productType/:productSearch?",
     async (req: TenantRequest, res) => {
       try {
         const { selectedCategory, productType, productSearch } = req.params;
@@ -6112,7 +7520,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/:customerSearch?/:customerStatus?",
+    "/api/customers/:customerSearch?/:customerStatus?",
     async (req: TenantRequest, res) => {
       try {
         const { customerSearch, customerStatus } = req.params;
@@ -6191,7 +7599,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // Tax code lookup proxy endpoint
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tax-code-lookup", async (req: TenantRequest, res) => {
+  app.post("/api/tax-code-lookup", async (req: TenantRequest, res) => {
     try {
       const { taxCode } = req.body;
       const tenantDb = await getTenantDatabase(req);
@@ -6240,7 +7648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // E-invoice publish proxy endpoint
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/einvoice/publish", async (req: TenantRequest, res) => {
+  app.post("/api/einvoice/publish", async (req: TenantRequest, res) => {
     try {
       const publishRequest = req.body;
       const tenantDb = await getTenantDatabase(req);
@@ -6329,47 +7737,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Printer configuration management APIs
   app.get(
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs",
+    "/api/printer-configs",
     tenantMiddleware,
     async (req: TenantRequest, res) => {
       try {
-        const tenantDb = await getTenantDatabase(req);
+        console.log(
+          "🔍 GET /api/printer-configs - Starting request processing",
+        );
+        let tenantDb;
+        try {
+          tenantDb = await getTenantDatabase(req);
+          console.log(
+            "✅ Tenant database connection obtained for printer configs",
+          );
+        } catch (dbError) {
+          console.error(
+            "❌ Failed to get tenant database for printer configs:",
+            dbError,
+          );
+          tenantDb = null;
+        }
+
         const configs = await storage.getPrinterConfigs(tenantDb);
+        console.log(
+          `✅ Successfully fetched ${configs.length} printer configs`,
+        );
         res.json(configs);
       } catch (error) {
-        console.error("Error fetching printer configs:", error);
-        res
-          .status(500)
-          .json({ error: "Failed to fetch printer configurations" });
+        console.error("❌ Error fetching printer configs:", error);
+        res.status(500).json({
+          error: "Failed to fetch printer configs",
+        });
       }
     },
   );
 
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs", async (req: TenantRequest, res) => {
+  app.post("/api/printer-configs", async (req: TenantRequest, res) => {
     try {
       const tenantDb = await getTenantDatabase(req);
       const configData = req.body;
 
-      // Validate required fields
-      if (!configData.name || !configData.connectionType) {
-        return res
-          .status(400)
-          .json({ error: "Name and connection type are required" });
-      }
+      console.log("Creating printer config with data:", configData);
 
       const config = await storage.createPrinterConfig(configData, tenantDb);
       res.status(201).json(config);
     } catch (error) {
       console.error("Error creating printer config:", error);
-      res.status(500).json({ error: "Failed to create printer configuration" });
+      res.status(500).json({
+        error: "Failed to create printer config",
+      });
     }
   });
 
-  app.put("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs/:id", async (req: TenantRequest, res) => {
+  app.put("/api/printer-configs/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
       const configData = req.body;
+
+      console.log(`Updating printer config ${id} with data:`, configData);
 
       const config = await storage.updatePrinterConfig(
         id,
@@ -6377,106 +7803,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
         tenantDb,
       );
       if (!config) {
-        return res
-          .status(404)
-          .json({ error: "Printer configuration not found" });
+        return res.status(404).json({
+          error: "Printer config not found",
+        });
       }
 
       res.json(config);
     } catch (error) {
       console.error("Error updating printer config:", error);
-      res.status(500).json({ error: "Failed to update printer configuration" });
+      res.status(500).json({
+        error: "Failed to update printer config",
+      });
     }
   });
 
-  app.delete("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs/:id", async (req: TenantRequest, res) => {
+  app.delete("/api/printer-configs/:id", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
+
+      console.log(`Deleting printer config ${id}`);
 
       const deleted = await storage.deletePrinterConfig(id, tenantDb);
+
       if (!deleted) {
-        return res
-          .status(404)
-          .json({ error: "Printer configuration not found" });
+        return res.status(404).json({
+          error: "Printer config not found",
+        });
       }
 
-      res.json({ message: "Printer configuration deleted successfully" });
+      res.json({
+        message: "Printer config deleted successfully",
+      });
     } catch (error) {
       console.error("Error deleting printer config:", error);
-      res.status(500).json({ error: "Failed to delete printer configuration" });
+      res.status(500).json({
+        error: "Failed to delete printer config",
+      });
     }
   });
 
-  // Test printer connection
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs/:id/test", async (req: TenantRequest, res) => {
+  app.post("/api/printer-configs/:id/test", async (req: TenantRequest, res) => {
     try {
       const id = parseInt(req.params.id);
       const tenantDb = await getTenantDatabase(req);
 
-      const [config] = await db
-        .select()
-        .from(printerConfigs)
-        .where(eq(printerConfigs.id, id));
+      // Get printer config
+      const configs = await storage.getPrinterConfigs(tenantDb);
+      const config = configs.find((c) => c.id === id);
+
       if (!config) {
-        return res
-          .status(404)
-          .json({ error: "Printer configuration not found" });
+        return res.status(404).json({
+          success: false,
+          message: "Printer configuration not found",
+        });
       }
 
-      // Test connection based on printer type
-      let testResult = { success: false, message: "" };
+      // Test connection based on connection type
+      let testResult = { success: false, message: "Unknown connection type" };
 
       if (config.connectionType === "network" && config.ipAddress) {
-        // Test network printer connection
-        try {
-          const net = require("net");
-          const socket = new net.Socket();
+        // Test network connection
+        const net = require("net");
 
-          socket.setTimeout(3000);
+        const testPromise = new Promise((resolve) => {
+          const client = new net.Socket();
+          client.setTimeout(3000);
 
-          await new Promise((resolve) => {
-            socket.connect(config.port || 9100, config.ipAddress, () => {
-              // Send test print command
-              const testData = Buffer.from(
-                "\x1B@Test Print from EDPOS\n\n\n\x1DV\x41\x00",
-                "utf8",
-              );
+          client.connect(config.port || 9100, config.ipAddress, () => {
+            // Send test print command
+            const testData = Buffer.from(
+              "\x1B@Test Print from EDPOS\n\n\n\x1DV\x41\x00",
+              "utf8",
+            );
 
-              socket.write(testData, (error) => {
-                if (error) {
-                  resolve({
-                    success: false,
-                    message: `Failed to send test data: ${error.message}`,
-                  });
-                } else {
-                  socket.destroy();
-                  resolve({
-                    success: true,
-                    message: `Successfully connected to ${config.name}`,
-                  });
-                }
-              });
-            });
-
-            socket.on("error", (err) => {
-              resolve({
-                success: false,
-                message: `Connection failed: ${err.message}`,
-              });
-            });
-
-            socket.on("timeout", () => {
-              socket.destroy();
-              resolve({ success: false, message: "Connection timeout" });
+            client.write(testData, (error) => {
+              if (error) {
+                resolve({
+                  success: false,
+                  message: `Failed to send test data: ${error.message}`,
+                });
+              } else {
+                client.end();
+                resolve({
+                  success: true,
+                  message: `Successfully connected to ${config.name}`,
+                });
+              }
             });
           });
-        } catch (error) {
-          testResult = {
-            success: false,
-            message: `Network test failed: ${error.message}`,
-          };
-        }
+
+          client.on("error", (err) => {
+            resolve({
+              success: false,
+              message: `Connection failed: ${err.message}`,
+            });
+          });
+
+          client.on("timeout", () => {
+            client.destroy();
+            resolve({ success: false, message: "Connection timeout" });
+          });
+        });
+
+        testResult = await testPromise;
       } else if (config.connectionType === "usb") {
         // For USB printers, we can't directly test but we can check if the config is valid
         testResult = {
@@ -6500,344 +7930,6586 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // POS Print Receipt API with real printer integration
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/pos/print-receipt", async (req, res) => {
+  // Customer Reports APIs
+  app.get("/api/customer-debts", async (req: TenantRequest, res) => {
     try {
-      const { content, type, timestamp, orderId, transactionId, printerId } =
-        req.body;
-
-      console.log("🖨️ POS Print Receipt API called:", {
-        type,
-        timestamp,
-        orderId,
-        transactionId,
-        printerId,
-        contentLength: content?.length || 0,
-        userAgent: req.headers["user-agent"]?.substring(0, 100),
-      });
-
-      // Validate input
-      if (!content || !transactionId) {
-        return res.status(400).json({
-          error: "Missing required fields",
-          message: "Content and transactionId are required",
-          success: false,
-        });
-      }
-
+      const { startDate, endDate, customerId } = req.query;
       const tenantDb = await getTenantDatabase(req);
 
-      // Get available printers
-      const printers = await storage.getPrinterConfigs(tenantDb);
+      // Get customer debts from database
+      const customerDebts = await db
+        .select({
+          id: customers.id,
+          customerCode: customers.customerId,
+          customerName: customers.name,
+          initialDebt: sql<number>`0`, // Mock initial debt
+          newDebt: sql<number>`COALESCE(${customers.totalSpent}, 0) * 0.1`, // 10% of total spent as debt
+          payment: sql<number>`COALESCE(${customers.totalSpent}, 0) * 0.05`, // 5% as payment
+          finalDebt: sql<number>`COALESCE(${customers.totalSpent}, 0) * 0.05`, // Final debt
+          phone: customers.phone,
+        })
+        .from(customers)
+        .where(eq(customers.status, "active"));
 
-      if (printers.length === 0) {
-        console.log("⚠️ No printers configured");
-        return res.status(404).json({
-          success: false,
-          message:
-            "No printers configured. Please add printer configuration first.",
-          error: "NO_PRINTERS_CONFIGURED",
-        });
+      // Filter by customer if specified
+      let filteredDebts = customerDebts;
+      if (customerId) {
+        filteredDebts = customerDebts.filter(
+          (debt) => debt.id === parseInt(customerId as string),
+        );
       }
 
-      // Select printer (use specified printerId or primary printer)
-      let selectedPrinter = null;
-      if (printerId) {
-        selectedPrinter = printers.find((p) => p.id === printerId);
-      } else {
-        selectedPrinter = printers.find((p) => p.isPrimary) || printers[0];
-      }
-
-      if (!selectedPrinter) {
-        return res.status(404).json({
-          success: false,
-          message: "Selected printer not found",
-          error: "PRINTER_NOT_FOUND",
-        });
-      }
-
-      console.log("🖨️ Using printer:", {
-        id: selectedPrinter.id,
-        name: selectedPrinter.name,
-        type: selectedPrinter.printerType,
-        connection: selectedPrinter.connectionType,
-      });
-
-      // Process print job based on connection type
-      let printResult = {
-        success: false,
-        message: "",
-        printerId: selectedPrinter.id,
-      };
-
-      if (
-        selectedPrinter.connectionType === "network" &&
-        selectedPrinter.ipAddress
-      ) {
-        // Network printer
-        try {
-          console.log(
-            `🌐 Printing to network printer: ${selectedPrinter.ipAddress}:${selectedPrinter.port}`,
-          );
-
-          // Convert HTML content to ESC/POS commands
-          const escPosData = convertToEscPos(content, selectedPrinter);
-
-          // Send to network printer
-          const net = require("net");
-          const socket = new net.Socket();
-
-          await new Promise((resolve, reject) => {
-            socket.connect(
-              selectedPrinter.port || 9100,
-              selectedPrinter.ipAddress,
-              () => {
-                socket.write(escPosData);
-                socket.end();
-
-                printResult = {
-                  success: true,
-                  message: `Printed successfully to ${selectedPrinter.name}`,
-                  printerId: selectedPrinter.id,
-                };
-
-                console.log("✅ Network print successful");
-                resolve(true);
-              },
-            );
-
-            socket.on("error", (err) => {
-              printResult = {
-                success: false,
-                message: `Network printer error: ${err.message}`,
-                printerId: selectedPrinter.id,
-              };
-              reject(err);
-            });
-
-            socket.setTimeout(5000, () => {
-              printResult = {
-                success: false,
-                message: "Network printer timeout",
-                printerId: selectedPrinter.id,
-              };
-              socket.destroy();
-              reject(new Error("timeout"));
-            });
-          });
-        } catch (error) {
-          console.error("❌ Network printer error:", error);
-          printResult = {
-            success: false,
-            message: `Network printer error: ${error.message}`,
-            printerId: selectedPrinter.id,
-          };
-        }
-      } else if (selectedPrinter.connectionType === "usb") {
-        // USB printer
-        try {
-          console.log("🔌 Printing to USB printer...");
-
-          // For USB printers, we would typically use node modules like 'node-printer' or 'electron-pos-printer'
-          // Since we're in a web environment, we'll simulate the process
-
-          // Convert HTML to ESC/POS
-          const escPosData = convertToEscPos(content, selectedPrinter);
-
-          // In a real implementation, you would:
-          // const printer = require('node-printer');
-          // printer.printDirect({
-          //   data: escPosData,
-          //   printer: selectedPrinter.name,
-          //   type: 'RAW',
-          //   success: function(jobID) { console.log("Printed with job ID: " + jobID); },
-          //   error: function(err) { console.log(err); }
-          // });
-
-          // For now, simulate successful USB printing
-          printResult = {
-            success: true,
-            message: `Print job sent to USB printer: ${selectedPrinter.name}`,
-            printerId: selectedPrinter.id,
-          };
-
-          console.log("✅ USB print job queued");
-        } catch (error) {
-          console.error("❌ USB printer error:", error);
-          printResult = {
-            success: false,
-            message: `USB printer error: ${error.message}`,
-            printerId: selectedPrinter.id,
-          };
-        }
-      } else {
-        printResult = {
-          success: false,
-          message: "Unsupported printer connection type",
-          printerId: selectedPrinter.id,
-        };
-      }
-
-      // Return result
-      res.json({
-        ...printResult,
-        timestamp: new Date().toISOString(),
-        orderId,
-        transactionId,
-        printerInfo: {
-          name: selectedPrinter.name,
-          type: selectedPrinter.printerType,
-          connection: selectedPrinter.connectionType,
-        },
-      });
+      res.json(filteredDebts);
     } catch (error) {
-      console.error("❌ Print receipt error:", error);
       res.status(500).json({
-        success: false,
-        message: "Failed to process print request",
-        error: error instanceof Error ? error.message : "Unknown error",
-        timestamp: new Date().toISOString(),
+        message: "Failed to fetch customer debts",
       });
     }
   });
 
-  // Helper function to convert HTML content to ESC/POS commands
-  function convertToEscPos(htmlContent: string, printer: any): Buffer {
-    // This is a simplified ESC/POS conversion
-    // In a real implementation, you'd use libraries like 'escpos' or 'node-thermal-printer'
-
-    const escPos = [];
-
-    // Initialize printer
-    escPos.push(0x1b, 0x40); // ESC @
-
-    // Set character set to UTF-8
-    escPos.push(0x1b, 0x74, 0x06);
-
-    // Extract text content from HTML (simplified)
-    const textContent = htmlContent
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
-      .replace(/<[^>]*>/g, "\n")
-      .replace(/\n\s*\n/g, "\n")
-      .trim();
-
-    // Convert text to bytes
-    const textBytes = Buffer.from(textContent, "utf8");
-    escPos.push(...textBytes);
-
-    // Add some line feeds and cut paper
-    escPos.push(0x0a, 0x0a, 0x0a); // Line feeds
-    escPos.push(0x1d, 0x56, 0x42, 0x00); // Cut paper
-
-    return Buffer.from(escPos);
-  }
-
-  // Test customer display connection
-  app.post("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/test-customer-display", async (req, res) => {
+  app.get("/api/customer-sales", async (req: TenantRequest, res) => {
     try {
-      const { testCart } = req.body;
+      const { startDate, endDate, customerId } = req.query;
+      const tenantDb = await getTenantDatabase(req);
 
-      console.log(
-        "🧪 Test customer display endpoint called with cart:",
-        testCart,
+      // Get customer sales data from database
+      const customerSales = await db
+        .select({
+          id: customers.id,
+          customerCode: customers.customerId,
+          customerName: customers.name,
+          totalSales: customers.totalSpent,
+          visitCount: customers.visitCount,
+          averageOrder: sql<number>`CASE WHEN ${customers.visitCount} > 0 THEN ${customers.totalSpent} / ${customers.visitCount} ELSE 0 END`,
+          phone: customers.phone,
+        })
+        .from(customers)
+        .where(eq(customers.status, "active"));
+
+      // Filter by customer if specified
+      let filteredSales = customerSales;
+      if (customerId) {
+        filteredSales = customerSales.filter(
+          (sale) => sale.id === parseInt(customerId as string),
+        );
+      }
+
+      res.json(filteredSales);
+    } catch (error) {
+      res.status(500).json({
+        message: "Failed to fetch customer sales",
+      });
+    }
+  });
+
+  // Bulk create products
+  app.post("/api/products/bulk", async (req: TenantRequest, res) => {
+    try {
+      const { products: productList } = req.body;
+      const tenantDb = await getTenantDatabase(req);
+
+      if (!productList || !Array.isArray(productList)) {
+        return res.status(400).json({
+          error: "Invalid products data",
+        });
+      }
+
+      const results = [];
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const productData of productList) {
+        try {
+          console.log(`Processing product: ${JSON.stringify(productData)}`);
+
+          // Validate required fields with detailed messages
+          const missingFields = [];
+          if (!productData.name) missingFields.push("name");
+          if (!productData.sku) missingFields.push("sku");
+          if (!productData.price) missingFields.push("price");
+          if (
+            productData.categoryId === undefined ||
+            productData.categoryId === null
+          )
+            missingFields.push("categoryId");
+
+          if (missingFields.length > 0) {
+            throw new Error(
+              `Missing required fields: ${missingFields.join(", ")}`,
+            );
+          }
+
+          // Validate data types
+          if (isNaN(parseFloat(productData.price))) {
+            throw new Error(`Invalid price: ${productData.price}`);
+          }
+
+          if (isNaN(parseInt(productData.categoryId))) {
+            throw new Error(`Invalid categoryId: ${productData.categoryId}`);
+          }
+
+          const [product] = await db
+            .insert(products)
+            .values({
+              name: productData.name,
+              sku: productData.sku,
+              price: productData.price.toString(),
+              stock: parseInt(productData.stock) || 0,
+              categoryId: parseInt(productData.categoryId),
+              imageUrl: productData.imageUrl || null,
+              taxRate: productData.taxRate
+                ? productData.taxRate.toString()
+                : "0.00",
+            })
+            .returning();
+
+          console.log(`Successfully created product: ${product.name}`);
+          results.push({
+            success: true,
+            product,
+          });
+          successCount++;
+        } catch (error) {
+          const errorMessage = error.message || "Unknown error";
+          console.error(
+            `Error creating product ${productData.name || "Unknown"}:`,
+            errorMessage,
+          );
+          console.error("Product data:", JSON.stringify(productData, null, 2));
+
+          results.push({
+            success: false,
+            error: errorMessage,
+            data: productData,
+            productName: productData.name || "Unknown",
+          });
+          errorCount++;
+        }
+      }
+
+      res.json({
+        success: successCount,
+        errors: errorCount,
+        results,
+        message: `${successCount} sản phẩm đã được tạo thành công${errorCount > 0 ? `, ${errorCount} sản phẩm lỗi` : ""}`,
+      });
+    } catch (error) {
+      console.error("Bulk products creation error:", error);
+      res.status(500).json({
+        error: "Failed to create products",
+      });
+    }
+  });
+
+  // Employee routes
+  app.get(
+    "/api/employees",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        console.log("🔍 GET /api/employees - Starting request processing");
+        let tenantDb;
+        try {
+          tenantDb = await getTenantDatabase(req);
+          console.log("✅ Tenant database connection obtained for employees");
+        } catch (dbError) {
+          console.error(
+            "❌ Failed to get tenant database for employees:",
+            dbError,
+          );
+          tenantDb = null;
+        }
+
+        const employees = await storage.getEmployees(tenantDb);
+        console.log(`✅ Successfully fetched ${employees.length} employees`);
+        res.json(employees);
+      } catch (error) {
+        console.error("❌ Error fetching employees:", error);
+        res.status(500).json({
+          message: "Failed to fetch employees",
+        });
+      }
+    },
+  );
+
+  // Employee sales report data
+  app.get("/api/employee-sales", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, employeeId } = req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      let query = db
+        .select({
+          employeeName: transactionsTable.cashierName,
+          total: transactionsTable.total,
+          createdAt: transactionsTable.createdAt,
+        })
+        .from(transactionsTable);
+
+      if (startDate && endDate) {
+        query = query.where(
+          and(
+            gte(transactionsTable.createdAt, startDate as string),
+            lte(transactionsTable.createdAt, endDate as string),
+          ),
+        );
+      }
+
+      if (employeeId && employeeId !== "all") {
+        query = query.where(
+          eq(transactionsTable.cashierName, employeeId as string),
+        );
+      }
+
+      const salesData = await query;
+      res.json(salesData);
+    } catch (error) {
+      console.error("Error fetching employee sales:", error);
+      res.status(500).json({
+        message: "Failed to fetch employee sales data",
+      });
+    }
+  });
+
+  // Server time endpoint for consistent timestamps
+  app.get("/api/server-time", async (req: TenantRequest, res) => {
+    try {
+      const serverTime = {
+        timestamp: new Date(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        localTime: new Date().toLocaleString("vi-VN", {
+          timeZone: "Asia/Ho_Chi_Minh",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+      };
+      res.json(serverTime);
+    } catch (error) {
+      res.status(500).json({
+        error: "Failed to get server time",
+      });
+    }
+  });
+
+  // Product Analysis API - using orders and order_items data
+  app.get("/api/product-analysis", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, categoryId, productType, productSearch } =
+        req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      console.log("Product Analysis API called with params:", {
+        startDate,
+        endDate,
+        categoryId,
+        productType,
+        productSearch,
+      });
+
+      // Build date conditions
+      const dateConditions = [];
+      if (startDate && endDate) {
+        const startDateTime = new Date(startDate as string);
+        const endDateTime = new Date(endDate as string);
+        endDateTime.setHours(23, 59, 59, 999);
+        dateConditions.push(
+          gte(orders.orderedAt, startDateTime),
+          lte(orders.orderedAt, endDateTime),
+        );
+      }
+
+      // Build category conditions for products
+      const categoryConditions = [];
+      if (categoryId && categoryId !== "all") {
+        categoryConditions.push(
+          eq(products.categoryId, parseInt(categoryId as string)),
+        );
+      }
+
+      // Build product type conditions
+      const typeConditions = [];
+      if (productType && productType !== "all") {
+        const typeMap = {
+          combo: 3,
+          product: 1,
+          service: 2,
+        };
+        const typeValue = typeMap[productType as keyof typeof typeMap];
+        if (typeValue) {
+          typeConditions.push(eq(products.productType, typeValue));
+        }
+      }
+
+      // Build search conditions
+      const searchConditions = [];
+      if (productSearch && productSearch !== "" && productSearch !== "all") {
+        const searchTerm = `%${productSearch}%`;
+        searchConditions.push(
+          or(ilike(products.name, searchTerm), ilike(products.sku, searchTerm)),
+        );
+      }
+
+      // Query order items with product details from completed/paid orders
+      const productSalesData = await db
+        .select({
+          productId: orderItemsTable.productId,
+          productName: products.name,
+          productSku: products.sku,
+          categoryId: products.categoryId,
+          categoryName: categories.name,
+          unitPrice: orderItemsTable.unitPrice, // This is the pre-tax price
+          quantity: orderItemsTable.quantity,
+          total: orderItemsTable.total, // This should also be pre-tax total
+          orderId: orderItemsTable.orderId,
+          orderDate: orders.orderedAt,
+          discount: orderItemsTable.discount,
+          orderStatus: orders.status,
+        })
+        .from(orderItemsTable)
+        .innerJoin(orders, eq(orderItemsTable.orderId, orders.id))
+        .innerJoin(products, eq(orderItemsTable.productId, products.id))
+        .leftJoin(categories, eq(products.categoryId, categories.id))
+        .where(
+          and(
+            or(eq(orders.status, "paid"), eq(orders.status, "completed")),
+            ...dateConditions,
+            ...categoryConditions,
+            ...typeConditions,
+            ...searchConditions,
+          ),
+        )
+        .orderBy(desc(orders.orderedAt));
+
+      console.log(`Found ${productSalesData.length} product sales records`);
+
+      // Group and aggregate data by product
+      const productMap = new Map();
+
+      productSalesData.forEach((item) => {
+        const productId = item.productId;
+        const quantity = Number(item.quantity || 0);
+        const revenue = Number(item.unitPrice || 0) * quantity;
+        const discount = Number(item.discount || 0);
+
+        if (productMap.has(productId)) {
+          const existing = productMap.get(productId);
+          existing.totalQuantity += quantity;
+          existing.totalRevenue += revenue;
+          existing.discount += discount;
+          existing.orderCount += 1;
+        } else {
+          productMap.set(productId, {
+            productId: item.productId,
+            productName: item.productName,
+            productSku: item.productSku,
+            categoryId: item.categoryId,
+            categoryName: item.categoryName,
+            productType: item.productType,
+            unitPrice: item.unitPrice, // This is the pre-tax price
+            quantity: item.quantity,
+            total: item.total,
+            discount: item.discount,
+            totalQuantity: quantity,
+            totalRevenue: revenue,
+            totalDiscount: discount,
+            averagePrice: Number(item.unitPrice || 0),
+            orderCount: 1,
+          });
+        }
+      });
+
+      // Convert to array and calculate final metrics
+      const productStats = Array.from(productMap.values()).map((product) => ({
+        ...product,
+        averageOrderValue:
+          product.orderCount > 0
+            ? product.totalRevenue / product.orderCount
+            : 0,
+      }));
+
+      // Calculate totals
+      const totalRevenue = productStats.reduce(
+        (sum, product) => sum + product.totalRevenue,
+        0,
       );
+      const totalQuantity = productStats.reduce(
+        (sum, product) => sum + product.totalQuantity,
+        0,
+      );
+      const totalDiscount = productStats.reduce(
+        (sum, product) => sum + product.totalDiscount,
+        0,
+      );
+      const totalProducts = productStats.length;
 
-      // Simulate a cart update broadcast
-      if (wss) {
-        const testMessage = JSON.stringify({
-          type: "cart_update",
-          cart: testCart || [
-            {
-              id: "test-1",
-              product: {
-                name: "Test Product",
-                price: "50000",
-              },
-              quantity: 2,
-              price: "50000",
-              total: "100000",
-            },
-          ],
-          subtotal: 100000,
-          tax: 10000,
-          total: 110000,
-          timestamp: new Date().toISOString(),
+      // Sort by revenue (descending)
+      productStats.sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+      const result = {
+        productStats,
+        totalRevenue,
+        totalQuantity,
+        totalDiscount,
+        totalProducts,
+        summary: {
+          topSellingProduct: productStats[0] || null,
+          averageRevenuePerProduct:
+            totalProducts > 0 ? totalRevenue / totalProducts : 0,
+        },
+      };
+
+      console.log("Product Analysis Results:", {
+        totalRevenue,
+        totalQuantity,
+        totalDiscount,
+        totalProducts,
+        topProduct: result.summary.topSellingProduct?.productName,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Product analysis error:", error);
+      res.status(500).json({
+        error: "Failed to fetch product analysis",
+        details: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // // Enhanced API endpoints for sales chart report - using same data source as dashboard
+  app.get(
+    "/api/dashboard-data/:startDate/:endDate",
+    async (req: TenantRequest, res) => {
+      try {
+        const { startDate, endDate } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Dashboard data API called with params:", {
+          startDate,
+          endDate,
         });
 
-        let clientCount = 0;
-        wss.clients.forEach((client) => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(testMessage);
-            clientCount++;
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+
+        // Get orders, tables, transactions, invoices - EXACT same as dashboard
+        const [orders, tables, transactions, invoices] = await Promise.all([
+          storage.getOrders(undefined, undefined, tenantDb),
+          storage.getTables(tenantDb),
+          storage.getTransactions(tenantDb),
+          storage.getInvoices(tenantDb),
+        ]);
+
+        // Filter completed orders within date range - EXACT same logic as dashboard
+        const filteredCompletedOrders = Array.isArray(orders)
+          ? orders.filter((order) => {
+              try {
+                if (!order) return false;
+
+                // Try multiple date fields - prioritize orderedAt, paidAt, createdAt
+                const orderDate = new Date(
+                  order.orderedAt ||
+                    order.paidAt ||
+                    order.createdAt ||
+                    order.created_at,
+                );
+
+                if (isNaN(orderDate.getTime())) {
+                  return false;
+                }
+
+                const dateMatch = orderDate >= start && orderDate <= end;
+
+                // Include more order statuses to show real data
+                const isCompleted =
+                  order.status === "paid" ||
+                  order.status === "completed" ||
+                  order.status === "served" ||
+                  order.status === "confirmed";
+
+                return dateMatch && isCompleted;
+              } catch (error) {
+                console.error("Error filtering order:", order, error);
+                return false;
+              }
+            })
+          : [];
+
+        // Calculate dashboard stats - EXACT same logic
+        const periodRevenue = filteredCompletedOrders.reduce((total, order) => {
+          const orderTotal = Number(order.total || 0);
+          return total + orderTotal;
+        }, 0);
+
+        const periodOrderCount = filteredCompletedOrders.length;
+
+        // Customer count: count unique customers from completed orders
+        const uniqueCustomers = new Set();
+        filteredCompletedOrders.forEach((order) => {
+          if (order.customerId) {
+            uniqueCustomers.add(order.customerId);
+          } else {
+            uniqueCustomers.add(`order_${order.id}`);
+          }
+        });
+        const periodCustomerCount = uniqueCustomers.size;
+
+        // Daily average for the period
+        const daysDiff = Math.max(
+          1,
+          Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
+            1,
+        );
+        const dailyAverageRevenue = periodRevenue / daysDiff;
+
+        // Active orders (pending/in-progress orders)
+        const activeOrders = orders.filter(
+          (order) =>
+            order.status === "pending" || order.status === "in_progress",
+        ).length;
+
+        const occupiedTables = tables.filter(
+          (table) => table.status === "occupied",
+        );
+
+        const monthRevenue = periodRevenue;
+        const averageOrderValue =
+          periodOrderCount > 0 ? periodRevenue / periodOrderCount : 0;
+
+        // Peak hours analysis
+        const hourlyOrders: {
+          [key: number]: number;
+        } = {};
+        filteredCompletedOrders.forEach((order) => {
+          const orderDate = new Date(
+            order.orderedAt ||
+              order.createdAt ||
+              order.created_at ||
+              order.paidAt,
+          );
+          if (!isNaN(orderDate.getTime())) {
+            const hour = orderDate.getHours();
+            hourlyOrders[hour] = (hourlyOrders[hour] || 0) + 1;
           }
         });
 
-        console.log(`🧪 Test message sent to ${clientCount} WebSocket clients`);
+        const peakHour = Object.keys(hourlyOrders).reduce(
+          (peak, hour) =>
+            hourlyOrders[parseInt(hour)] > hourlyOrders[parseInt(peak)]
+              ? hour
+              : peak,
+          "12",
+        );
 
+        const dashboardData = {
+          periodRevenue,
+          periodOrderCount,
+          periodCustomerCount,
+          dailyAverageRevenue,
+          activeOrders,
+          occupiedTables: occupiedTables.length,
+          monthRevenue,
+          averageOrderValue,
+          peakHour: parseInt(peakHour),
+          totalTables: tables.length,
+          filteredCompletedOrders,
+          orders: orders || [],
+          tables: tables || [],
+          transactions: transactions || [],
+          invoices: invoices || [],
+        };
+
+        console.log("Dashboard data calculated:", {
+          periodRevenue,
+          periodOrderCount,
+          periodCustomerCount,
+          filteredOrdersCount: filteredCompletedOrders.length,
+        });
+
+        res.json(dashboardData);
+      } catch (error) {
+        console.error("Error in dashboard data API:", error);
+        res.status(500).json({
+          error: "Failed to fetch dashboard data",
+        });
+      }
+    },
+  );
+
+  // Transactions API with enhanced filtering
+  app.get(
+    "/api/transactions/:startDate/:endDate/:salesMethod/:salesChannel/:analysisType/:concernType/:selectedEmployee",
+    async (req: TenantRequest, res) => {
+      try {
+        const {
+          startDate,
+          endDate,
+          salesMethod,
+          salesChannel,
+          analysisType,
+          concernType,
+          selectedEmployee,
+        } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Transactions API called with params:", {
+          startDate,
+          endDate,
+          salesMethod,
+          salesChannel,
+          analysisType,
+          concernType,
+          selectedEmployee,
+        });
+
+        // Get transactions data
+        const transactions = await storage.getTransactions(tenantDb);
+
+        // Filter transactions based on parameters
+        const filteredTransactions = transactions.filter((transaction) => {
+          const transactionDate = new Date(transaction.createdAt);
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+
+          const dateMatch = transactionDate >= start && transactionDate <= end;
+
+          // Enhanced sales method filtering
+          let salesMethodMatch = true;
+          if (salesMethod !== "all") {
+            const paymentMethod = transaction.paymentMethod || "cash";
+            switch (salesMethod) {
+              case "no_delivery":
+                salesMethodMatch =
+                  !transaction.deliveryMethod ||
+                  transaction.deliveryMethod === "pickup" ||
+                  transaction.deliveryMethod === "takeaway";
+                break;
+              case "delivery":
+                salesMethodMatch = transaction.deliveryMethod === "delivery";
+                break;
+              default:
+                salesMethodMatch =
+                  paymentMethod.toLowerCase() === salesMethod.toLowerCase();
+            }
+          }
+
+          // Enhanced sales channel filtering
+          let salesChannelMatch = true;
+          if (salesChannel !== "all") {
+            const channel = transaction.salesChannel || "direct";
+            switch (salesChannel) {
+              case "direct":
+                salesChannelMatch =
+                  !transaction.salesChannel ||
+                  transaction.salesChannel === "direct" ||
+                  transaction.salesChannel === "pos";
+                break;
+              case "other":
+                salesChannelMatch =
+                  transaction.salesChannel &&
+                  transaction.salesChannel !== "direct" &&
+                  transaction.salesChannel !== "pos";
+                break;
+              default:
+                salesChannelMatch =
+                  channel.toLowerCase() === salesChannel.toLowerCase();
+            }
+          }
+
+          // Enhanced employee filtering
+          let employeeMatch = true;
+          if (selectedEmployee !== "all") {
+            employeeMatch =
+              transaction.cashierName === selectedEmployee ||
+              (transaction.cashierName &&
+                transaction.cashierName
+                  .toLowerCase()
+                  .includes(selectedEmployee.toLowerCase()));
+          }
+
+          return (
+            dateMatch && salesMethodMatch && salesChannelMatch && employeeMatch
+          );
+        });
+
+        console.log(
+          `Found ${filteredTransactions.length} filtered transactions out of ${transactions.length} total`,
+        );
+        res.json(filteredTransactions);
+      } catch (error) {
+        console.error("Error in transactions API:", error);
+        res.status(500).json({
+          error: "Failed to fetch transactions data",
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/api/orders/:startDate/:endDate/:selectedEmployee/:salesChannel/:salesMethod/:analysisType/:concernType",
+    async (req: TenantRequest, res) => {
+      try {
+        const {
+          startDate,
+          endDate,
+          selectedEmployee,
+          salesChannel,
+          salesMethod,
+          analysisType,
+          concernType,
+        } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Orders API called with params:", {
+          startDate,
+          endDate,
+          selectedEmployee,
+          salesChannel,
+          salesMethod,
+          analysisType,
+          concernType,
+        });
+
+        // Get orders data
+        const orders = await storage.getOrders(undefined, undefined, tenantDb);
+
+        // Filter orders based on parameters with enhanced logic
+        const filteredOrders = orders.filter((order) => {
+          const orderDate = new Date(order.orderedAt || order.createdAt);
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+
+          const dateMatch = orderDate >= start && orderDate <= end;
+
+          // Enhanced employee filtering
+          let employeeMatch = true;
+          if (selectedEmployee !== "all") {
+            employeeMatch =
+              order.employeeId?.toString() === selectedEmployee ||
+              (order.employeeName &&
+                order.employeeName
+                  .toLowerCase()
+                  .includes(selectedEmployee.toLowerCase()));
+          }
+
+          // Enhanced sales channel filtering
+          let salesChannelMatch = true;
+          if (salesChannel !== "all") {
+            const channel = order.salesChannel || "direct";
+            switch (salesChannel) {
+              case "direct":
+                salesChannelMatch =
+                  !order.salesChannel ||
+                  order.salesChannel === "direct" ||
+                  order.salesChannel === "pos";
+                break;
+              case "other":
+                salesChannelMatch =
+                  order.salesChannel &&
+                  order.salesChannel !== "direct" &&
+                  order.salesChannel !== "pos";
+                break;
+              default:
+                salesChannelMatch =
+                  channel.toLowerCase() === salesChannel.toLowerCase();
+            }
+          }
+
+          // Enhanced sales method filtering
+          let salesMethodMatch = true;
+          if (salesMethod !== "all") {
+            switch (salesMethod) {
+              case "no_delivery":
+                salesMethodMatch =
+                  !order.deliveryMethod ||
+                  order.deliveryMethod === "pickup" ||
+                  order.deliveryMethod === "takeaway";
+                break;
+              case "delivery":
+                salesMethodMatch = order.deliveryMethod === "delivery";
+                break;
+              default:
+                const paymentMethod = order.paymentMethod || "cash";
+                salesMethodMatch =
+                  paymentMethod.toLowerCase() === salesMethod.toLowerCase();
+            }
+          }
+
+          // Only include paid orders for analysis
+          const statusMatch = order.status === "paid";
+
+          return (
+            dateMatch &&
+            employeeMatch &&
+            salesChannelMatch &&
+            salesMethodMatch &&
+            statusMatch
+          );
+        });
+
+        console.log(
+          `Found ${filteredOrders.length} filtered orders out of ${orders.length} total`,
+        );
+        res.json(filteredOrders);
+      } catch (error) {
+        console.error("Error in orders API:", error);
+        res.status(500).json({
+          error: "Failed to fetch orders data",
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/api/products/:selectedCategory/:productType/:productSearch?",
+    async (req: TenantRequest, res) => {
+      try {
+        const { selectedCategory, productType, productSearch } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Products API called with params:", {
+          selectedCategory,
+          productType,
+          productSearch,
+        });
+
+        let products;
+
+        // Get products by category or all products
+        if (
+          selectedCategory &&
+          selectedCategory !== "all" &&
+          selectedCategory !== "undefined"
+        ) {
+          const categoryId = parseInt(selectedCategory);
+          if (!isNaN(categoryId)) {
+            products = await storage.getProductsByCategory(
+              categoryId,
+              true,
+              tenantDb,
+            );
+          } else {
+            products = await storage.getAllProducts(true, tenantDb);
+          }
+        } else {
+          products = await storage.getAllProducts(true, tenantDb);
+        }
+
+        // Filter by product type if specified
+        if (
+          productType &&
+          productType !== "all" &&
+          productType !== "undefined"
+        ) {
+          const typeMap = {
+            combo: 3,
+            "combo-dongoi": 3,
+            product: 1,
+            "hang-hoa": 1,
+            service: 2,
+            "dich-vu": 2,
+          };
+          const typeValue =
+            typeMap[productType.toLowerCase() as keyof typeof typeMap];
+          if (typeValue) {
+            products = products.filter(
+              (product) => product.productType === typeValue,
+            );
+          }
+        }
+
+        // Filter by product search if provided
+        if (
+          productSearch &&
+          productSearch !== "" &&
+          productSearch !== "undefined" &&
+          productSearch !== "all"
+        ) {
+          const searchTerm = productSearch.toLowerCase();
+          products = products.filter(
+            (product) =>
+              product.name?.toLowerCase().includes(searchTerm) ||
+              product.sku?.toLowerCase().includes(searchTerm) ||
+              product.description?.toLowerCase().includes(searchTerm),
+          );
+        }
+
+        console.log(`Found ${products.length} products after filtering`);
+        res.json(products);
+      } catch (error) {
+        console.error("Error in products API:", error);
+        res.status(500).json({
+          error: "Failed to fetch products data",
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/api/customers/:customerSearch?/:customerStatus?",
+    async (req: TenantRequest, res) => {
+      try {
+        const { customerSearch, customerStatus } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log(
+          "Customers API called with search:",
+          customerSearch,
+          "status:",
+          customerStatus,
+        );
+
+        let customers = await storage.getCustomers(tenantDb);
+
+        // Filter by search if provided
+        if (
+          customerSearch &&
+          customerSearch !== "" &&
+          customerSearch !== "undefined" &&
+          customerSearch !== "all"
+        ) {
+          const searchTerm = customerSearch.toLowerCase();
+          customers = customers.filter(
+            (customer) =>
+              customer.name?.toLowerCase().includes(searchTerm) ||
+              customer.phone?.includes(customerSearch) ||
+              customer.email?.toLowerCase().includes(searchTerm) ||
+              customer.customerId?.toLowerCase().includes(searchTerm) ||
+              customer.address?.toLowerCase().includes(searchTerm),
+          );
+        }
+
+        // Filter by status if provided
+        if (
+          customerStatus &&
+          customerStatus !== "all" &&
+          customerStatus !== "undefined"
+        ) {
+          const now = new Date();
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+          customers = customers.filter((customer) => {
+            const totalSpent = Number(customer.totalSpent || 0);
+            const lastVisit = customer.lastVisit
+              ? new Date(customer.lastVisit)
+              : null;
+
+            switch (customerStatus) {
+              case "active":
+                return lastVisit && lastVisit >= thirtyDaysAgo;
+              case "inactive":
+                return !lastVisit || lastVisit < thirtyDaysAgo;
+              case "vip":
+                return totalSpent >= 500000; // VIP customers with total spent >= 500k VND
+              case "new":
+                const joinDate = customer.createdAt
+                  ? new Date(customer.createdAt)
+                  : null;
+                return joinDate && joinDate >= thirtyDaysAgo;
+              default:
+                return true;
+            }
+          });
+        }
+
+        console.log(`Found ${customers.length} customers after filtering`);
+        res.json(customers);
+      } catch (error) {
+        console.error("Error in customers API:", error);
+        res.status(500).json({
+          error: "Failed to fetch customers data",
+        });
+      }
+    },
+  );
+
+  // Tax code lookup proxy endpoint
+  app.post("/api/tax-code-lookup", async (req: TenantRequest, res) => {
+    try {
+      const { taxCode } = req.body;
+      const tenantDb = await getTenantDatabase(req);
+
+      if (!taxCode) {
+        return res.status(400).json({
+          success: false,
+          message: "Mã số thuế không được để trống",
+        });
+      }
+
+      // Call the external tax code API
+      const response = await fetch(
+        "https://infoerpvn.com:9440/api/CheckListTaxCode/v2",
+        {
+          method: "POST",
+          headers: {
+            token: "EnURbbnPhUm4GjNgE4Ogrw==",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify([taxCode]),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `External API error: ${response.status} ${response.statusText}`,
+        );
+      }
+
+      const result = await response.json();
+
+      res.json({
+        success: true,
+        data: result,
+        message: "Tra cứu thành công",
+      });
+    } catch (error) {
+      console.error("Tax code lookup error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Có lỗi xảy ra khi tra cứu mã số thuế",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // E-invoice publish proxy endpoint
+  app.post("/api/einvoice/publish", async (req: TenantRequest, res) => {
+    try {
+      const publishRequest = req.body;
+      const tenantDb = await getTenantDatabase(req);
+      console.log(
+        "Publishing invoice with data:",
+        JSON.stringify(publishRequest, null, 2),
+      );
+
+      // Call the real e-invoice API
+      const response = await fetch(
+        "https://infoerpvn.com:9440/api/invoice/publish",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            token: "EnURbbnPhUm4GjNgE4Ogrw==",
+          },
+          body: JSON.stringify(publishRequest),
+        },
+      );
+
+      if (!response.ok) {
+        console.error(
+          "E-invoice API error:",
+          response.status,
+          response.statusText,
+        );
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+
+        return res.status(response.status).json({
+          error: "Failed to publish invoice",
+          details: `API returned ${response.status}: ${response.statusText}`,
+          apiResponse: errorText,
+        });
+      }
+
+      const result = await response.json();
+      console.log("E-invoice API response:", result);
+
+      // Check if the API returned success
+      if (result.status === true) {
+        console.log("Invoice published successfully:", result);
+
+        // Return standardized response format
         res.json({
           success: true,
-          message: `Test cart update sent to ${clientCount} connected clients`,
-          clientCount,
+          message:
+            result.message || "Hóa đơn điện tử đã được phát hành thành công",
+          data: {
+            invoiceNo: result.data?.invoiceNo,
+            invDate: result.data?.invDate,
+            transactionID: result.data?.transactionID,
+            macqt: result.data?.macqt,
+            originalRequest: {
+              transactionID: publishRequest.transactionID,
+              invRef: publishRequest.invRef,
+              totalAmount: publishRequest.invTotalAmount,
+              customer: publishRequest.Customer,
+            },
+          },
         });
       } else {
-        res.status(500).json({
-          success: false,
-          message: "WebSocket server not available",
+        // API returned failure
+        console.error("E-invoice API returned failure:", result);
+        res.status(400).json({
+          error: "E-invoice publication failed",
+          message: result.message || "Unknown error from e-invoice service",
+          details: result,
         });
       }
     } catch (error) {
-      console.error("❌ Error in test customer display:", error);
+      console.error("E-invoice publish proxy error details:");
+      console.error("- Error type:", error?.constructor.name);
+      console.error("- Error message:", error?.message);
+      console.error("- Full error:", error);
+
       res.status(500).json({
-        success: false,
-        error: error.message,
+        error: "Failed to publish invoice",
+        details: error?.message,
+        errorType: error?.constructor.name,
       });
     }
   });
 
-  // Database health check
-  app.get("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/health/db", async (req, res) => {
-    try {
-      // Test basic connection with simple query
-      const result = await db.execute(sql`
-        SELECT
-          current_database() as database_name,
-          current_user as user_name,
-          version() as postgres_version,
-          NOW() as server_time
-      `);
+  // Printer configuration management APIs
+  app.get(
+    "/api/printer-configs",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        console.log(
+          "🔍 GET /api/printer-configs - Starting request processing",
+        );
+        let tenantDb;
+        try {
+          tenantDb = await getTenantDatabase(req);
+          console.log(
+            "✅ Tenant database connection obtained for printer configs",
+          );
+        } catch (dbError) {
+          console.error(
+            "❌ Failed to get tenant database for printer configs:",
+            dbError,
+          );
+          tenantDb = null;
+        }
 
-      const dbInfo = result && result.length > 0 ? result[0] : {};
+        const configs = await storage.getPrinterConfigs(tenantDb);
+        console.log(
+          `✅ Successfully fetched ${configs.length} printer configs`,
+        );
+        res.json(configs);
+      } catch (error) {
+        console.error("❌ Error fetching printer configs:", error);
+        res.status(500).json({
+          error: "Failed to fetch printer configs",
+        });
+      }
+    },
+  );
+
+  app.post("/api/printer-configs", async (req: TenantRequest, res) => {
+    try {
+      const tenantDb = await getTenantDatabase(req);
+      const configData = req.body;
+
+      console.log("Creating printer config with data:", configData);
+
+      const config = await storage.createPrinterConfig(configData, tenantDb);
+      res.status(201).json(config);
+    } catch (error) {
+      console.error("Error creating printer config:", error);
+      res.status(500).json({
+        error: "Failed to create printer config",
+      });
+    }
+  });
+
+  app.put("/api/printer-configs/:id", async (req: TenantRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tenantDb = await getTenantDatabase(req);
+      const configData = req.body;
+
+      console.log(`Updating printer config ${id} with data:`, configData);
+
+      const config = await storage.updatePrinterConfig(
+        id,
+        configData,
+        tenantDb,
+      );
+      if (!config) {
+        return res.status(404).json({
+          error: "Printer config not found",
+        });
+      }
+
+      res.json(config);
+    } catch (error) {
+      console.error("Error updating printer config:", error);
+      res.status(500).json({
+        error: "Failed to update printer config",
+      });
+    }
+  });
+
+  app.delete("/api/printer-configs/:id", async (req: TenantRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tenantDb = await getTenantDatabase(req);
+
+      console.log(`Deleting printer config ${id}`);
+
+      const deleted = await storage.deletePrinterConfig(id, tenantDb);
+
+      if (!deleted) {
+        return res.status(404).json({
+          error: "Printer config not found",
+        });
+      }
 
       res.json({
-        status: "healthy",
-        database: dbInfo.database_name,
-        user: dbInfo.user_name,
-        version: dbInfo.postgres_version,
-        serverTime: dbInfo.server_time,
-        connectionString: process.env.DATABASE_URL?.replace(
-          /:[^:@]*@/,
-          ":****@",
-        ),
-        usingExternalDb: !!process.env.EXTERNAL_DB_URL,
+        message: "Printer config deleted successfully",
       });
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      console.error("Database health check failed:", error);
-
+      console.error("Error deleting printer config:", error);
       res.status(500).json({
-        status: "unhealthy",
-        error: errorMessage,
-        connectionString: process.env.DATABASE_URL?.replace(
-          /:[^:@]*@/,
-          ":****@",
-        ),
-        usingExternalDb: !!process.env.EXTERNAL_DB_URL,
-        details: error,
+        error: "Failed to delete printer config",
       });
     }
   });
+
+  app.post("/api/printer-configs/:id/test", async (req: TenantRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tenantDb = await getTenantDatabase(req);
+
+      // Get printer config
+      const configs = await storage.getPrinterConfigs(tenantDb);
+      const config = configs.find((c) => c.id === id);
+
+      if (!config) {
+        return res.status(404).json({
+          success: false,
+          message: "Printer configuration not found",
+        });
+      }
+
+      // Test connection based on connection type
+      let testResult = { success: false, message: "Unknown connection type" };
+
+      if (config.connectionType === "network" && config.ipAddress) {
+        // Test network connection
+        const net = require("net");
+
+        const testPromise = new Promise((resolve) => {
+          const client = new net.Socket();
+          client.setTimeout(3000);
+
+          client.connect(config.port || 9100, config.ipAddress, () => {
+            // Send test print command
+            const testData = Buffer.from(
+              "\x1B@Test Print from EDPOS\n\n\n\x1DV\x41\x00",
+              "utf8",
+            );
+
+            client.write(testData, (error) => {
+              if (error) {
+                resolve({
+                  success: false,
+                  message: `Failed to send test data: ${error.message}`,
+                });
+              } else {
+                client.end();
+                resolve({
+                  success: true,
+                  message: `Successfully connected to ${config.name}`,
+                });
+              }
+            });
+          });
+
+          client.on("error", (err) => {
+            resolve({
+              success: false,
+              message: `Connection failed: ${err.message}`,
+            });
+          });
+
+          client.on("timeout", () => {
+            client.destroy();
+            resolve({ success: false, message: "Connection timeout" });
+          });
+        });
+
+        testResult = await testPromise;
+      } else if (config.connectionType === "usb") {
+        // For USB printers, we can't directly test but we can check if the config is valid
+        testResult = {
+          success: true,
+          message: "USB printer detection not implemented",
+        };
+      } else {
+        testResult = {
+          success: false,
+          message: "Invalid printer configuration",
+        };
+      }
+
+      res.json(testResult);
+    } catch (error) {
+      console.error("Error testing printer connection:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to test printer connection",
+      });
+    }
+  });
+
+  // Customer Reports APIs
+  app.get("/api/customer-debts", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, customerId } = req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      // Get customer debts from database
+      const customerDebts = await db
+        .select({
+          id: customers.id,
+          customerCode: customers.customerId,
+          customerName: customers.name,
+          initialDebt: sql<number>`0`, // Mock initial debt
+          newDebt: sql<number>`COALESCE(${customers.totalSpent}, 0) * 0.1`, // 10% of total spent as debt
+          payment: sql<number>`COALESCE(${customers.totalSpent}, 0) * 0.05`, // 5% as payment
+          finalDebt: sql<number>`COALESCE(${customers.totalSpent}, 0) * 0.05`, // Final debt
+          phone: customers.phone,
+        })
+        .from(customers)
+        .where(eq(customers.status, "active"));
+
+      // Filter by customer if specified
+      let filteredDebts = customerDebts;
+      if (customerId) {
+        filteredDebts = customerDebts.filter(
+          (debt) => debt.id === parseInt(customerId as string),
+        );
+      }
+
+      res.json(filteredDebts);
+    } catch (error) {
+      res.status(500).json({
+        message: "Failed to fetch customer debts",
+      });
+    }
+  });
+
+  app.get("/api/customer-sales", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, customerId } = req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      // Get customer sales data from database
+      const customerSales = await db
+        .select({
+          id: customers.id,
+          customerCode: customers.customerId,
+          customerName: customers.name,
+          totalSales: customers.totalSpent,
+          visitCount: customers.visitCount,
+          averageOrder: sql<number>`CASE WHEN ${customers.visitCount} > 0 THEN ${customers.totalSpent} / ${customers.visitCount} ELSE 0 END`,
+          phone: customers.phone,
+        })
+        .from(customers)
+        .where(eq(customers.status, "active"));
+
+      // Filter by customer if specified
+      let filteredSales = customerSales;
+      if (customerId) {
+        filteredSales = customerSales.filter(
+          (sale) => sale.id === parseInt(customerId as string),
+        );
+      }
+
+      res.json(filteredSales);
+    } catch (error) {
+      res.status(500).json({
+        message: "Failed to fetch customer sales",
+      });
+    }
+  });
+
+  // Bulk create products
+  app.post("/api/products/bulk", async (req: TenantRequest, res) => {
+    try {
+      const { products: productList } = req.body;
+      const tenantDb = await getTenantDatabase(req);
+
+      if (!productList || !Array.isArray(productList)) {
+        return res.status(400).json({
+          error: "Invalid products data",
+        });
+      }
+
+      const results = [];
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const productData of productList) {
+        try {
+          console.log(`Processing product: ${JSON.stringify(productData)}`);
+
+          // Validate required fields with detailed messages
+          const missingFields = [];
+          if (!productData.name) missingFields.push("name");
+          if (!productData.sku) missingFields.push("sku");
+          if (!productData.price) missingFields.push("price");
+          if (
+            productData.categoryId === undefined ||
+            productData.categoryId === null
+          )
+            missingFields.push("categoryId");
+
+          if (missingFields.length > 0) {
+            throw new Error(
+              `Missing required fields: ${missingFields.join(", ")}`,
+            );
+          }
+
+          // Validate data types
+          if (isNaN(parseFloat(productData.price))) {
+            throw new Error(`Invalid price: ${productData.price}`);
+          }
+
+          if (isNaN(parseInt(productData.categoryId))) {
+            throw new Error(`Invalid categoryId: ${productData.categoryId}`);
+          }
+
+          const [product] = await db
+            .insert(products)
+            .values({
+              name: productData.name,
+              sku: productData.sku,
+              price: productData.price.toString(),
+              stock: parseInt(productData.stock) || 0,
+              categoryId: parseInt(productData.categoryId),
+              imageUrl: productData.imageUrl || null,
+              taxRate: productData.taxRate
+                ? productData.taxRate.toString()
+                : "0.00",
+            })
+            .returning();
+
+          console.log(`Successfully created product: ${product.name}`);
+          results.push({
+            success: true,
+            product,
+          });
+          successCount++;
+        } catch (error) {
+          const errorMessage = error.message || "Unknown error";
+          console.error(
+            `Error creating product ${productData.name || "Unknown"}:`,
+            errorMessage,
+          );
+          console.error("Product data:", JSON.stringify(productData, null, 2));
+
+          results.push({
+            success: false,
+            error: errorMessage,
+            data: productData,
+            productName: productData.name || "Unknown",
+          });
+          errorCount++;
+        }
+      }
+
+      res.json({
+        success: successCount,
+        errors: errorCount,
+        results,
+        message: `${successCount} sản phẩm đã được tạo thành công${errorCount > 0 ? `, ${errorCount} sản phẩm lỗi` : ""}`,
+      });
+    } catch (error) {
+      console.error("Bulk products creation error:", error);
+      res.status(500).json({
+        error: "Failed to create products",
+      });
+    }
+  });
+
+  // Employee routes
+  app.get(
+    "/api/employees",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        console.log("🔍 GET /api/employees - Starting request processing");
+        let tenantDb;
+        try {
+          tenantDb = await getTenantDatabase(req);
+          console.log("✅ Tenant database connection obtained for employees");
+        } catch (dbError) {
+          console.error(
+            "❌ Failed to get tenant database for employees:",
+            dbError,
+          );
+          tenantDb = null;
+        }
+
+        const employees = await storage.getEmployees(tenantDb);
+        console.log(`✅ Successfully fetched ${employees.length} employees`);
+        res.json(employees);
+      } catch (error) {
+        console.error("❌ Error fetching employees:", error);
+        res.status(500).json({
+          message: "Failed to fetch employees",
+        });
+      }
+    },
+  );
+
+  // Employee sales report data
+  app.get("/api/employee-sales", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, employeeId } = req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      let query = db
+        .select({
+          employeeName: transactionsTable.cashierName,
+          total: transactionsTable.total,
+          createdAt: transactionsTable.createdAt,
+        })
+        .from(transactionsTable);
+
+      if (startDate && endDate) {
+        query = query.where(
+          and(
+            gte(transactionsTable.createdAt, startDate as string),
+            lte(transactionsTable.createdAt, endDate as string),
+          ),
+        );
+      }
+
+      if (employeeId && employeeId !== "all") {
+        query = query.where(
+          eq(transactionsTable.cashierName, employeeId as string),
+        );
+      }
+
+      const salesData = await query;
+      res.json(salesData);
+    } catch (error) {
+      console.error("Error fetching employee sales:", error);
+      res.status(500).json({
+        message: "Failed to fetch employee sales data",
+      });
+    }
+  });
+
+  // Server time endpoint for consistent timestamps
+  app.get("/api/server-time", async (req: TenantRequest, res) => {
+    try {
+      const serverTime = {
+        timestamp: new Date(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        localTime: new Date().toLocaleString("vi-VN", {
+          timeZone: "Asia/Ho_Chi_Minh",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+      };
+      res.json(serverTime);
+    } catch (error) {
+      res.status(500).json({
+        error: "Failed to get server time",
+      });
+    }
+  });
+
+  // Product Analysis API - using orders and order_items data
+  app.get("/api/product-analysis", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, categoryId, productType, productSearch } =
+        req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      console.log("Product Analysis API called with params:", {
+        startDate,
+        endDate,
+        categoryId,
+        productType,
+        productSearch,
+      });
+
+      // Build date conditions
+      const dateConditions = [];
+      if (startDate && endDate) {
+        const startDateTime = new Date(startDate as string);
+        const endDateTime = new Date(endDate as string);
+        endDateTime.setHours(23, 59, 59, 999);
+        dateConditions.push(
+          gte(orders.orderedAt, startDateTime),
+          lte(orders.orderedAt, endDateTime),
+        );
+      }
+
+      // Build category conditions for products
+      const categoryConditions = [];
+      if (categoryId && categoryId !== "all") {
+        categoryConditions.push(
+          eq(products.categoryId, parseInt(categoryId as string)),
+        );
+      }
+
+      // Build product type conditions
+      const typeConditions = [];
+      if (productType && productType !== "all") {
+        const typeMap = {
+          combo: 3,
+          product: 1,
+          service: 2,
+        };
+        const typeValue = typeMap[productType as keyof typeof typeMap];
+        if (typeValue) {
+          typeConditions.push(eq(products.productType, typeValue));
+        }
+      }
+
+      // Build search conditions
+      const searchConditions = [];
+      if (productSearch && productSearch !== "" && productSearch !== "all") {
+        const searchTerm = `%${productSearch}%`;
+        searchConditions.push(
+          or(ilike(products.name, searchTerm), ilike(products.sku, searchTerm)),
+        );
+      }
+
+      // Query order items with product details from completed/paid orders
+      const productSalesData = await db
+        .select({
+          productId: orderItemsTable.productId,
+          productName: products.name,
+          productSku: products.sku,
+          categoryId: products.categoryId,
+          categoryName: categories.name,
+          unitPrice: orderItemsTable.unitPrice, // This is the pre-tax price
+          quantity: orderItemsTable.quantity,
+          total: orderItemsTable.total, // This should also be pre-tax total
+          orderId: orderItemsTable.orderId,
+          orderDate: orders.orderedAt,
+          discount: orderItemsTable.discount,
+          orderStatus: orders.status,
+        })
+        .from(orderItemsTable)
+        .innerJoin(orders, eq(orderItemsTable.orderId, orders.id))
+        .innerJoin(products, eq(orderItemsTable.productId, products.id))
+        .leftJoin(categories, eq(products.categoryId, categories.id))
+        .where(
+          and(
+            or(eq(orders.status, "paid"), eq(orders.status, "completed")),
+            ...dateConditions,
+            ...categoryConditions,
+            ...typeConditions,
+            ...searchConditions,
+          ),
+        )
+        .orderBy(desc(orders.orderedAt));
+
+      console.log(`Found ${productSalesData.length} product sales records`);
+
+      // Group and aggregate data by product
+      const productMap = new Map();
+
+      productSalesData.forEach((item) => {
+        const productId = item.productId;
+        const quantity = Number(item.quantity || 0);
+        const revenue = Number(item.unitPrice || 0) * quantity;
+        const discount = Number(item.discount || 0);
+
+        if (productMap.has(productId)) {
+          const existing = productMap.get(productId);
+          existing.totalQuantity += quantity;
+          existing.totalRevenue += revenue;
+          existing.discount += discount;
+          existing.orderCount += 1;
+        } else {
+          productMap.set(productId, {
+            productId: item.productId,
+            productName: item.productName,
+            productSku: item.productSku,
+            categoryId: item.categoryId,
+            categoryName: item.categoryName,
+            productType: item.productType,
+            unitPrice: item.unitPrice, // This is the pre-tax price
+            quantity: item.quantity,
+            total: item.total,
+            discount: item.discount,
+            totalQuantity: quantity,
+            totalRevenue: revenue,
+            totalDiscount: discount,
+            averagePrice: Number(item.unitPrice || 0),
+            orderCount: 1,
+          });
+        }
+      });
+
+      // Convert to array and calculate final metrics
+      const productStats = Array.from(productMap.values()).map((product) => ({
+        ...product,
+        averageOrderValue:
+          product.orderCount > 0
+            ? product.totalRevenue / product.orderCount
+            : 0,
+      }));
+
+      // Calculate totals
+      const totalRevenue = productStats.reduce(
+        (sum, product) => sum + product.totalRevenue,
+        0,
+      );
+      const totalQuantity = productStats.reduce(
+        (sum, product) => sum + product.totalQuantity,
+        0,
+      );
+      const totalDiscount = productStats.reduce(
+        (sum, product) => sum + product.totalDiscount,
+        0,
+      );
+      const totalProducts = productStats.length;
+
+      // Sort by revenue (descending)
+      productStats.sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+      const result = {
+        productStats,
+        totalRevenue,
+        totalQuantity,
+        totalDiscount,
+        totalProducts,
+        summary: {
+          topSellingProduct: productStats[0] || null,
+          averageRevenuePerProduct:
+            totalProducts > 0 ? totalRevenue / totalProducts : 0,
+        },
+      };
+
+      console.log("Product Analysis Results:", {
+        totalRevenue,
+        totalQuantity,
+        totalDiscount,
+        totalProducts,
+        topProduct: result.summary.topSellingProduct?.productName,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Product analysis error:", error);
+      res.status(500).json({
+        error: "Failed to fetch product analysis",
+        details: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // // Enhanced API endpoints for sales chart report - using same data source as dashboard
+  app.get(
+    "/api/dashboard-data/:startDate/:endDate",
+    async (req: TenantRequest, res) => {
+      try {
+        const { startDate, endDate } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Dashboard data API called with params:", {
+          startDate,
+          endDate,
+        });
+
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+
+        // Get orders, tables, transactions, invoices - EXACT same as dashboard
+        const [orders, tables, transactions, invoices] = await Promise.all([
+          storage.getOrders(undefined, undefined, tenantDb),
+          storage.getTables(tenantDb),
+          storage.getTransactions(tenantDb),
+          storage.getInvoices(tenantDb),
+        ]);
+
+        // Filter completed orders within date range - EXACT same logic as dashboard
+        const filteredCompletedOrders = Array.isArray(orders)
+          ? orders.filter((order) => {
+              try {
+                if (!order) return false;
+
+                // Try multiple date fields - prioritize orderedAt, paidAt, createdAt
+                const orderDate = new Date(
+                  order.orderedAt ||
+                    order.paidAt ||
+                    order.createdAt ||
+                    order.created_at,
+                );
+
+                if (isNaN(orderDate.getTime())) {
+                  return false;
+                }
+
+                const dateMatch = orderDate >= start && orderDate <= end;
+
+                // Include more order statuses to show real data
+                const isCompleted =
+                  order.status === "paid" ||
+                  order.status === "completed" ||
+                  order.status === "served" ||
+                  order.status === "confirmed";
+
+                return dateMatch && isCompleted;
+              } catch (error) {
+                console.error("Error filtering order:", order, error);
+                return false;
+              }
+            })
+          : [];
+
+        // Calculate dashboard stats - EXACT same logic
+        const periodRevenue = filteredCompletedOrders.reduce((total, order) => {
+          const orderTotal = Number(order.total || 0);
+          return total + orderTotal;
+        }, 0);
+
+        const periodOrderCount = filteredCompletedOrders.length;
+
+        // Customer count: count unique customers from completed orders
+        const uniqueCustomers = new Set();
+        filteredCompletedOrders.forEach((order) => {
+          if (order.customerId) {
+            uniqueCustomers.add(order.customerId);
+          } else {
+            uniqueCustomers.add(`order_${order.id}`);
+          }
+        });
+        const periodCustomerCount = uniqueCustomers.size;
+
+        // Daily average for the period
+        const daysDiff = Math.max(
+          1,
+          Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
+            1,
+        );
+        const dailyAverageRevenue = periodRevenue / daysDiff;
+
+        // Active orders (pending/in-progress orders)
+        const activeOrders = orders.filter(
+          (order) =>
+            order.status === "pending" || order.status === "in_progress",
+        ).length;
+
+        const occupiedTables = tables.filter(
+          (table) => table.status === "occupied",
+        );
+
+        const monthRevenue = periodRevenue;
+        const averageOrderValue =
+          periodOrderCount > 0 ? periodRevenue / periodOrderCount : 0;
+
+        // Peak hours analysis
+        const hourlyOrders: {
+          [key: number]: number;
+        } = {};
+        filteredCompletedOrders.forEach((order) => {
+          const orderDate = new Date(
+            order.orderedAt ||
+              order.createdAt ||
+              order.created_at ||
+              order.paidAt,
+          );
+          if (!isNaN(orderDate.getTime())) {
+            const hour = orderDate.getHours();
+            hourlyOrders[hour] = (hourlyOrders[hour] || 0) + 1;
+          }
+        });
+
+        const peakHour = Object.keys(hourlyOrders).reduce(
+          (peak, hour) =>
+            hourlyOrders[parseInt(hour)] > hourlyOrders[parseInt(peak)]
+              ? hour
+              : peak,
+          "12",
+        );
+
+        const dashboardData = {
+          periodRevenue,
+          periodOrderCount,
+          periodCustomerCount,
+          dailyAverageRevenue,
+          activeOrders,
+          occupiedTables: occupiedTables.length,
+          monthRevenue,
+          averageOrderValue,
+          peakHour: parseInt(peakHour),
+          totalTables: tables.length,
+          filteredCompletedOrders,
+          orders: orders || [],
+          tables: tables || [],
+          transactions: transactions || [],
+          invoices: invoices || [],
+        };
+
+        console.log("Dashboard data calculated:", {
+          periodRevenue,
+          periodOrderCount,
+          periodCustomerCount,
+          filteredOrdersCount: filteredCompletedOrders.length,
+        });
+
+        res.json(dashboardData);
+      } catch (error) {
+        console.error("Error in dashboard data API:", error);
+        res.status(500).json({
+          error: "Failed to fetch dashboard data",
+        });
+      }
+    },
+  );
+
+  // Transactions API with enhanced filtering
+  app.get(
+    "/api/transactions/:startDate/:endDate/:salesMethod/:salesChannel/:analysisType/:concernType/:selectedEmployee",
+    async (req: TenantRequest, res) => {
+      try {
+        const {
+          startDate,
+          endDate,
+          salesMethod,
+          salesChannel,
+          analysisType,
+          concernType,
+          selectedEmployee,
+        } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Transactions API called with params:", {
+          startDate,
+          endDate,
+          salesMethod,
+          salesChannel,
+          analysisType,
+          concernType,
+          selectedEmployee,
+        });
+
+        // Get transactions data
+        const transactions = await storage.getTransactions(tenantDb);
+
+        // Filter transactions based on parameters
+        const filteredTransactions = transactions.filter((transaction) => {
+          const transactionDate = new Date(transaction.createdAt);
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+
+          const dateMatch = transactionDate >= start && transactionDate <= end;
+
+          // Enhanced sales method filtering
+          let salesMethodMatch = true;
+          if (salesMethod !== "all") {
+            const paymentMethod = transaction.paymentMethod || "cash";
+            switch (salesMethod) {
+              case "no_delivery":
+                salesMethodMatch =
+                  !transaction.deliveryMethod ||
+                  transaction.deliveryMethod === "pickup" ||
+                  transaction.deliveryMethod === "takeaway";
+                break;
+              case "delivery":
+                salesMethodMatch = transaction.deliveryMethod === "delivery";
+                break;
+              default:
+                salesMethodMatch =
+                  paymentMethod.toLowerCase() === salesMethod.toLowerCase();
+            }
+          }
+
+          // Enhanced sales channel filtering
+          let salesChannelMatch = true;
+          if (salesChannel !== "all") {
+            const channel = transaction.salesChannel || "direct";
+            switch (salesChannel) {
+              case "direct":
+                salesChannelMatch =
+                  !transaction.salesChannel ||
+                  transaction.salesChannel === "direct" ||
+                  transaction.salesChannel === "pos";
+                break;
+              case "other":
+                salesChannelMatch =
+                  transaction.salesChannel &&
+                  transaction.salesChannel !== "direct" &&
+                  transaction.salesChannel !== "pos";
+                break;
+              default:
+                salesChannelMatch =
+                  channel.toLowerCase() === salesChannel.toLowerCase();
+            }
+          }
+
+          // Enhanced employee filtering
+          let employeeMatch = true;
+          if (selectedEmployee !== "all") {
+            employeeMatch =
+              transaction.cashierName === selectedEmployee ||
+              (transaction.cashierName &&
+                transaction.cashierName
+                  .toLowerCase()
+                  .includes(selectedEmployee.toLowerCase()));
+          }
+
+          return (
+            dateMatch && salesMethodMatch && salesChannelMatch && employeeMatch
+          );
+        });
+
+        console.log(
+          `Found ${filteredTransactions.length} filtered transactions out of ${transactions.length} total`,
+        );
+        res.json(filteredTransactions);
+      } catch (error) {
+        console.error("Error in transactions API:", error);
+        res.status(500).json({
+          error: "Failed to fetch transactions data",
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/api/orders/:startDate/:endDate/:selectedEmployee/:salesChannel/:salesMethod/:analysisType/:concernType",
+    async (req: TenantRequest, res) => {
+      try {
+        const {
+          startDate,
+          endDate,
+          selectedEmployee,
+          salesChannel,
+          salesMethod,
+          analysisType,
+          concernType,
+        } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Orders API called with params:", {
+          startDate,
+          endDate,
+          selectedEmployee,
+          salesChannel,
+          salesMethod,
+          analysisType,
+          concernType,
+        });
+
+        // Get orders data
+        const orders = await storage.getOrders(undefined, undefined, tenantDb);
+
+        // Filter orders based on parameters with enhanced logic
+        const filteredOrders = orders.filter((order) => {
+          const orderDate = new Date(order.orderedAt || order.createdAt);
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+
+          const dateMatch = orderDate >= start && orderDate <= end;
+
+          // Enhanced employee filtering
+          let employeeMatch = true;
+          if (selectedEmployee !== "all") {
+            employeeMatch =
+              order.employeeId?.toString() === selectedEmployee ||
+              (order.employeeName &&
+                order.employeeName
+                  .toLowerCase()
+                  .includes(selectedEmployee.toLowerCase()));
+          }
+
+          // Enhanced sales channel filtering
+          let salesChannelMatch = true;
+          if (salesChannel !== "all") {
+            const channel = order.salesChannel || "direct";
+            switch (salesChannel) {
+              case "direct":
+                salesChannelMatch =
+                  !order.salesChannel ||
+                  order.salesChannel === "direct" ||
+                  order.salesChannel === "pos";
+                break;
+              case "other":
+                salesChannelMatch =
+                  order.salesChannel &&
+                  order.salesChannel !== "direct" &&
+                  order.salesChannel !== "pos";
+                break;
+              default:
+                salesChannelMatch =
+                  channel.toLowerCase() === salesChannel.toLowerCase();
+            }
+          }
+
+          // Enhanced sales method filtering
+          let salesMethodMatch = true;
+          if (salesMethod !== "all") {
+            switch (salesMethod) {
+              case "no_delivery":
+                salesMethodMatch =
+                  !order.deliveryMethod ||
+                  order.deliveryMethod === "pickup" ||
+                  order.deliveryMethod === "takeaway";
+                break;
+              case "delivery":
+                salesMethodMatch = order.deliveryMethod === "delivery";
+                break;
+              default:
+                const paymentMethod = order.paymentMethod || "cash";
+                salesMethodMatch =
+                  paymentMethod.toLowerCase() === salesMethod.toLowerCase();
+            }
+          }
+
+          // Only include paid orders for analysis
+          const statusMatch = order.status === "paid";
+
+          return (
+            dateMatch &&
+            employeeMatch &&
+            salesChannelMatch &&
+            salesMethodMatch &&
+            statusMatch
+          );
+        });
+
+        console.log(
+          `Found ${filteredOrders.length} filtered orders out of ${orders.length} total`,
+        );
+        res.json(filteredOrders);
+      } catch (error) {
+        console.error("Error in orders API:", error);
+        res.status(500).json({
+          error: "Failed to fetch orders data",
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/api/products/:selectedCategory/:productType/:productSearch?",
+    async (req: TenantRequest, res) => {
+      try {
+        const { selectedCategory, productType, productSearch } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Products API called with params:", {
+          selectedCategory,
+          productType,
+          productSearch,
+        });
+
+        let products;
+
+        // Get products by category or all products
+        if (
+          selectedCategory &&
+          selectedCategory !== "all" &&
+          selectedCategory !== "undefined"
+        ) {
+          const categoryId = parseInt(selectedCategory);
+          if (!isNaN(categoryId)) {
+            products = await storage.getProductsByCategory(
+              categoryId,
+              true,
+              tenantDb,
+            );
+          } else {
+            products = await storage.getAllProducts(true, tenantDb);
+          }
+        } else {
+          products = await storage.getAllProducts(true, tenantDb);
+        }
+
+        // Filter by product type if specified
+        if (
+          productType &&
+          productType !== "all" &&
+          productType !== "undefined"
+        ) {
+          const typeMap = {
+            combo: 3,
+            "combo-dongoi": 3,
+            product: 1,
+            "hang-hoa": 1,
+            service: 2,
+            "dich-vu": 2,
+          };
+          const typeValue =
+            typeMap[productType.toLowerCase() as keyof typeof typeMap];
+          if (typeValue) {
+            products = products.filter(
+              (product) => product.productType === typeValue,
+            );
+          }
+        }
+
+        // Filter by product search if provided
+        if (
+          productSearch &&
+          productSearch !== "" &&
+          productSearch !== "undefined" &&
+          productSearch !== "all"
+        ) {
+          const searchTerm = productSearch.toLowerCase();
+          products = products.filter(
+            (product) =>
+              product.name?.toLowerCase().includes(searchTerm) ||
+              product.sku?.toLowerCase().includes(searchTerm) ||
+              product.description?.toLowerCase().includes(searchTerm),
+          );
+        }
+
+        console.log(`Found ${products.length} products after filtering`);
+        res.json(products);
+      } catch (error) {
+        console.error("Error in products API:", error);
+        res.status(500).json({
+          error: "Failed to fetch products data",
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/api/customers/:customerSearch?/:customerStatus?",
+    async (req: TenantRequest, res) => {
+      try {
+        const { customerSearch, customerStatus } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log(
+          "Customers API called with search:",
+          customerSearch,
+          "status:",
+          customerStatus,
+        );
+
+        let customers = await storage.getCustomers(tenantDb);
+
+        // Filter by search if provided
+        if (
+          customerSearch &&
+          customerSearch !== "" &&
+          customerSearch !== "undefined" &&
+          customerSearch !== "all"
+        ) {
+          const searchTerm = customerSearch.toLowerCase();
+          customers = customers.filter(
+            (customer) =>
+              customer.name?.toLowerCase().includes(searchTerm) ||
+              customer.phone?.includes(customerSearch) ||
+              customer.email?.toLowerCase().includes(searchTerm) ||
+              customer.customerId?.toLowerCase().includes(searchTerm) ||
+              customer.address?.toLowerCase().includes(searchTerm),
+          );
+        }
+
+        // Filter by status if provided
+        if (
+          customerStatus &&
+          customerStatus !== "all" &&
+          customerStatus !== "undefined"
+        ) {
+          const now = new Date();
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+          customers = customers.filter((customer) => {
+            const totalSpent = Number(customer.totalSpent || 0);
+            const lastVisit = customer.lastVisit
+              ? new Date(customer.lastVisit)
+              : null;
+
+            switch (customerStatus) {
+              case "active":
+                return lastVisit && lastVisit >= thirtyDaysAgo;
+              case "inactive":
+                return !lastVisit || lastVisit < thirtyDaysAgo;
+              case "vip":
+                return totalSpent >= 500000; // VIP customers with total spent >= 500k VND
+              case "new":
+                const joinDate = customer.createdAt
+                  ? new Date(customer.createdAt)
+                  : null;
+                return joinDate && joinDate >= thirtyDaysAgo;
+              default:
+                return true;
+            }
+          });
+        }
+
+        console.log(`Found ${customers.length} customers after filtering`);
+        res.json(customers);
+      } catch (error) {
+        console.error("Error in customers API:", error);
+        res.status(500).json({
+          error: "Failed to fetch customers data",
+        });
+      }
+    },
+  );
+
+  // Tax code lookup proxy endpoint
+  app.post("/api/tax-code-lookup", async (req: TenantRequest, res) => {
+    try {
+      const { taxCode } = req.body;
+      const tenantDb = await getTenantDatabase(req);
+
+      if (!taxCode) {
+        return res.status(400).json({
+          success: false,
+          message: "Mã số thuế không được để trống",
+        });
+      }
+
+      // Call the external tax code API
+      const response = await fetch(
+        "https://infoerpvn.com:9440/api/CheckListTaxCode/v2",
+        {
+          method: "POST",
+          headers: {
+            token: "EnURbbnPhUm4GjNgE4Ogrw==",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify([taxCode]),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `External API error: ${response.status} ${response.statusText}`,
+        );
+      }
+
+      const result = await response.json();
+
+      res.json({
+        success: true,
+        data: result,
+        message: "Tra cứu thành công",
+      });
+    } catch (error) {
+      console.error("Tax code lookup error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Có lỗi xảy ra khi tra cứu mã số thuế",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // E-invoice publish proxy endpoint
+  app.post("/api/einvoice/publish", async (req: TenantRequest, res) => {
+    try {
+      const publishRequest = req.body;
+      const tenantDb = await getTenantDatabase(req);
+      console.log(
+        "Publishing invoice with data:",
+        JSON.stringify(publishRequest, null, 2),
+      );
+
+      // Call the real e-invoice API
+      const response = await fetch(
+        "https://infoerpvn.com:9440/api/invoice/publish",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            token: "EnURbbnPhUm4GjNgE4Ogrw==",
+          },
+          body: JSON.stringify(publishRequest),
+        },
+      );
+
+      if (!response.ok) {
+        console.error(
+          "E-invoice API error:",
+          response.status,
+          response.statusText,
+        );
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+
+        return res.status(response.status).json({
+          error: "Failed to publish invoice",
+          details: `API returned ${response.status}: ${response.statusText}`,
+          apiResponse: errorText,
+        });
+      }
+
+      const result = await response.json();
+      console.log("E-invoice API response:", result);
+
+      // Check if the API returned success
+      if (result.status === true) {
+        console.log("Invoice published successfully:", result);
+
+        // Return standardized response format
+        res.json({
+          success: true,
+          message:
+            result.message || "Hóa đơn điện tử đã được phát hành thành công",
+          data: {
+            invoiceNo: result.data?.invoiceNo,
+            invDate: result.data?.invDate,
+            transactionID: result.data?.transactionID,
+            macqt: result.data?.macqt,
+            originalRequest: {
+              transactionID: publishRequest.transactionID,
+              invRef: publishRequest.invRef,
+              totalAmount: publishRequest.invTotalAmount,
+              customer: publishRequest.Customer,
+            },
+          },
+        });
+      } else {
+        // API returned failure
+        console.error("E-invoice API returned failure:", result);
+        res.status(400).json({
+          error: "E-invoice publication failed",
+          message: result.message || "Unknown error from e-invoice service",
+          details: result,
+        });
+      }
+    } catch (error) {
+      console.error("E-invoice publish proxy error details:");
+      console.error("- Error type:", error?.constructor.name);
+      console.error("- Error message:", error?.message);
+      console.error("- Full error:", error);
+
+      res.status(500).json({
+        error: "Failed to publish invoice",
+        details: error?.message,
+        errorType: error?.constructor.name,
+      });
+    }
+  });
+
+  // Printer configuration management APIs
+  app.get(
+    "/api/printer-configs",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        console.log(
+          "🔍 GET /api/printer-configs - Starting request processing",
+        );
+        let tenantDb;
+        try {
+          tenantDb = await getTenantDatabase(req);
+          console.log(
+            "✅ Tenant database connection obtained for printer configs",
+          );
+        } catch (dbError) {
+          console.error(
+            "❌ Failed to get tenant database for printer configs:",
+            dbError,
+          );
+          tenantDb = null;
+        }
+
+        const configs = await storage.getPrinterConfigs(tenantDb);
+        console.log(
+          `✅ Successfully fetched ${configs.length} printer configs`,
+        );
+        res.json(configs);
+      } catch (error) {
+        console.error("❌ Error fetching printer configs:", error);
+        res.status(500).json({
+          error: "Failed to fetch printer configs",
+        });
+      }
+    },
+  );
+
+  app.post("/api/printer-configs", async (req: TenantRequest, res) => {
+    try {
+      const tenantDb = await getTenantDatabase(req);
+      const configData = req.body;
+
+      console.log("Creating printer config with data:", configData);
+
+      const config = await storage.createPrinterConfig(configData, tenantDb);
+      res.status(201).json(config);
+    } catch (error) {
+      console.error("Error creating printer config:", error);
+      res.status(500).json({
+        error: "Failed to create printer config",
+      });
+    }
+  });
+
+  app.put("/api/printer-configs/:id", async (req: TenantRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tenantDb = await getTenantDatabase(req);
+      const configData = req.body;
+
+      console.log(`Updating printer config ${id} with data:`, configData);
+
+      const config = await storage.updatePrinterConfig(
+        id,
+        configData,
+        tenantDb,
+      );
+      if (!config) {
+        return res.status(404).json({
+          error: "Printer config not found",
+        });
+      }
+
+      res.json(config);
+    } catch (error) {
+      console.error("Error updating printer config:", error);
+      res.status(500).json({
+        error: "Failed to update printer config",
+      });
+    }
+  });
+
+  app.delete("/api/printer-configs/:id", async (req: TenantRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tenantDb = await getTenantDatabase(req);
+
+      console.log(`Deleting printer config ${id}`);
+
+      const deleted = await storage.deletePrinterConfig(id, tenantDb);
+
+      if (!deleted) {
+        return res.status(404).json({
+          error: "Printer config not found",
+        });
+      }
+
+      res.json({
+        message: "Printer config deleted successfully",
+      });
+    } catch (error) {
+      console.error("Error deleting printer config:", error);
+      res.status(500).json({
+        error: "Failed to delete printer config",
+      });
+    }
+  });
+
+  app.post("/api/printer-configs/:id/test", async (req: TenantRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tenantDb = await getTenantDatabase(req);
+
+      // Get printer config
+      const configs = await storage.getPrinterConfigs(tenantDb);
+      const config = configs.find((c) => c.id === id);
+
+      if (!config) {
+        return res.status(404).json({
+          success: false,
+          message: "Printer configuration not found",
+        });
+      }
+
+      // Test connection based on connection type
+      let testResult = { success: false, message: "Unknown connection type" };
+
+      if (config.connectionType === "network" && config.ipAddress) {
+        // Test network connection
+        const net = require("net");
+
+        const testPromise = new Promise((resolve) => {
+          const client = new net.Socket();
+          client.setTimeout(3000);
+
+          client.connect(config.port || 9100, config.ipAddress, () => {
+            // Send test print command
+            const testData = Buffer.from(
+              "\x1B@Test Print from EDPOS\n\n\n\x1DV\x41\x00",
+              "utf8",
+            );
+
+            client.write(testData, (error) => {
+              if (error) {
+                resolve({
+                  success: false,
+                  message: `Failed to send test data: ${error.message}`,
+                });
+              } else {
+                client.end();
+                resolve({
+                  success: true,
+                  message: `Successfully connected to ${config.name}`,
+                });
+              }
+            });
+          });
+
+          client.on("error", (err) => {
+            resolve({
+              success: false,
+              message: `Connection failed: ${err.message}`,
+            });
+          });
+
+          client.on("timeout", () => {
+            client.destroy();
+            resolve({ success: false, message: "Connection timeout" });
+          });
+        });
+
+        testResult = await testPromise;
+      } else if (config.connectionType === "usb") {
+        // For USB printers, we can't directly test but we can check if the config is valid
+        testResult = {
+          success: true,
+          message: "USB printer detection not implemented",
+        };
+      } else {
+        testResult = {
+          success: false,
+          message: "Invalid printer configuration",
+        };
+      }
+
+      res.json(testResult);
+    } catch (error) {
+      console.error("Error testing printer connection:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to test printer connection",
+      });
+    }
+  });
+
+  // Customer Reports APIs
+  app.get("/api/customer-debts", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, customerId } = req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      // Get customer debts from database
+      const customerDebts = await db
+        .select({
+          id: customers.id,
+          customerCode: customers.customerId,
+          customerName: customers.name,
+          initialDebt: sql<number>`0`, // Mock initial debt
+          newDebt: sql<number>`COALESCE(${customers.totalSpent}, 0) * 0.1`, // 10% of total spent as debt
+          payment: sql<number>`COALESCE(${customers.totalSpent}, 0) * 0.05`, // 5% as payment
+          finalDebt: sql<number>`COALESCE(${customers.totalSpent}, 0) * 0.05`, // Final debt
+          phone: customers.phone,
+        })
+        .from(customers)
+        .where(eq(customers.status, "active"));
+
+      // Filter by customer if specified
+      let filteredDebts = customerDebts;
+      if (customerId) {
+        filteredDebts = customerDebts.filter(
+          (debt) => debt.id === parseInt(customerId as string),
+        );
+      }
+
+      res.json(filteredDebts);
+    } catch (error) {
+      res.status(500).json({
+        message: "Failed to fetch customer debts",
+      });
+    }
+  });
+
+  app.get("/api/customer-sales", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, customerId } = req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      // Get customer sales data from database
+      const customerSales = await db
+        .select({
+          id: customers.id,
+          customerCode: customers.customerId,
+          customerName: customers.name,
+          totalSales: customers.totalSpent,
+          visitCount: customers.visitCount,
+          averageOrder: sql<number>`CASE WHEN ${customers.visitCount} > 0 THEN ${customers.totalSpent} / ${customers.visitCount} ELSE 0 END`,
+          phone: customers.phone,
+        })
+        .from(customers)
+        .where(eq(customers.status, "active"));
+
+      // Filter by customer if specified
+      let filteredSales = customerSales;
+      if (customerId) {
+        filteredSales = customerSales.filter(
+          (sale) => sale.id === parseInt(customerId as string),
+        );
+      }
+
+      res.json(filteredSales);
+    } catch (error) {
+      res.status(500).json({
+        message: "Failed to fetch customer sales",
+      });
+    }
+  });
+
+  // Bulk create products
+  app.post("/api/products/bulk", async (req: TenantRequest, res) => {
+    try {
+      const { products: productList } = req.body;
+      const tenantDb = await getTenantDatabase(req);
+
+      if (!productList || !Array.isArray(productList)) {
+        return res.status(400).json({
+          error: "Invalid products data",
+        });
+      }
+
+      const results = [];
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const productData of productList) {
+        try {
+          console.log(`Processing product: ${JSON.stringify(productData)}`);
+
+          // Validate required fields with detailed messages
+          const missingFields = [];
+          if (!productData.name) missingFields.push("name");
+          if (!productData.sku) missingFields.push("sku");
+          if (!productData.price) missingFields.push("price");
+          if (
+            productData.categoryId === undefined ||
+            productData.categoryId === null
+          )
+            missingFields.push("categoryId");
+
+          if (missingFields.length > 0) {
+            throw new Error(
+              `Missing required fields: ${missingFields.join(", ")}`,
+            );
+          }
+
+          // Validate data types
+          if (isNaN(parseFloat(productData.price))) {
+            throw new Error(`Invalid price: ${productData.price}`);
+          }
+
+          if (isNaN(parseInt(productData.categoryId))) {
+            throw new Error(`Invalid categoryId: ${productData.categoryId}`);
+          }
+
+          const [product] = await db
+            .insert(products)
+            .values({
+              name: productData.name,
+              sku: productData.sku,
+              price: productData.price.toString(),
+              stock: parseInt(productData.stock) || 0,
+              categoryId: parseInt(productData.categoryId),
+              imageUrl: productData.imageUrl || null,
+              taxRate: productData.taxRate
+                ? productData.taxRate.toString()
+                : "0.00",
+            })
+            .returning();
+
+          console.log(`Successfully created product: ${product.name}`);
+          results.push({
+            success: true,
+            product,
+          });
+          successCount++;
+        } catch (error) {
+          const errorMessage = error.message || "Unknown error";
+          console.error(
+            `Error creating product ${productData.name || "Unknown"}:`,
+            errorMessage,
+          );
+          console.error("Product data:", JSON.stringify(productData, null, 2));
+
+          results.push({
+            success: false,
+            error: errorMessage,
+            data: productData,
+            productName: productData.name || "Unknown",
+          });
+          errorCount++;
+        }
+      }
+
+      res.json({
+        success: successCount,
+        errors: errorCount,
+        results,
+        message: `${successCount} sản phẩm đã được tạo thành công${errorCount > 0 ? `, ${errorCount} sản phẩm lỗi` : ""}`,
+      });
+    } catch (error) {
+      console.error("Bulk products creation error:", error);
+      res.status(500).json({
+        error: "Failed to create products",
+      });
+    }
+  });
+
+  // Employee routes
+  app.get(
+    "/api/employees",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        console.log("🔍 GET /api/employees - Starting request processing");
+        let tenantDb;
+        try {
+          tenantDb = await getTenantDatabase(req);
+          console.log("✅ Tenant database connection obtained for employees");
+        } catch (dbError) {
+          console.error(
+            "❌ Failed to get tenant database for employees:",
+            dbError,
+          );
+          tenantDb = null;
+        }
+
+        const employees = await storage.getEmployees(tenantDb);
+        console.log(`✅ Successfully fetched ${employees.length} employees`);
+        res.json(employees);
+      } catch (error) {
+        console.error("❌ Error fetching employees:", error);
+        res.status(500).json({
+          message: "Failed to fetch employees",
+        });
+      }
+    },
+  );
+
+  // Employee sales report data
+  app.get("/api/employee-sales", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, employeeId } = req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      let query = db
+        .select({
+          employeeName: transactionsTable.cashierName,
+          total: transactionsTable.total,
+          createdAt: transactionsTable.createdAt,
+        })
+        .from(transactionsTable);
+
+      if (startDate && endDate) {
+        query = query.where(
+          and(
+            gte(transactionsTable.createdAt, startDate as string),
+            lte(transactionsTable.createdAt, endDate as string),
+          ),
+        );
+      }
+
+      if (employeeId && employeeId !== "all") {
+        query = query.where(
+          eq(transactionsTable.cashierName, employeeId as string),
+        );
+      }
+
+      const salesData = await query;
+      res.json(salesData);
+    } catch (error) {
+      console.error("Error fetching employee sales:", error);
+      res.status(500).json({
+        message: "Failed to fetch employee sales data",
+      });
+    }
+  });
+
+  // Server time endpoint for consistent timestamps
+  app.get("/api/server-time", async (req: TenantRequest, res) => {
+    try {
+      const serverTime = {
+        timestamp: new Date(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        localTime: new Date().toLocaleString("vi-VN", {
+          timeZone: "Asia/Ho_Chi_Minh",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+      };
+      res.json(serverTime);
+    } catch (error) {
+      res.status(500).json({
+        error: "Failed to get server time",
+      });
+    }
+  });
+
+  // Product Analysis API - using orders and order_items data
+  app.get("/api/product-analysis", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, categoryId, productType, productSearch } =
+        req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      console.log("Product Analysis API called with params:", {
+        startDate,
+        endDate,
+        categoryId,
+        productType,
+        productSearch,
+      });
+
+      // Build date conditions
+      const dateConditions = [];
+      if (startDate && endDate) {
+        const startDateTime = new Date(startDate as string);
+        const endDateTime = new Date(endDate as string);
+        endDateTime.setHours(23, 59, 59, 999);
+        dateConditions.push(
+          gte(orders.orderedAt, startDateTime),
+          lte(orders.orderedAt, endDateTime),
+        );
+      }
+
+      // Build category conditions for products
+      const categoryConditions = [];
+      if (categoryId && categoryId !== "all") {
+        categoryConditions.push(
+          eq(products.categoryId, parseInt(categoryId as string)),
+        );
+      }
+
+      // Build product type conditions
+      const typeConditions = [];
+      if (productType && productType !== "all") {
+        const typeMap = {
+          combo: 3,
+          product: 1,
+          service: 2,
+        };
+        const typeValue = typeMap[productType as keyof typeof typeMap];
+        if (typeValue) {
+          typeConditions.push(eq(products.productType, typeValue));
+        }
+      }
+
+      // Build search conditions
+      const searchConditions = [];
+      if (productSearch && productSearch !== "" && productSearch !== "all") {
+        const searchTerm = `%${productSearch}%`;
+        searchConditions.push(
+          or(ilike(products.name, searchTerm), ilike(products.sku, searchTerm)),
+        );
+      }
+
+      // Query order items with product details from completed/paid orders
+      const productSalesData = await db
+        .select({
+          productId: orderItemsTable.productId,
+          productName: products.name,
+          productSku: products.sku,
+          categoryId: products.categoryId,
+          categoryName: categories.name,
+          unitPrice: orderItemsTable.unitPrice, // This is the pre-tax price
+          quantity: orderItemsTable.quantity,
+          total: orderItemsTable.total, // This should also be pre-tax total
+          orderId: orderItemsTable.orderId,
+          orderDate: orders.orderedAt,
+          discount: orderItemsTable.discount,
+          orderStatus: orders.status,
+        })
+        .from(orderItemsTable)
+        .innerJoin(orders, eq(orderItemsTable.orderId, orders.id))
+        .innerJoin(products, eq(orderItemsTable.productId, products.id))
+        .leftJoin(categories, eq(products.categoryId, categories.id))
+        .where(
+          and(
+            or(eq(orders.status, "paid"), eq(orders.status, "completed")),
+            ...dateConditions,
+            ...categoryConditions,
+            ...typeConditions,
+            ...searchConditions,
+          ),
+        )
+        .orderBy(desc(orders.orderedAt));
+
+      console.log(`Found ${productSalesData.length} product sales records`);
+
+      // Group and aggregate data by product
+      const productMap = new Map();
+
+      productSalesData.forEach((item) => {
+        const productId = item.productId;
+        const quantity = Number(item.quantity || 0);
+        const revenue = Number(item.unitPrice || 0) * quantity;
+        const discount = Number(item.discount || 0);
+
+        if (productMap.has(productId)) {
+          const existing = productMap.get(productId);
+          existing.totalQuantity += quantity;
+          existing.totalRevenue += revenue;
+          existing.discount += discount;
+          existing.orderCount += 1;
+        } else {
+          productMap.set(productId, {
+            productId: item.productId,
+            productName: item.productName,
+            productSku: item.productSku,
+            categoryId: item.categoryId,
+            categoryName: item.categoryName,
+            productType: item.productType,
+            unitPrice: item.unitPrice, // This is the pre-tax price
+            quantity: item.quantity,
+            total: item.total,
+            discount: item.discount,
+            totalQuantity: quantity,
+            totalRevenue: revenue,
+            totalDiscount: discount,
+            averagePrice: Number(item.unitPrice || 0),
+            orderCount: 1,
+          });
+        }
+      });
+
+      // Convert to array and calculate final metrics
+      const productStats = Array.from(productMap.values()).map((product) => ({
+        ...product,
+        averageOrderValue:
+          product.orderCount > 0
+            ? product.totalRevenue / product.orderCount
+            : 0,
+      }));
+
+      // Calculate totals
+      const totalRevenue = productStats.reduce(
+        (sum, product) => sum + product.totalRevenue,
+        0,
+      );
+      const totalQuantity = productStats.reduce(
+        (sum, product) => sum + product.totalQuantity,
+        0,
+      );
+      const totalDiscount = productStats.reduce(
+        (sum, product) => sum + product.totalDiscount,
+        0,
+      );
+      const totalProducts = productStats.length;
+
+      // Sort by revenue (descending)
+      productStats.sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+      const result = {
+        productStats,
+        totalRevenue,
+        totalQuantity,
+        totalDiscount,
+        totalProducts,
+        summary: {
+          topSellingProduct: productStats[0] || null,
+          averageRevenuePerProduct:
+            totalProducts > 0 ? totalRevenue / totalProducts : 0,
+        },
+      };
+
+      console.log("Product Analysis Results:", {
+        totalRevenue,
+        totalQuantity,
+        totalDiscount,
+        totalProducts,
+        topProduct: result.summary.topSellingProduct?.productName,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Product analysis error:", error);
+      res.status(500).json({
+        error: "Failed to fetch product analysis",
+        details: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // // Enhanced API endpoints for sales chart report - using same data source as dashboard
+  app.get(
+    "/api/dashboard-data/:startDate/:endDate",
+    async (req: TenantRequest, res) => {
+      try {
+        const { startDate, endDate } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Dashboard data API called with params:", {
+          startDate,
+          endDate,
+        });
+
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+
+        // Get orders, tables, transactions, invoices - EXACT same as dashboard
+        const [orders, tables, transactions, invoices] = await Promise.all([
+          storage.getOrders(undefined, undefined, tenantDb),
+          storage.getTables(tenantDb),
+          storage.getTransactions(tenantDb),
+          storage.getInvoices(tenantDb),
+        ]);
+
+        // Filter completed orders within date range - EXACT same logic as dashboard
+        const filteredCompletedOrders = Array.isArray(orders)
+          ? orders.filter((order) => {
+              try {
+                if (!order) return false;
+
+                // Try multiple date fields - prioritize orderedAt, paidAt, createdAt
+                const orderDate = new Date(
+                  order.orderedAt ||
+                    order.paidAt ||
+                    order.createdAt ||
+                    order.created_at,
+                );
+
+                if (isNaN(orderDate.getTime())) {
+                  return false;
+                }
+
+                const dateMatch = orderDate >= start && orderDate <= end;
+
+                // Include more order statuses to show real data
+                const isCompleted =
+                  order.status === "paid" ||
+                  order.status === "completed" ||
+                  order.status === "served" ||
+                  order.status === "confirmed";
+
+                return dateMatch && isCompleted;
+              } catch (error) {
+                console.error("Error filtering order:", order, error);
+                return false;
+              }
+            })
+          : [];
+
+        // Calculate dashboard stats - EXACT same logic
+        const periodRevenue = filteredCompletedOrders.reduce((total, order) => {
+          const orderTotal = Number(order.total || 0);
+          return total + orderTotal;
+        }, 0);
+
+        const periodOrderCount = filteredCompletedOrders.length;
+
+        // Customer count: count unique customers from completed orders
+        const uniqueCustomers = new Set();
+        filteredCompletedOrders.forEach((order) => {
+          if (order.customerId) {
+            uniqueCustomers.add(order.customerId);
+          } else {
+            uniqueCustomers.add(`order_${order.id}`);
+          }
+        });
+        const periodCustomerCount = uniqueCustomers.size;
+
+        // Daily average for the period
+        const daysDiff = Math.max(
+          1,
+          Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
+            1,
+        );
+        const dailyAverageRevenue = periodRevenue / daysDiff;
+
+        // Active orders (pending/in-progress orders)
+        const activeOrders = orders.filter(
+          (order) =>
+            order.status === "pending" || order.status === "in_progress",
+        ).length;
+
+        const occupiedTables = tables.filter(
+          (table) => table.status === "occupied",
+        );
+
+        const monthRevenue = periodRevenue;
+        const averageOrderValue =
+          periodOrderCount > 0 ? periodRevenue / periodOrderCount : 0;
+
+        // Peak hours analysis
+        const hourlyOrders: {
+          [key: number]: number;
+        } = {};
+        filteredCompletedOrders.forEach((order) => {
+          const orderDate = new Date(
+            order.orderedAt ||
+              order.createdAt ||
+              order.created_at ||
+              order.paidAt,
+          );
+          if (!isNaN(orderDate.getTime())) {
+            const hour = orderDate.getHours();
+            hourlyOrders[hour] = (hourlyOrders[hour] || 0) + 1;
+          }
+        });
+
+        const peakHour = Object.keys(hourlyOrders).reduce(
+          (peak, hour) =>
+            hourlyOrders[parseInt(hour)] > hourlyOrders[parseInt(peak)]
+              ? hour
+              : peak,
+          "12",
+        );
+
+        const dashboardData = {
+          periodRevenue,
+          periodOrderCount,
+          periodCustomerCount,
+          dailyAverageRevenue,
+          activeOrders,
+          occupiedTables: occupiedTables.length,
+          monthRevenue,
+          averageOrderValue,
+          peakHour: parseInt(peakHour),
+          totalTables: tables.length,
+          filteredCompletedOrders,
+          orders: orders || [],
+          tables: tables || [],
+          transactions: transactions || [],
+          invoices: invoices || [],
+        };
+
+        console.log("Dashboard data calculated:", {
+          periodRevenue,
+          periodOrderCount,
+          periodCustomerCount,
+          filteredOrdersCount: filteredCompletedOrders.length,
+        });
+
+        res.json(dashboardData);
+      } catch (error) {
+        console.error("Error in dashboard data API:", error);
+        res.status(500).json({
+          error: "Failed to fetch dashboard data",
+        });
+      }
+    },
+  );
+
+  // Transactions API with enhanced filtering
+  app.get(
+    "/api/transactions/:startDate/:endDate/:salesMethod/:salesChannel/:analysisType/:concernType/:selectedEmployee",
+    async (req: TenantRequest, res) => {
+      try {
+        const {
+          startDate,
+          endDate,
+          salesMethod,
+          salesChannel,
+          analysisType,
+          concernType,
+          selectedEmployee,
+        } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Transactions API called with params:", {
+          startDate,
+          endDate,
+          salesMethod,
+          salesChannel,
+          analysisType,
+          concernType,
+          selectedEmployee,
+        });
+
+        // Get transactions data
+        const transactions = await storage.getTransactions(tenantDb);
+
+        // Filter transactions based on parameters
+        const filteredTransactions = transactions.filter((transaction) => {
+          const transactionDate = new Date(transaction.createdAt);
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+
+          const dateMatch = transactionDate >= start && transactionDate <= end;
+
+          // Enhanced sales method filtering
+          let salesMethodMatch = true;
+          if (salesMethod !== "all") {
+            const paymentMethod = transaction.paymentMethod || "cash";
+            switch (salesMethod) {
+              case "no_delivery":
+                salesMethodMatch =
+                  !transaction.deliveryMethod ||
+                  transaction.deliveryMethod === "pickup" ||
+                  transaction.deliveryMethod === "takeaway";
+                break;
+              case "delivery":
+                salesMethodMatch = transaction.deliveryMethod === "delivery";
+                break;
+              default:
+                salesMethodMatch =
+                  paymentMethod.toLowerCase() === salesMethod.toLowerCase();
+            }
+          }
+
+          // Enhanced sales channel filtering
+          let salesChannelMatch = true;
+          if (salesChannel !== "all") {
+            const channel = transaction.salesChannel || "direct";
+            switch (salesChannel) {
+              case "direct":
+                salesChannelMatch =
+                  !transaction.salesChannel ||
+                  transaction.salesChannel === "direct" ||
+                  transaction.salesChannel === "pos";
+                break;
+              case "other":
+                salesChannelMatch =
+                  transaction.salesChannel &&
+                  transaction.salesChannel !== "direct" &&
+                  transaction.salesChannel !== "pos";
+                break;
+              default:
+                salesChannelMatch =
+                  channel.toLowerCase() === salesChannel.toLowerCase();
+            }
+          }
+
+          // Enhanced employee filtering
+          let employeeMatch = true;
+          if (selectedEmployee !== "all") {
+            employeeMatch =
+              transaction.cashierName === selectedEmployee ||
+              (transaction.cashierName &&
+                transaction.cashierName
+                  .toLowerCase()
+                  .includes(selectedEmployee.toLowerCase()));
+          }
+
+          return (
+            dateMatch && salesMethodMatch && salesChannelMatch && employeeMatch
+          );
+        });
+
+        console.log(
+          `Found ${filteredTransactions.length} filtered transactions out of ${transactions.length} total`,
+        );
+        res.json(filteredTransactions);
+      } catch (error) {
+        console.error("Error in transactions API:", error);
+        res.status(500).json({
+          error: "Failed to fetch transactions data",
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/api/orders/:startDate/:endDate/:selectedEmployee/:salesChannel/:salesMethod/:analysisType/:concernType",
+    async (req: TenantRequest, res) => {
+      try {
+        const {
+          startDate,
+          endDate,
+          selectedEmployee,
+          salesChannel,
+          salesMethod,
+          analysisType,
+          concernType,
+        } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Orders API called with params:", {
+          startDate,
+          endDate,
+          selectedEmployee,
+          salesChannel,
+          salesMethod,
+          analysisType,
+          concernType,
+        });
+
+        // Get orders data
+        const orders = await storage.getOrders(undefined, undefined, tenantDb);
+
+        // Filter orders based on parameters with enhanced logic
+        const filteredOrders = orders.filter((order) => {
+          const orderDate = new Date(order.orderedAt || order.createdAt);
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+
+          const dateMatch = orderDate >= start && orderDate <= end;
+
+          // Enhanced employee filtering
+          let employeeMatch = true;
+          if (selectedEmployee !== "all") {
+            employeeMatch =
+              order.employeeId?.toString() === selectedEmployee ||
+              (order.employeeName &&
+                order.employeeName
+                  .toLowerCase()
+                  .includes(selectedEmployee.toLowerCase()));
+          }
+
+          // Enhanced sales channel filtering
+          let salesChannelMatch = true;
+          if (salesChannel !== "all") {
+            const channel = order.salesChannel || "direct";
+            switch (salesChannel) {
+              case "direct":
+                salesChannelMatch =
+                  !order.salesChannel ||
+                  order.salesChannel === "direct" ||
+                  order.salesChannel === "pos";
+                break;
+              case "other":
+                salesChannelMatch =
+                  order.salesChannel &&
+                  order.salesChannel !== "direct" &&
+                  order.salesChannel !== "pos";
+                break;
+              default:
+                salesChannelMatch =
+                  channel.toLowerCase() === salesChannel.toLowerCase();
+            }
+          }
+
+          // Enhanced sales method filtering
+          let salesMethodMatch = true;
+          if (salesMethod !== "all") {
+            switch (salesMethod) {
+              case "no_delivery":
+                salesMethodMatch =
+                  !order.deliveryMethod ||
+                  order.deliveryMethod === "pickup" ||
+                  order.deliveryMethod === "takeaway";
+                break;
+              case "delivery":
+                salesMethodMatch = order.deliveryMethod === "delivery";
+                break;
+              default:
+                const paymentMethod = order.paymentMethod || "cash";
+                salesMethodMatch =
+                  paymentMethod.toLowerCase() === salesMethod.toLowerCase();
+            }
+          }
+
+          // Only include paid orders for analysis
+          const statusMatch = order.status === "paid";
+
+          return (
+            dateMatch &&
+            employeeMatch &&
+            salesChannelMatch &&
+            salesMethodMatch &&
+            statusMatch
+          );
+        });
+
+        console.log(
+          `Found ${filteredOrders.length} filtered orders out of ${orders.length} total`,
+        );
+        res.json(filteredOrders);
+      } catch (error) {
+        console.error("Error in orders API:", error);
+        res.status(500).json({
+          error: "Failed to fetch orders data",
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/api/products/:selectedCategory/:productType/:productSearch?",
+    async (req: TenantRequest, res) => {
+      try {
+        const { selectedCategory, productType, productSearch } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Products API called with params:", {
+          selectedCategory,
+          productType,
+          productSearch,
+        });
+
+        let products;
+
+        // Get products by category or all products
+        if (
+          selectedCategory &&
+          selectedCategory !== "all" &&
+          selectedCategory !== "undefined"
+        ) {
+          const categoryId = parseInt(selectedCategory);
+          if (!isNaN(categoryId)) {
+            products = await storage.getProductsByCategory(
+              categoryId,
+              true,
+              tenantDb,
+            );
+          } else {
+            products = await storage.getAllProducts(true, tenantDb);
+          }
+        } else {
+          products = await storage.getAllProducts(true, tenantDb);
+        }
+
+        // Filter by product type if specified
+        if (
+          productType &&
+          productType !== "all" &&
+          productType !== "undefined"
+        ) {
+          const typeMap = {
+            combo: 3,
+            "combo-dongoi": 3,
+            product: 1,
+            "hang-hoa": 1,
+            service: 2,
+            "dich-vu": 2,
+          };
+          const typeValue =
+            typeMap[productType.toLowerCase() as keyof typeof typeMap];
+          if (typeValue) {
+            products = products.filter(
+              (product) => product.productType === typeValue,
+            );
+          }
+        }
+
+        // Filter by product search if provided
+        if (
+          productSearch &&
+          productSearch !== "" &&
+          productSearch !== "undefined" &&
+          productSearch !== "all"
+        ) {
+          const searchTerm = productSearch.toLowerCase();
+          products = products.filter(
+            (product) =>
+              product.name?.toLowerCase().includes(searchTerm) ||
+              product.sku?.toLowerCase().includes(searchTerm) ||
+              product.description?.toLowerCase().includes(searchTerm),
+          );
+        }
+
+        console.log(`Found ${products.length} products after filtering`);
+        res.json(products);
+      } catch (error) {
+        console.error("Error in products API:", error);
+        res.status(500).json({
+          error: "Failed to fetch products data",
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/api/customers/:customerSearch?/:customerStatus?",
+    async (req: TenantRequest, res) => {
+      try {
+        const { customerSearch, customerStatus } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log(
+          "Customers API called with search:",
+          customerSearch,
+          "status:",
+          customerStatus,
+        );
+
+        let customers = await storage.getCustomers(tenantDb);
+
+        // Filter by search if provided
+        if (
+          customerSearch &&
+          customerSearch !== "" &&
+          customerSearch !== "undefined" &&
+          customerSearch !== "all"
+        ) {
+          const searchTerm = customerSearch.toLowerCase();
+          customers = customers.filter(
+            (customer) =>
+              customer.name?.toLowerCase().includes(searchTerm) ||
+              customer.phone?.includes(customerSearch) ||
+              customer.email?.toLowerCase().includes(searchTerm) ||
+              customer.customerId?.toLowerCase().includes(searchTerm) ||
+              customer.address?.toLowerCase().includes(searchTerm),
+          );
+        }
+
+        // Filter by status if provided
+        if (
+          customerStatus &&
+          customerStatus !== "all" &&
+          customerStatus !== "undefined"
+        ) {
+          const now = new Date();
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+          customers = customers.filter((customer) => {
+            const totalSpent = Number(customer.totalSpent || 0);
+            const lastVisit = customer.lastVisit
+              ? new Date(customer.lastVisit)
+              : null;
+
+            switch (customerStatus) {
+              case "active":
+                return lastVisit && lastVisit >= thirtyDaysAgo;
+              case "inactive":
+                return !lastVisit || lastVisit < thirtyDaysAgo;
+              case "vip":
+                return totalSpent >= 500000; // VIP customers with total spent >= 500k VND
+              case "new":
+                const joinDate = customer.createdAt
+                  ? new Date(customer.createdAt)
+                  : null;
+                return joinDate && joinDate >= thirtyDaysAgo;
+              default:
+                return true;
+            }
+          });
+        }
+
+        console.log(`Found ${customers.length} customers after filtering`);
+        res.json(customers);
+      } catch (error) {
+        console.error("Error in customers API:", error);
+        res.status(500).json({
+          error: "Failed to fetch customers data",
+        });
+      }
+    },
+  );
+
+  // Tax code lookup proxy endpoint
+  app.post("/api/tax-code-lookup", async (req: TenantRequest, res) => {
+    try {
+      const { taxCode } = req.body;
+      const tenantDb = await getTenantDatabase(req);
+
+      if (!taxCode) {
+        return res.status(400).json({
+          success: false,
+          message: "Mã số thuế không được để trống",
+        });
+      }
+
+      // Call the external tax code API
+      const response = await fetch(
+        "https://infoerpvn.com:9440/api/CheckListTaxCode/v2",
+        {
+          method: "POST",
+          headers: {
+            token: "EnURbbnPhUm4GjNgE4Ogrw==",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify([taxCode]),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `External API error: ${response.status} ${response.statusText}`,
+        );
+      }
+
+      const result = await response.json();
+
+      res.json({
+        success: true,
+        data: result,
+        message: "Tra cứu thành công",
+      });
+    } catch (error) {
+      console.error("Tax code lookup error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Có lỗi xảy ra khi tra cứu mã số thuế",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // E-invoice publish proxy endpoint
+  app.post("/api/einvoice/publish", async (req: TenantRequest, res) => {
+    try {
+      const publishRequest = req.body;
+      const tenantDb = await getTenantDatabase(req);
+      console.log(
+        "Publishing invoice with data:",
+        JSON.stringify(publishRequest, null, 2),
+      );
+
+      // Call the real e-invoice API
+      const response = await fetch(
+        "https://infoerpvn.com:9440/api/invoice/publish",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            token: "EnURbbnPhUm4GjNgE4Ogrw==",
+          },
+          body: JSON.stringify(publishRequest),
+        },
+      );
+
+      if (!response.ok) {
+        console.error(
+          "E-invoice API error:",
+          response.status,
+          response.statusText,
+        );
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+
+        return res.status(response.status).json({
+          error: "Failed to publish invoice",
+          details: `API returned ${response.status}: ${response.statusText}`,
+          apiResponse: errorText,
+        });
+      }
+
+      const result = await response.json();
+      console.log("E-invoice API response:", result);
+
+      // Check if the API returned success
+      if (result.status === true) {
+        console.log("Invoice published successfully:", result);
+
+        // Return standardized response format
+        res.json({
+          success: true,
+          message:
+            result.message || "Hóa đơn điện tử đã được phát hành thành công",
+          data: {
+            invoiceNo: result.data?.invoiceNo,
+            invDate: result.data?.invDate,
+            transactionID: result.data?.transactionID,
+            macqt: result.data?.macqt,
+            originalRequest: {
+              transactionID: publishRequest.transactionID,
+              invRef: publishRequest.invRef,
+              totalAmount: publishRequest.invTotalAmount,
+              customer: publishRequest.Customer,
+            },
+          },
+        });
+      } else {
+        // API returned failure
+        console.error("E-invoice API returned failure:", result);
+        res.status(400).json({
+          error: "E-invoice publication failed",
+          message: result.message || "Unknown error from e-invoice service",
+          details: result,
+        });
+      }
+    } catch (error) {
+      console.error("E-invoice publish proxy error details:");
+      console.error("- Error type:", error?.constructor.name);
+      console.error("- Error message:", error?.message);
+      console.error("- Full error:", error);
+
+      res.status(500).json({
+        error: "Failed to publish invoice",
+        details: error?.message,
+        errorType: error?.constructor.name,
+      });
+    }
+  });
+
+  // Printer configuration management APIs
+  app.get(
+    "/api/printer-configs",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        console.log(
+          "🔍 GET /api/printer-configs - Starting request processing",
+        );
+        let tenantDb;
+        try {
+          tenantDb = await getTenantDatabase(req);
+          console.log(
+            "✅ Tenant database connection obtained for printer configs",
+          );
+        } catch (dbError) {
+          console.error(
+            "❌ Failed to get tenant database for printer configs:",
+            dbError,
+          );
+          tenantDb = null;
+        }
+
+        const configs = await storage.getPrinterConfigs(tenantDb);
+        console.log(
+          `✅ Successfully fetched ${configs.length} printer configs`,
+        );
+        res.json(configs);
+      } catch (error) {
+        console.error("❌ Error fetching printer configs:", error);
+        res.status(500).json({
+          error: "Failed to fetch printer configs",
+        });
+      }
+    },
+  );
+
+  app.post("/api/printer-configs", async (req: TenantRequest, res) => {
+    try {
+      const tenantDb = await getTenantDatabase(req);
+      const configData = req.body;
+
+      console.log("Creating printer config with data:", configData);
+
+      const config = await storage.createPrinterConfig(configData, tenantDb);
+      res.status(201).json(config);
+    } catch (error) {
+      console.error("Error creating printer config:", error);
+      res.status(500).json({
+        error: "Failed to create printer config",
+      });
+    }
+  });
+
+  app.put("/api/printer-configs/:id", async (req: TenantRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tenantDb = await getTenantDatabase(req);
+      const configData = req.body;
+
+      console.log(`Updating printer config ${id} with data:`, configData);
+
+      const config = await storage.updatePrinterConfig(
+        id,
+        configData,
+        tenantDb,
+      );
+      if (!config) {
+        return res.status(404).json({
+          error: "Printer config not found",
+        });
+      }
+
+      res.json(config);
+    } catch (error) {
+      console.error("Error updating printer config:", error);
+      res.status(500).json({
+        error: "Failed to update printer config",
+      });
+    }
+  });
+
+  app.delete("/api/printer-configs/:id", async (req: TenantRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tenantDb = await getTenantDatabase(req);
+
+      console.log(`Deleting printer config ${id}`);
+
+      const deleted = await storage.deletePrinterConfig(id, tenantDb);
+
+      if (!deleted) {
+        return res.status(404).json({
+          error: "Printer config not found",
+        });
+      }
+
+      res.json({
+        message: "Printer config deleted successfully",
+      });
+    } catch (error) {
+      console.error("Error deleting printer config:", error);
+      res.status(500).json({
+        error: "Failed to delete printer config",
+      });
+    }
+  });
+
+  app.post("/api/printer-configs/:id/test", async (req: TenantRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tenantDb = await getTenantDatabase(req);
+
+      // Get printer config
+      const configs = await storage.getPrinterConfigs(tenantDb);
+      const config = configs.find((c) => c.id === id);
+
+      if (!config) {
+        return res.status(404).json({
+          success: false,
+          message: "Printer configuration not found",
+        });
+      }
+
+      // Test connection based on connection type
+      let testResult = { success: false, message: "Unknown connection type" };
+
+      if (config.connectionType === "network" && config.ipAddress) {
+        // Test network connection
+        const net = require("net");
+
+        const testPromise = new Promise((resolve) => {
+          const client = new net.Socket();
+          client.setTimeout(3000);
+
+          client.connect(config.port || 9100, config.ipAddress, () => {
+            // Send test print command
+            const testData = Buffer.from(
+              "\x1B@Test Print from EDPOS\n\n\n\x1DV\x41\x00",
+              "utf8",
+            );
+
+            client.write(testData, (error) => {
+              if (error) {
+                resolve({
+                  success: false,
+                  message: `Failed to send test data: ${error.message}`,
+                });
+              } else {
+                client.end();
+                resolve({
+                  success: true,
+                  message: `Successfully connected to ${config.name}`,
+                });
+              }
+            });
+          });
+
+          client.on("error", (err) => {
+            resolve({
+              success: false,
+              message: `Connection failed: ${err.message}`,
+            });
+          });
+
+          client.on("timeout", () => {
+            client.destroy();
+            resolve({ success: false, message: "Connection timeout" });
+          });
+        });
+
+        testResult = await testPromise;
+      } else if (config.connectionType === "usb") {
+        // For USB printers, we can't directly test but we can check if the config is valid
+        testResult = {
+          success: true,
+          message: "USB printer detection not implemented",
+        };
+      } else {
+        testResult = {
+          success: false,
+          message: "Invalid printer configuration",
+        };
+      }
+
+      res.json(testResult);
+    } catch (error) {
+      console.error("Error testing printer connection:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to test printer connection",
+      });
+    }
+  });
+
+  // Customer Reports APIs
+  app.get("/api/customer-debts", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, customerId } = req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      // Get customer debts from database
+      const customerDebts = await db
+        .select({
+          id: customers.id,
+          customerCode: customers.customerId,
+          customerName: customers.name,
+          initialDebt: sql<number>`0`, // Mock initial debt
+          newDebt: sql<number>`COALESCE(${customers.totalSpent}, 0) * 0.1`, // 10% of total spent as debt
+          payment: sql<number>`COALESCE(${customers.totalSpent}, 0) * 0.05`, // 5% as payment
+          finalDebt: sql<number>`COALESCE(${customers.totalSpent}, 0) * 0.05`, // Final debt
+          phone: customers.phone,
+        })
+        .from(customers)
+        .where(eq(customers.status, "active"));
+
+      // Filter by customer if specified
+      let filteredDebts = customerDebts;
+      if (customerId) {
+        filteredDebts = customerDebts.filter(
+          (debt) => debt.id === parseInt(customerId as string),
+        );
+      }
+
+      res.json(filteredDebts);
+    } catch (error) {
+      res.status(500).json({
+        message: "Failed to fetch customer debts",
+      });
+    }
+  });
+
+  app.get("/api/customer-sales", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, customerId } = req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      // Get customer sales data from database
+      const customerSales = await db
+        .select({
+          id: customers.id,
+          customerCode: customers.customerId,
+          customerName: customers.name,
+          totalSales: customers.totalSpent,
+          visitCount: customers.visitCount,
+          averageOrder: sql<number>`CASE WHEN ${customers.visitCount} > 0 THEN ${customers.totalSpent} / ${customers.visitCount} ELSE 0 END`,
+          phone: customers.phone,
+        })
+        .from(customers)
+        .where(eq(customers.status, "active"));
+
+      // Filter by customer if specified
+      let filteredSales = customerSales;
+      if (customerId) {
+        filteredSales = customerSales.filter(
+          (sale) => sale.id === parseInt(customerId as string),
+        );
+      }
+
+      res.json(filteredSales);
+    } catch (error) {
+      res.status(500).json({
+        message: "Failed to fetch customer sales",
+      });
+    }
+  });
+
+  // Bulk create products
+  app.post("/api/products/bulk", async (req: TenantRequest, res) => {
+    try {
+      const { products: productList } = req.body;
+      const tenantDb = await getTenantDatabase(req);
+
+      if (!productList || !Array.isArray(productList)) {
+        return res.status(400).json({
+          error: "Invalid products data",
+        });
+      }
+
+      const results = [];
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const productData of productList) {
+        try {
+          console.log(`Processing product: ${JSON.stringify(productData)}`);
+
+          // Validate required fields with detailed messages
+          const missingFields = [];
+          if (!productData.name) missingFields.push("name");
+          if (!productData.sku) missingFields.push("sku");
+          if (!productData.price) missingFields.push("price");
+          if (
+            productData.categoryId === undefined ||
+            productData.categoryId === null
+          )
+            missingFields.push("categoryId");
+
+          if (missingFields.length > 0) {
+            throw new Error(
+              `Missing required fields: ${missingFields.join(", ")}`,
+            );
+          }
+
+          // Validate data types
+          if (isNaN(parseFloat(productData.price))) {
+            throw new Error(`Invalid price: ${productData.price}`);
+          }
+
+          if (isNaN(parseInt(productData.categoryId))) {
+            throw new Error(`Invalid categoryId: ${productData.categoryId}`);
+          }
+
+          const [product] = await db
+            .insert(products)
+            .values({
+              name: productData.name,
+              sku: productData.sku,
+              price: productData.price.toString(),
+              stock: parseInt(productData.stock) || 0,
+              categoryId: parseInt(productData.categoryId),
+              imageUrl: productData.imageUrl || null,
+              taxRate: productData.taxRate
+                ? productData.taxRate.toString()
+                : "0.00",
+            })
+            .returning();
+
+          console.log(`Successfully created product: ${product.name}`);
+          results.push({
+            success: true,
+            product,
+          });
+          successCount++;
+        } catch (error) {
+          const errorMessage = error.message || "Unknown error";
+          console.error(
+            `Error creating product ${productData.name || "Unknown"}:`,
+            errorMessage,
+          );
+          console.error("Product data:", JSON.stringify(productData, null, 2));
+
+          results.push({
+            success: false,
+            error: errorMessage,
+            data: productData,
+            productName: productData.name || "Unknown",
+          });
+          errorCount++;
+        }
+      }
+
+      res.json({
+        success: successCount,
+        errors: errorCount,
+        results,
+        message: `${successCount} sản phẩm đã được tạo thành công${errorCount > 0 ? `, ${errorCount} sản phẩm lỗi` : ""}`,
+      });
+    } catch (error) {
+      console.error("Bulk products creation error:", error);
+      res.status(500).json({
+        error: "Failed to create products",
+      });
+    }
+  });
+
+  // Employee routes
+  app.get(
+    "/api/employees",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        console.log("🔍 GET /api/employees - Starting request processing");
+        let tenantDb;
+        try {
+          tenantDb = await getTenantDatabase(req);
+          console.log("✅ Tenant database connection obtained for employees");
+        } catch (dbError) {
+          console.error(
+            "❌ Failed to get tenant database for employees:",
+            dbError,
+          );
+          tenantDb = null;
+        }
+
+        const employees = await storage.getEmployees(tenantDb);
+        console.log(`✅ Successfully fetched ${employees.length} employees`);
+        res.json(employees);
+      } catch (error) {
+        console.error("❌ Error fetching employees:", error);
+        res.status(500).json({
+          message: "Failed to fetch employees",
+        });
+      }
+    },
+  );
+
+  // Employee sales report data
+  app.get("/api/employee-sales", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, employeeId } = req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      let query = db
+        .select({
+          employeeName: transactionsTable.cashierName,
+          total: transactionsTable.total,
+          createdAt: transactionsTable.createdAt,
+        })
+        .from(transactionsTable);
+
+      if (startDate && endDate) {
+        query = query.where(
+          and(
+            gte(transactionsTable.createdAt, startDate as string),
+            lte(transactionsTable.createdAt, endDate as string),
+          ),
+        );
+      }
+
+      if (employeeId && employeeId !== "all") {
+        query = query.where(
+          eq(transactionsTable.cashierName, employeeId as string),
+        );
+      }
+
+      const salesData = await query;
+      res.json(salesData);
+    } catch (error) {
+      console.error("Error fetching employee sales:", error);
+      res.status(500).json({
+        message: "Failed to fetch employee sales data",
+      });
+    }
+  });
+
+  // Server time endpoint for consistent timestamps
+  app.get("/api/server-time", async (req: TenantRequest, res) => {
+    try {
+      const serverTime = {
+        timestamp: new Date(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        localTime: new Date().toLocaleString("vi-VN", {
+          timeZone: "Asia/Ho_Chi_Minh",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+      };
+      res.json(serverTime);
+    } catch (error) {
+      res.status(500).json({
+        error: "Failed to get server time",
+      });
+    }
+  });
+
+  // Product Analysis API - using orders and order_items data
+  app.get("/api/product-analysis", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, categoryId, productType, productSearch } =
+        req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      console.log("Product Analysis API called with params:", {
+        startDate,
+        endDate,
+        categoryId,
+        productType,
+        productSearch,
+      });
+
+      // Build date conditions
+      const dateConditions = [];
+      if (startDate && endDate) {
+        const startDateTime = new Date(startDate as string);
+        const endDateTime = new Date(endDate as string);
+        endDateTime.setHours(23, 59, 59, 999);
+        dateConditions.push(
+          gte(orders.orderedAt, startDateTime),
+          lte(orders.orderedAt, endDateTime),
+        );
+      }
+
+      // Build category conditions for products
+      const categoryConditions = [];
+      if (categoryId && categoryId !== "all") {
+        categoryConditions.push(
+          eq(products.categoryId, parseInt(categoryId as string)),
+        );
+      }
+
+      // Build product type conditions
+      const typeConditions = [];
+      if (productType && productType !== "all") {
+        const typeMap = {
+          combo: 3,
+          product: 1,
+          service: 2,
+        };
+        const typeValue = typeMap[productType as keyof typeof typeMap];
+        if (typeValue) {
+          typeConditions.push(eq(products.productType, typeValue));
+        }
+      }
+
+      // Build search conditions
+      const searchConditions = [];
+      if (productSearch && productSearch !== "" && productSearch !== "all") {
+        const searchTerm = `%${productSearch}%`;
+        searchConditions.push(
+          or(ilike(products.name, searchTerm), ilike(products.sku, searchTerm)),
+        );
+      }
+
+      // Query order items with product details from completed/paid orders
+      const productSalesData = await db
+        .select({
+          productId: orderItemsTable.productId,
+          productName: products.name,
+          productSku: products.sku,
+          categoryId: products.categoryId,
+          categoryName: categories.name,
+          unitPrice: orderItemsTable.unitPrice, // This is the pre-tax price
+          quantity: orderItemsTable.quantity,
+          total: orderItemsTable.total, // This should also be pre-tax total
+          orderId: orderItemsTable.orderId,
+          orderDate: orders.orderedAt,
+          discount: orderItemsTable.discount,
+          orderStatus: orders.status,
+        })
+        .from(orderItemsTable)
+        .innerJoin(orders, eq(orderItemsTable.orderId, orders.id))
+        .innerJoin(products, eq(orderItemsTable.productId, products.id))
+        .leftJoin(categories, eq(products.categoryId, categories.id))
+        .where(
+          and(
+            or(eq(orders.status, "paid"), eq(orders.status, "completed")),
+            ...dateConditions,
+            ...categoryConditions,
+            ...typeConditions,
+            ...searchConditions,
+          ),
+        )
+        .orderBy(desc(orders.orderedAt));
+
+      console.log(`Found ${productSalesData.length} product sales records`);
+
+      // Group and aggregate data by product
+      const productMap = new Map();
+
+      productSalesData.forEach((item) => {
+        const productId = item.productId;
+        const quantity = Number(item.quantity || 0);
+        const revenue = Number(item.unitPrice || 0) * quantity;
+        const discount = Number(item.discount || 0);
+
+        if (productMap.has(productId)) {
+          const existing = productMap.get(productId);
+          existing.totalQuantity += quantity;
+          existing.totalRevenue += revenue;
+          existing.discount += discount;
+          existing.orderCount += 1;
+        } else {
+          productMap.set(productId, {
+            productId: item.productId,
+            productName: item.productName,
+            productSku: item.productSku,
+            categoryId: item.categoryId,
+            categoryName: item.categoryName,
+            productType: item.productType,
+            unitPrice: item.unitPrice, // This is the pre-tax price
+            quantity: item.quantity,
+            total: item.total,
+            discount: item.discount,
+            totalQuantity: quantity,
+            totalRevenue: revenue,
+            totalDiscount: discount,
+            averagePrice: Number(item.unitPrice || 0),
+            orderCount: 1,
+          });
+        }
+      });
+
+      // Convert to array and calculate final metrics
+      const productStats = Array.from(productMap.values()).map((product) => ({
+        ...product,
+        averageOrderValue:
+          product.orderCount > 0
+            ? product.totalRevenue / product.orderCount
+            : 0,
+      }));
+
+      // Calculate totals
+      const totalRevenue = productStats.reduce(
+        (sum, product) => sum + product.totalRevenue,
+        0,
+      );
+      const totalQuantity = productStats.reduce(
+        (sum, product) => sum + product.totalQuantity,
+        0,
+      );
+      const totalDiscount = productStats.reduce(
+        (sum, product) => sum + product.totalDiscount,
+        0,
+      );
+      const totalProducts = productStats.length;
+
+      // Sort by revenue (descending)
+      productStats.sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+      const result = {
+        productStats,
+        totalRevenue,
+        totalQuantity,
+        totalDiscount,
+        totalProducts,
+        summary: {
+          topSellingProduct: productStats[0] || null,
+          averageRevenuePerProduct:
+            totalProducts > 0 ? totalRevenue / totalProducts : 0,
+        },
+      };
+
+      console.log("Product Analysis Results:", {
+        totalRevenue,
+        totalQuantity,
+        totalDiscount,
+        totalProducts,
+        topProduct: result.summary.topSellingProduct?.productName,
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error("Product analysis error:", error);
+      res.status(500).json({
+        error: "Failed to fetch product analysis",
+        details: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // // Enhanced API endpoints for sales chart report - using same data source as dashboard
+  app.get(
+    "/api/dashboard-data/:startDate/:endDate",
+    async (req: TenantRequest, res) => {
+      try {
+        const { startDate, endDate } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Dashboard data API called with params:", {
+          startDate,
+          endDate,
+        });
+
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+
+        // Get orders, tables, transactions, invoices - EXACT same as dashboard
+        const [orders, tables, transactions, invoices] = await Promise.all([
+          storage.getOrders(undefined, undefined, tenantDb),
+          storage.getTables(tenantDb),
+          storage.getTransactions(tenantDb),
+          storage.getInvoices(tenantDb),
+        ]);
+
+        // Filter completed orders within date range - EXACT same logic as dashboard
+        const filteredCompletedOrders = Array.isArray(orders)
+          ? orders.filter((order) => {
+              try {
+                if (!order) return false;
+
+                // Try multiple date fields - prioritize orderedAt, paidAt, createdAt
+                const orderDate = new Date(
+                  order.orderedAt ||
+                    order.paidAt ||
+                    order.createdAt ||
+                    order.created_at,
+                );
+
+                if (isNaN(orderDate.getTime())) {
+                  return false;
+                }
+
+                const dateMatch = orderDate >= start && orderDate <= end;
+
+                // Include more order statuses to show real data
+                const isCompleted =
+                  order.status === "paid" ||
+                  order.status === "completed" ||
+                  order.status === "served" ||
+                  order.status === "confirmed";
+
+                return dateMatch && isCompleted;
+              } catch (error) {
+                console.error("Error filtering order:", order, error);
+                return false;
+              }
+            })
+          : [];
+
+        // Calculate dashboard stats - EXACT same logic
+        const periodRevenue = filteredCompletedOrders.reduce((total, order) => {
+          const orderTotal = Number(order.total || 0);
+          return total + orderTotal;
+        }, 0);
+
+        const periodOrderCount = filteredCompletedOrders.length;
+
+        // Customer count: count unique customers from completed orders
+        const uniqueCustomers = new Set();
+        filteredCompletedOrders.forEach((order) => {
+          if (order.customerId) {
+            uniqueCustomers.add(order.customerId);
+          } else {
+            uniqueCustomers.add(`order_${order.id}`);
+          }
+        });
+        const periodCustomerCount = uniqueCustomers.size;
+
+        // Daily average for the period
+        const daysDiff = Math.max(
+          1,
+          Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
+            1,
+        );
+        const dailyAverageRevenue = periodRevenue / daysDiff;
+
+        // Active orders (pending/in-progress orders)
+        const activeOrders = orders.filter(
+          (order) =>
+            order.status === "pending" || order.status === "in_progress",
+        ).length;
+
+        const occupiedTables = tables.filter(
+          (table) => table.status === "occupied",
+        );
+
+        const monthRevenue = periodRevenue;
+        const averageOrderValue =
+          periodOrderCount > 0 ? periodRevenue / periodOrderCount : 0;
+
+        // Peak hours analysis
+        const hourlyOrders: {
+          [key: number]: number;
+        } = {};
+        filteredCompletedOrders.forEach((order) => {
+          const orderDate = new Date(
+            order.orderedAt ||
+              order.createdAt ||
+              order.created_at ||
+              order.paidAt,
+          );
+          if (!isNaN(orderDate.getTime())) {
+            const hour = orderDate.getHours();
+            hourlyOrders[hour] = (hourlyOrders[hour] || 0) + 1;
+          }
+        });
+
+        const peakHour = Object.keys(hourlyOrders).reduce(
+          (peak, hour) =>
+            hourlyOrders[parseInt(hour)] > hourlyOrders[parseInt(peak)]
+              ? hour
+              : peak,
+          "12",
+        );
+
+        const dashboardData = {
+          periodRevenue,
+          periodOrderCount,
+          periodCustomerCount,
+          dailyAverageRevenue,
+          activeOrders,
+          occupiedTables: occupiedTables.length,
+          monthRevenue,
+          averageOrderValue,
+          peakHour: parseInt(peakHour),
+          totalTables: tables.length,
+          filteredCompletedOrders,
+          orders: orders || [],
+          tables: tables || [],
+          transactions: transactions || [],
+          invoices: invoices || [],
+        };
+
+        console.log("Dashboard data calculated:", {
+          periodRevenue,
+          periodOrderCount,
+          periodCustomerCount,
+          filteredOrdersCount: filteredCompletedOrders.length,
+        });
+
+        res.json(dashboardData);
+      } catch (error) {
+        console.error("Error in dashboard data API:", error);
+        res.status(500).json({
+          error: "Failed to fetch dashboard data",
+        });
+      }
+    },
+  );
+
+  // Transactions API with enhanced filtering
+  app.get(
+    "/api/transactions/:startDate/:endDate/:salesMethod/:salesChannel/:analysisType/:concernType/:selectedEmployee",
+    async (req: TenantRequest, res) => {
+      try {
+        const {
+          startDate,
+          endDate,
+          salesMethod,
+          salesChannel,
+          analysisType,
+          concernType,
+          selectedEmployee,
+        } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Transactions API called with params:", {
+          startDate,
+          endDate,
+          salesMethod,
+          salesChannel,
+          analysisType,
+          concernType,
+          selectedEmployee,
+        });
+
+        // Get transactions data
+        const transactions = await storage.getTransactions(tenantDb);
+
+        // Filter transactions based on parameters
+        const filteredTransactions = transactions.filter((transaction) => {
+          const transactionDate = new Date(transaction.createdAt);
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+
+          const dateMatch = transactionDate >= start && transactionDate <= end;
+
+          // Enhanced sales method filtering
+          let salesMethodMatch = true;
+          if (salesMethod !== "all") {
+            const paymentMethod = transaction.paymentMethod || "cash";
+            switch (salesMethod) {
+              case "no_delivery":
+                salesMethodMatch =
+                  !transaction.deliveryMethod ||
+                  transaction.deliveryMethod === "pickup" ||
+                  transaction.deliveryMethod === "takeaway";
+                break;
+              case "delivery":
+                salesMethodMatch = transaction.deliveryMethod === "delivery";
+                break;
+              default:
+                salesMethodMatch =
+                  paymentMethod.toLowerCase() === salesMethod.toLowerCase();
+            }
+          }
+
+          // Enhanced sales channel filtering
+          let salesChannelMatch = true;
+          if (salesChannel !== "all") {
+            const channel = transaction.salesChannel || "direct";
+            switch (salesChannel) {
+              case "direct":
+                salesChannelMatch =
+                  !transaction.salesChannel ||
+                  transaction.salesChannel === "direct" ||
+                  transaction.salesChannel === "pos";
+                break;
+              case "other":
+                salesChannelMatch =
+                  transaction.salesChannel &&
+                  transaction.salesChannel !== "direct" &&
+                  transaction.salesChannel !== "pos";
+                break;
+              default:
+                salesChannelMatch =
+                  channel.toLowerCase() === salesChannel.toLowerCase();
+            }
+          }
+
+          // Enhanced employee filtering
+          let employeeMatch = true;
+          if (selectedEmployee !== "all") {
+            employeeMatch =
+              transaction.cashierName === selectedEmployee ||
+              (transaction.cashierName &&
+                transaction.cashierName
+                  .toLowerCase()
+                  .includes(selectedEmployee.toLowerCase()));
+          }
+
+          return (
+            dateMatch && salesMethodMatch && salesChannelMatch && employeeMatch
+          );
+        });
+
+        console.log(
+          `Found ${filteredTransactions.length} filtered transactions out of ${transactions.length} total`,
+        );
+        res.json(filteredTransactions);
+      } catch (error) {
+        console.error("Error in transactions API:", error);
+        res.status(500).json({
+          error: "Failed to fetch transactions data",
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/api/orders/:startDate/:endDate/:selectedEmployee/:salesChannel/:salesMethod/:analysisType/:concernType",
+    async (req: TenantRequest, res) => {
+      try {
+        const {
+          startDate,
+          endDate,
+          selectedEmployee,
+          salesChannel,
+          salesMethod,
+          analysisType,
+          concernType,
+        } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Orders API called with params:", {
+          startDate,
+          endDate,
+          selectedEmployee,
+          salesChannel,
+          salesMethod,
+          analysisType,
+          concernType,
+        });
+
+        // Get orders data
+        const orders = await storage.getOrders(undefined, undefined, tenantDb);
+
+        // Filter orders based on parameters with enhanced logic
+        const filteredOrders = orders.filter((order) => {
+          const orderDate = new Date(order.orderedAt || order.createdAt);
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+
+          const dateMatch = orderDate >= start && orderDate <= end;
+
+          // Enhanced employee filtering
+          let employeeMatch = true;
+          if (selectedEmployee !== "all") {
+            employeeMatch =
+              order.employeeId?.toString() === selectedEmployee ||
+              (order.employeeName &&
+                order.employeeName
+                  .toLowerCase()
+                  .includes(selectedEmployee.toLowerCase()));
+          }
+
+          // Enhanced sales channel filtering
+          let salesChannelMatch = true;
+          if (salesChannel !== "all") {
+            const channel = order.salesChannel || "direct";
+            switch (salesChannel) {
+              case "direct":
+                salesChannelMatch =
+                  !order.salesChannel ||
+                  order.salesChannel === "direct" ||
+                  order.salesChannel === "pos";
+                break;
+              case "other":
+                salesChannelMatch =
+                  order.salesChannel &&
+                  order.salesChannel !== "direct" &&
+                  order.salesChannel !== "pos";
+                break;
+              default:
+                salesChannelMatch =
+                  channel.toLowerCase() === salesChannel.toLowerCase();
+            }
+          }
+
+          // Enhanced sales method filtering
+          let salesMethodMatch = true;
+          if (salesMethod !== "all") {
+            switch (salesMethod) {
+              case "no_delivery":
+                salesMethodMatch =
+                  !order.deliveryMethod ||
+                  order.deliveryMethod === "pickup" ||
+                  order.deliveryMethod === "takeaway";
+                break;
+              case "delivery":
+                salesMethodMatch = order.deliveryMethod === "delivery";
+                break;
+              default:
+                const paymentMethod = order.paymentMethod || "cash";
+                salesMethodMatch =
+                  paymentMethod.toLowerCase() === salesMethod.toLowerCase();
+            }
+          }
+
+          // Only include paid orders for analysis
+          const statusMatch = order.status === "paid";
+
+          return (
+            dateMatch &&
+            employeeMatch &&
+            salesChannelMatch &&
+            salesMethodMatch &&
+            statusMatch
+          );
+        });
+
+        console.log(
+          `Found ${filteredOrders.length} filtered orders out of ${orders.length} total`,
+        );
+        res.json(filteredOrders);
+      } catch (error) {
+        console.error("Error in orders API:", error);
+        res.status(500).json({
+          error: "Failed to fetch orders data",
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/api/products/:selectedCategory/:productType/:productSearch?",
+    async (req: TenantRequest, res) => {
+      try {
+        const { selectedCategory, productType, productSearch } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Products API called with params:", {
+          selectedCategory,
+          productType,
+          productSearch,
+        });
+
+        let products;
+
+        // Get products by category or all products
+        if (
+          selectedCategory &&
+          selectedCategory !== "all" &&
+          selectedCategory !== "undefined"
+        ) {
+          const categoryId = parseInt(selectedCategory);
+          if (!isNaN(categoryId)) {
+            products = await storage.getProductsByCategory(
+              categoryId,
+              true,
+              tenantDb,
+            );
+          } else {
+            products = await storage.getAllProducts(true, tenantDb);
+          }
+        } else {
+          products = await storage.getAllProducts(true, tenantDb);
+        }
+
+        // Filter by product type if specified
+        if (
+          productType &&
+          productType !== "all" &&
+          productType !== "undefined"
+        ) {
+          const typeMap = {
+            combo: 3,
+            "combo-dongoi": 3,
+            product: 1,
+            "hang-hoa": 1,
+            service: 2,
+            "dich-vu": 2,
+          };
+          const typeValue =
+            typeMap[productType.toLowerCase() as keyof typeof typeMap];
+          if (typeValue) {
+            products = products.filter(
+              (product) => product.productType === typeValue,
+            );
+          }
+        }
+
+        // Filter by product search if provided
+        if (
+          productSearch &&
+          productSearch !== "" &&
+          productSearch !== "undefined" &&
+          productSearch !== "all"
+        ) {
+          const searchTerm = productSearch.toLowerCase();
+          products = products.filter(
+            (product) =>
+              product.name?.toLowerCase().includes(searchTerm) ||
+              product.sku?.toLowerCase().includes(searchTerm) ||
+              product.description?.toLowerCase().includes(searchTerm),
+          );
+        }
+
+        console.log(`Found ${products.length} products after filtering`);
+        res.json(products);
+      } catch (error) {
+        console.error("Error in products API:", error);
+        res.status(500).json({
+          error: "Failed to fetch products data",
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/api/customers/:customerSearch?/:customerStatus?",
+    async (req: TenantRequest, res) => {
+      try {
+        const { customerSearch, customerStatus } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log(
+          "Customers API called with search:",
+          customerSearch,
+          "status:",
+          customerStatus,
+        );
+
+        let customers = await storage.getCustomers(tenantDb);
+
+        // Filter by search if provided
+        if (
+          customerSearch &&
+          customerSearch !== "" &&
+          customerSearch !== "undefined" &&
+          customerSearch !== "all"
+        ) {
+          const searchTerm = customerSearch.toLowerCase();
+          customers = customers.filter(
+            (customer) =>
+              customer.name?.toLowerCase().includes(searchTerm) ||
+              customer.phone?.includes(customerSearch) ||
+              customer.email?.toLowerCase().includes(searchTerm) ||
+              customer.customerId?.toLowerCase().includes(searchTerm) ||
+              customer.address?.toLowerCase().includes(searchTerm),
+          );
+        }
+
+        // Filter by status if provided
+        if (
+          customerStatus &&
+          customerStatus !== "all" &&
+          customerStatus !== "undefined"
+        ) {
+          const now = new Date();
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+          customers = customers.filter((customer) => {
+            const totalSpent = Number(customer.totalSpent || 0);
+            const lastVisit = customer.lastVisit
+              ? new Date(customer.lastVisit)
+              : null;
+
+            switch (customerStatus) {
+              case "active":
+                return lastVisit && lastVisit >= thirtyDaysAgo;
+              case "inactive":
+                return !lastVisit || lastVisit < thirtyDaysAgo;
+              case "vip":
+                return totalSpent >= 500000; // VIP customers with total spent >= 500k VND
+              case "new":
+                const joinDate = customer.createdAt
+                  ? new Date(customer.createdAt)
+                  : null;
+                return joinDate && joinDate >= thirtyDaysAgo;
+              default:
+                return true;
+            }
+          });
+        }
+
+        console.log(`Found ${customers.length} customers after filtering`);
+        res.json(customers);
+      } catch (error) {
+        console.error("Error in customers API:", error);
+        res.status(500).json({
+          error: "Failed to fetch customers data",
+        });
+      }
+    },
+  );
+
+  // Tax code lookup proxy endpoint
+  app.post("/api/tax-code-lookup", async (req: TenantRequest, res) => {
+    try {
+      const { taxCode } = req.body;
+      const tenantDb = await getTenantDatabase(req);
+
+      if (!taxCode) {
+        return res.status(400).json({
+          success: false,
+          message: "Mã số thuế không được để trống",
+        });
+      }
+
+      // Call the external tax code API
+      const response = await fetch(
+        "https://infoerpvn.com:9440/api/CheckListTaxCode/v2",
+        {
+          method: "POST",
+          headers: {
+            token: "EnURbbnPhUm4GjNgE4Ogrw==",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify([taxCode]),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `External API error: ${response.status} ${response.statusText}`,
+        );
+      }
+
+      const result = await response.json();
+
+      res.json({
+        success: true,
+        data: result,
+        message: "Tra cứu thành công",
+      });
+    } catch (error) {
+      console.error("Tax code lookup error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Có lỗi xảy ra khi tra cứu mã số thuế",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // E-invoice publish proxy endpoint
+  app.post("/api/einvoice/publish", async (req: TenantRequest, res) => {
+    try {
+      const publishRequest = req.body;
+      const tenantDb = await getTenantDatabase(req);
+      console.log(
+        "Publishing invoice with data:",
+        JSON.stringify(publishRequest, null, 2),
+      );
+
+      // Call the real e-invoice API
+      const response = await fetch(
+        "https://infoerpvn.com:9440/api/invoice/publish",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            token: "EnURbbnPhUm4GjNgE4Ogrw==",
+          },
+          body: JSON.stringify(publishRequest),
+        },
+      );
+
+      if (!response.ok) {
+        console.error(
+          "E-invoice API error:",
+          response.status,
+          response.statusText,
+        );
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+
+        return res.status(response.status).json({
+          error: "Failed to publish invoice",
+          details: `API returned ${response.status}: ${response.statusText}`,
+          apiResponse: errorText,
+        });
+      }
+
+      const result = await response.json();
+      console.log("E-invoice API response:", result);
+
+      // Check if the API returned success
+      if (result.status === true) {
+        console.log("Invoice published successfully:", result);
+
+        // Return standardized response format
+        res.json({
+          success: true,
+          message:
+            result.message || "Hr�a đơn điện tử đã được phát hành thành công",
+          data: {
+            invoiceNo: result.data?.invoiceNo,
+            invDate: result.data?.invDate,
+            transactionID: result.data?.transactionID,
+            macqt: result.data?.macqt,
+            originalRequest: {
+              transactionID: publishRequest.transactionID,
+              invRef: publishRequest.invRef,
+              totalAmount: publishRequest.invTotalAmount,
+              customer: publishRequest.Customer,
+            },
+          },
+        });
+      } else {
+        // API returned failure
+        console.error("E-invoice API returned failure:", result);
+        res.status(400).json({
+          error: "E-invoice publication failed",
+          message: result.message || "Unknown error from e-invoice service",
+          details: result,
+        });
+      }
+    } catch (error) {
+      console.error("E-invoice publish proxy error details:");
+      console.error("- Error type:", error?.constructor.name);
+      console.error("- Error message:", error?.message);
+      console.error("- Full error:", error);
+
+      res.status(500).json({
+        error: "Failed to publish invoice",
+        details: error?.message,
+        errorType: error?.constructor.name,
+      });
+    }
+  });
+
+  // Printer configuration management APIs
+  app.get(
+    "/api/printer-configs",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        console.log(
+          "🔍 GET /api/printer-configs - Starting request processing",
+        );
+        let tenantDb;
+        try {
+          tenantDb = await getTenantDatabase(req);
+          console.log(
+            "✅ Tenant database connection obtained for printer configs",
+          );
+        } catch (dbError) {
+          console.error(
+            "❌ Failed to get tenant database for printer configs:",
+            dbError,
+          );
+          tenantDb = null;
+        }
+
+        const configs = await storage.getPrinterConfigs(tenantDb);
+        console.log(
+          `✅ Successfully fetched ${configs.length} printer configs`,
+        );
+        res.json(configs);
+      } catch (error) {
+        console.error("❌ Error fetching printer configs:", error);
+        res.status(500).json({
+          error: "Failed to fetch printer configs",
+        });
+      }
+    },
+  );
+
+  app.post("/api/printer-configs", async (req: TenantRequest, res) => {
+    try {
+      const tenantDb = await getTenantDatabase(req);
+      const configData = req.body;
+
+      console.log("Creating printer config with data:", configData);
+
+      const config = await storage.createPrinterConfig(configData, tenantDb);
+      res.status(201).json(config);
+    } catch (error) {
+      console.error("Error creating printer config:", error);
+      res.status(500).json({
+        error: "Failed to create printer config",
+      });
+    }
+  });
+
+  app.put("/api/printer-configs/:id", async (req: TenantRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tenantDb = await getTenantDatabase(req);
+      const configData = req.body;
+
+      console.log(`Updating printer config ${id} with data:`, configData);
+
+      const config = await storage.updatePrinterConfig(
+        id,
+        configData,
+        tenantDb,
+      );
+      if (!config) {
+        return res.status(404).json({
+          error: "Printer config not found",
+        });
+      }
+
+      res.json(config);
+    } catch (error) {
+      console.error("Error updating printer config:", error);
+      res.status(500).json({
+        error: "Failed to update printer config",
+      });
+    }
+  });
+
+  app.delete("/api/printer-configs/:id", async (req: TenantRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tenantDb = await getTenantDatabase(req);
+
+      console.log(`Deleting printer config ${id}`);
+
+      const deleted = await storage.deletePrinterConfig(id, tenantDb);
+
+      if (!deleted) {
+        return res.status(404).json({
+          error: "Printer config not found",
+        });
+      }
+
+      res.json({
+        message: "Printer config deleted successfully",
+      });
+    } catch (error) {
+      console.error("Error deleting printer config:", error);
+      res.status(500).json({
+        error: "Failed to delete printer config",
+      });
+    }
+  });
+
+  app.post("/api/printer-configs/:id/test", async (req: TenantRequest, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const tenantDb = await getTenantDatabase(req);
+
+      // Get printer config
+      const configs = await storage.getPrinterConfigs(tenantDb);
+      const config = configs.find((c) => c.id === id);
+
+      if (!config) {
+        return res.status(404).json({
+          success: false,
+          message: "Printer configuration not found",
+        });
+      }
+
+      // Test connection based on connection type
+      let testResult = { success: false, message: "Unknown connection type" };
+
+      if (config.connectionType === "network" && config.ipAddress) {
+        // Test network connection
+        const net = require("net");
+
+        const testPromise = new Promise((resolve) => {
+          const client = new net.Socket();
+          client.setTimeout(3000);
+
+          client.connect(config.port || 9100, config.ipAddress, () => {
+            // Send test print command
+            const testData = Buffer.from(
+              "\x1B@Test Print from EDPOS\n\n\n\x1DV\x41\x00",
+              "utf8",
+            );
+
+            client.write(testData, (error) => {
+              if (error) {
+                resolve({
+                  success: false,
+                  message: `Failed to send test data: ${error.message}`,
+                });
+              } else {
+                client.end();
+                resolve({
+                  success: true,
+                  message: `Successfully connected to ${config.name}`,
+                });
+              }
+            });
+          });
+
+          client.on("error", (err) => {
+            resolve({
+              success: false,
+              message: `Connection failed: ${err.message}`,
+            });
+          });
+
+          client.on("timeout", () => {
+            client.destroy();
+            resolve({ success: false, message: "Connection timeout" });
+          });
+        });
+
+        testResult = await testPromise;
+      } else if (config.connectionType === "usb") {
+        // For USB printers, we can't directly test but we can check if the config is valid
+        testResult = {
+          success: true,
+          message: "USB printer detection not implemented",
+        };
+      } else {
+        testResult = {
+          success: false,
+          message: "Invalid printer configuration",
+        };
+      }
+
+      res.json(testResult);
+    } catch (error) {
+      console.error("Error testing printer connection:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to test printer connection",
+      });
+    }
+  });
+
+  // Customer Reports APIs
+  app.get("/api/customer-debts", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, customerId } = req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      // Get customer debts from database
+      const customerDebts = await db
+        .select({
+          id: customers.id,
+          customerCode: customers.customerId,
+          customerName: customers.name,
+          initialDebt: sql<number>`0`, // Mock initial debt
+          newDebt: sql<number>`COALESCE(${customers.totalSpent}, 0) * 0.1`, // 10% of total spent as debt
+          payment: sql<number>`COALESCE(${customers.totalSpent}, 0) * 0.05`, // 5% as payment
+          finalDebt: sql<number>`COALESCE(${customers.totalSpent}, 0) * 0.05`, // Final debt
+          phone: customers.phone,
+        })
+        .from(customers)
+        .where(eq(customers.status, "active"));
+
+      // Filter by customer if specified
+      let filteredDebts = customerDebts;
+      if (customerId) {
+        filteredDebts = customerDebts.filter(
+          (debt) => debt.id === parseInt(customerId as string),
+        );
+      }
+
+      res.json(filteredDebts);
+    } catch (error) {
+      res.status(500).json({
+        message: "Failed to fetch customer debts",
+      });
+    }
+  });
+
+  app.get("/api/customer-sales", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, customerId } = req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      // Get customer sales data from database
+      const customerSales = await db
+        .select({
+          id: customers.id,
+          customerCode: customers.customerId,
+          customerName: customers.name,
+          totalSales: customers.totalSpent,
+          visitCount: customers.visitCount,
+          averageOrder: sql<number>`CASE WHEN ${customers.visitCount} > 0 THEN ${customers.totalSpent} / ${customers.visitCount} ELSE 0 END`,
+          phone: customers.phone,
+        })
+        .from(customers)
+        .where(eq(customers.status, "active"));
+
+      // Filter by customer if specified
+      let filteredSales = customerSales;
+      if (customerId) {
+        filteredSales = customerSales.filter(
+          (sale) => sale.id === parseInt(customerId as string),
+        );
+      }
+
+      res.json(filteredSales);
+    } catch (error) {
+      res.status(500).json({
+        message: "Failed to fetch customer sales",
+      });
+    }
+  });
+
+  // Bulk create products
+  app.post("/api/products/bulk", async (req: TenantRequest, res) => {
+    try {
+      const { products: productList } = req.body;
+      const tenantDb = await getTenantDatabase(req);
+
+      if (!productList || !Array.isArray(productList)) {
+        return res.status(400).json({
+          error: "Invalid products data",
+        });
+      }
+
+      const results = [];
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const productData of productList) {
+        try {
+          console.log(`Processing product: ${JSON.stringify(productData)}`);
+
+          // Validate required fields with detailed messages
+          const missingFields = [];
+          if (!productData.name) missingFields.push("name");
+          if (!productData.sku) missingFields.push("sku");
+          if (!productData.price) missingFields.push("price");
+          if (
+            productData.categoryId === undefined ||
+            productData.categoryId === null
+          )
+            missingFields.push("categoryId");
+
+          if (missingFields.length > 0) {
+            throw new Error(
+              `Missing required fields: ${missingFields.join(", ")}`,
+            );
+          }
+
+          // Validate data types
+          if (isNaN(parseFloat(productData.price))) {
+            throw new Error(`Invalid price: ${productData.price}`);
+          }
+
+          if (isNaN(parseInt(productData.categoryId))) {
+            throw new Error(`Invalid categoryId: ${productData.categoryId}`);
+          }
+
+          const [product] = await db
+            .insert(products)
+            .values({
+              name: productData.name,
+              sku: productData.sku,
+              price: productData.price.toString(),
+              stock: parseInt(productData.stock) || 0,
+              categoryId: parseInt(productData.categoryId),
+              imageUrl: productData.imageUrl || null,
+              taxRate: productData.taxRate
+                ? productData.taxRate.toString()
+                : "0.00",
+            })
+            .returning();
+
+          console.log(`Successfully created product: ${product.name}`);
+          results.push({
+            success: true,
+            product,
+          });
+          successCount++;
+        } catch (error) {
+          const errorMessage = error.message || "Unknown error";
+          console.error(
+            `Error creating product ${productData.name || "Unknown"}:`,
+            errorMessage,
+          );
+          console.error("Product data:", JSON.stringify(productData, null, 2));
+
+          results.push({
+            success: false,
+            error: errorMessage,
+            data: productData,
+            productName: productData.name || "Unknown",
+          });
+          errorCount++;
+        }
+      }
+
+      res.json({
+        success: successCount,
+        errors: errorCount,
+        results,
+        message: `${successCount} sản phẩm đã được tạo thành công${errorCount > 0 ? `, ${errorCount} sản phẩm lỗi` : ""}`,
+      });
+    } catch (error) {
+      console.error("Bulk products creation error:", error);
+      res.status(500).json({
+        error: "Failed to create products",
+      });
+    }
+  });
+
+  // Employee routes
+  app.get(
+    "/api/employees",
+    tenantMiddleware,
+    async (req: TenantRequest, res) => {
+      try {
+        console.log("🔍 GET /api/employees - Starting request processing");
+        let tenantDb;
+        try {
+          tenantDb = await getTenantDatabase(req);
+          console.log("✅ Tenant database connection obtained for employees");
+        } catch (dbError) {
+          console.error(
+            "❌ Failed to get tenant database for employees:",
+            dbError,
+          );
+          tenantDb = null;
+        }
+
+        const employees = await storage.getEmployees(tenantDb);
+        console.log(`✅ Successfully fetched ${employees.length} employees`);
+        res.json(employees);
+      } catch (error) {
+        console.error("❌ Error fetching employees:", error);
+        res.status(500).json({
+          message: "Failed to fetch employees",
+        });
+      }
+    },
+  );
+
+  // Employee sales report data
+  app.get("/api/employee-sales", async (req: TenantRequest, res) => {
+    try {
+      const { startDate, endDate, employeeId } = req.query;
+      const tenantDb = await getTenantDatabase(req);
+
+      let query = db
+        .select({
+          employeeName: transactionsTable.cashierName,
+          total: transactionsTable.total,
+          createdAt: transactionsTable.createdAt,
+        })
+        .from(transactionsTable);
+
+      if (startDate && endDate) {
+        query = query.where(
+          and(
+            gte(transactionsTable.createdAt, startDate as string),
+            lte(transactionsTable.createdAt, endDate as string),
+          ),
+        );
+      }
+
+      if (employeeId && employeeId !== "all") {
+        query = query.where(
+          eq(transactionsTable.cashierName, employeeId as string),
+        );
+      }
+
+      const salesData = await query;
+      res.json(salesData);
+    } catch (error) {
+      console.error("Error fetching employee sales:", error);
+      res.status(500).json({
+        message: "Failed to fetch employee sales data",
+      });
+    }
+  });
+
+  // Server time endpoint for consistent timestamps
+  app.get("/api/server-time", async (req: TenantRequest, res) => {
+    try {
+      const serverTime = {
+        timestamp: new Date(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        localTime: new Date().toLocaleString("vi-VN", {
+          timeZone: "Asia/Ho_Chi_Minh",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+      };
+      res.json(serverTime);
+    } catch (error) {
+      res.status(500).json({
+        error: "Failed to get server time",
+      });
+    }
+  });
+
+  // Product Analysis API - using orders and order_items data
+  app.get(
+    "/api/product-analysis/:startDate/:endDate",
+    async (req: TenantRequest, res) => {
+      try {
+        const { startDate, endDate } = req.params;
+        const { categoryId, productType, productSearch } = req.query;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Product Analysis API called with params:", {
+          startDate,
+          endDate,
+          categoryId,
+          productType,
+          productSearch,
+        });
+
+        // Build date conditions
+        // Improve date parsing to handle both date-only and datetime formats
+        let start: Date;
+        let end: Date;
+
+        // Check if startDate includes time (has 'T' or contains time format)
+        if (startDate.includes("T") || startDate.includes(":")) {
+          // DateTime format - parse as is (ISO datetime or time included)
+          start = new Date(startDate);
+          console.log(
+            `📅 Parsed start datetime: ${startDate} -> ${start} (Local: ${start.toLocaleString()})`,
+          );
+        } else {
+          // Date-only format - set to start of day (00:00:00)
+          start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          console.log(
+            `📅 Parsed start date-only: ${startDate} -> ${start} (Local: ${start.toLocaleString()})`,
+          );
+        }
+
+        // Check if endDate includes time (has 'T' or contains time format)
+        if (endDate.includes("T") || endDate.includes(":")) {
+          // DateTime format - parse as is (ISO datetime or time included)
+          end = new Date(endDate);
+          console.log(
+            `📅 Parsed end datetime: ${endDate} -> ${end} (Local: ${end.toLocaleString()})`,
+          );
+        } else {
+          // Date-only format - set to end of day (23:59:59)
+          end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          console.log(
+            `📅 Parsed end date-only: ${endDate} -> ${end} (Local: ${end.toLocaleString()})`,
+          );
+        }
+        const dateConditions = [];
+        if (start && end) {
+          dateConditions.push(
+            gte(orders.orderedAt, start),
+            lte(orders.orderedAt, end),
+          );
+        }
+
+        // Build category conditions for products
+        const categoryConditions = [];
+        if (categoryId && categoryId !== "all") {
+          categoryConditions.push(
+            eq(products.categoryId, parseInt(categoryId as string)),
+          );
+        }
+
+        // Build product type conditions
+        const typeConditions = [];
+        if (productType && productType !== "all") {
+          const typeMap = {
+            combo: 3,
+            product: 1,
+            service: 2,
+          };
+          const typeValue = typeMap[productType as keyof typeof typeMap];
+          if (typeValue) {
+            typeConditions.push(eq(products.productType, typeValue));
+          }
+        }
+
+        // Build search conditions
+        const searchConditions = [];
+        if (productSearch && productSearch !== "" && productSearch !== "all") {
+          const searchTerm = `%${productSearch}%`;
+          searchConditions.push(
+            or(
+              ilike(products.name, searchTerm),
+              ilike(products.sku, searchTerm),
+            ),
+          );
+        }
+
+        // Query order items with product details from completed/paid orders
+        const productSalesData = await db
+          .select({
+            productId: orderItemsTable.productId,
+            productName: products.name,
+            productSku: products.sku,
+            categoryId: products.categoryId,
+            categoryName: categories.name,
+            unitPrice: orderItemsTable.unitPrice, // This is the pre-tax price
+            quantity: orderItemsTable.quantity,
+            total: orderItemsTable.total, // This should also be pre-tax total
+            orderId: orderItemsTable.orderId,
+            orderDate: orders.orderedAt,
+            discount: orderItemsTable.discount,
+            orderStatus: orders.status,
+            taxRate: products.taxRate,
+            priceIncludesTax: orders.priceIncludeTax,
+          })
+          .from(orderItemsTable)
+          .innerJoin(orders, eq(orderItemsTable.orderId, orders.id))
+          .innerJoin(products, eq(orderItemsTable.productId, products.id))
+          .leftJoin(categories, eq(products.categoryId, categories.id))
+          .where(
+            and(
+              or(eq(orders.status, "paid"), eq(orders.status, "completed")),
+              ...dateConditions,
+              ...categoryConditions,
+              ...typeConditions,
+              ...searchConditions,
+            ),
+          )
+          .orderBy(desc(orders.orderedAt));
+
+        console.log(`Found ${productSalesData.length} product sales records`);
+
+        // Group and aggregate data by product
+        const productMap = new Map();
+
+        productSalesData.forEach((item) => {
+          let productId = item.productId;
+          let quantity = Number(item.quantity || 0);
+          let revenue = 0;
+          let discount = Number(item.discount || 0);
+
+          if (item.priceIncludesTax) {
+            // If price includes tax, we need to calculate the pre-tax price
+            const unitPrice = Number(item.unitPrice || 0);
+            const taxRate = Number(item.taxRate || 0);
+            const preTaxPrice = unitPrice / (1 + taxRate / 100);
+            const preTaxTotal = preTaxPrice * quantity;
+            item.unitPrice = Math.round(preTaxPrice);
+            revenue = preTaxTotal;
+          }
+
+          if (productMap.has(productId)) {
+            const existing = productMap.get(productId);
+            existing.quantity += quantity;
+            existing.totalQuantity += quantity;
+            existing.totalRevenue += revenue;
+            existing.discount += discount;
+            existing.totalDiscount += discount;
+            existing.orderCount += 1;
+          } else {
+            productMap.set(productId, {
+              productId: item.productId,
+              productName: item.productName,
+              productSku: item.productSku,
+              categoryId: item.categoryId,
+              categoryName: item.categoryName,
+              productType: item.productType,
+              unitPrice: item.unitPrice, // This is the pre-tax price
+              quantity: item.quantity,
+              total: item.total,
+              discount: item.discount,
+              totalQuantity: quantity,
+              totalRevenue: revenue,
+              totalDiscount: discount,
+              averagePrice: Number(item.unitPrice || 0),
+              orderCount: 1,
+            });
+          }
+        });
+
+        // Convert to array and calculate final metrics
+        const productStats = Array.from(productMap.values()).map((product) => ({
+          ...product,
+          averageOrderValue:
+            product.orderCount > 0
+              ? product.totalRevenue / product.orderCount
+              : 0,
+        }));
+
+        // Calculate totals
+        const totalRevenue = productStats.reduce(
+          (sum, product) => sum + product.totalRevenue,
+          0,
+        );
+        const totalQuantity = productStats.reduce(
+          (sum, product) => sum + product.totalQuantity,
+          0,
+        );
+        const totalDiscount = productStats.reduce(
+          (sum, product) => sum + product.totalDiscount,
+          0,
+        );
+        const totalProducts = productStats.length;
+
+        // Sort by revenue (descending)
+        productStats.sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+        const result = {
+          productStats,
+          totalRevenue,
+          totalQuantity,
+          totalDiscount,
+          totalProducts,
+          summary: {
+            topSellingProduct: productStats[0] || null,
+            averageRevenuePerProduct:
+              totalProducts > 0 ? totalRevenue / totalProducts : 0,
+          },
+        };
+
+        console.log("Product Analysis Results:", {
+          totalRevenue,
+          totalQuantity,
+          totalDiscount,
+          totalProducts,
+          topProduct: result.summary.topSellingProduct?.productName,
+        });
+
+        res.json(result);
+      } catch (error) {
+        console.error("Product analysis error:", error);
+        res.status(500).json({
+          error: "Failed to fetch product analysis",
+          details: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    },
+  );
+
+  // // Enhanced API endpoints for sales chart report - using same data source as dashboard
+  app.get(
+    "/api/dashboard-data/:startDate/:endDate",
+    async (req: TenantRequest, res) => {
+      try {
+        const { startDate, endDate } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Dashboard data API called with params:", {
+          startDate,
+          endDate,
+        });
+
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+
+        // Get orders, tables, transactions, invoices - EXACT same as dashboard
+        const [orders, tables, transactions, invoices] = await Promise.all([
+          storage.getOrders(undefined, undefined, tenantDb),
+          storage.getTables(tenantDb),
+          storage.getTransactions(tenantDb),
+          storage.getInvoices(tenantDb),
+        ]);
+
+        // Filter completed orders within date range - EXACT same logic as dashboard
+        const filteredCompletedOrders = Array.isArray(orders)
+          ? orders.filter((order) => {
+              try {
+                if (!order) return false;
+
+                // Try multiple date fields - prioritize orderedAt, paidAt, createdAt
+                const orderDate = new Date(
+                  order.orderedAt ||
+                    order.paidAt ||
+                    order.createdAt ||
+                    order.created_at,
+                );
+
+                if (isNaN(orderDate.getTime())) {
+                  return false;
+                }
+
+                const dateMatch = orderDate >= start && orderDate <= end;
+
+                // Include more order statuses to show real data
+                const isCompleted =
+                  order.status === "paid" ||
+                  order.status === "completed" ||
+                  order.status === "served" ||
+                  order.status === "confirmed";
+
+                return dateMatch && isCompleted;
+              } catch (error) {
+                console.error("Error filtering order:", order, error);
+                return false;
+              }
+            })
+          : [];
+
+        // Calculate dashboard stats - EXACT same logic
+        const periodRevenue = filteredCompletedOrders.reduce((total, order) => {
+          const orderTotal = Number(order.total || 0);
+          return total + orderTotal;
+        }, 0);
+
+        const periodOrderCount = filteredCompletedOrders.length;
+
+        // Customer count: count unique customers from completed orders
+        const uniqueCustomers = new Set();
+        filteredCompletedOrders.forEach((order) => {
+          if (order.customerId) {
+            uniqueCustomers.add(order.customerId);
+          } else {
+            uniqueCustomers.add(`order_${order.id}`);
+          }
+        });
+        const periodCustomerCount = uniqueCustomers.size;
+
+        // Daily average for the period
+        const daysDiff = Math.max(
+          1,
+          Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) +
+            1,
+        );
+        const dailyAverageRevenue = periodRevenue / daysDiff;
+
+        // Active orders (pending/in-progress orders)
+        const activeOrders = orders.filter(
+          (order) =>
+            order.status === "pending" || order.status === "in_progress",
+        ).length;
+
+        const occupiedTables = tables.filter(
+          (table) => table.status === "occupied",
+        );
+
+        const monthRevenue = periodRevenue;
+        const averageOrderValue =
+          periodOrderCount > 0 ? periodRevenue / periodOrderCount : 0;
+
+        // Peak hours analysis
+        const hourlyOrders: {
+          [key: number]: number;
+        } = {};
+        filteredCompletedOrders.forEach((order) => {
+          const orderDate = new Date(
+            order.orderedAt ||
+              order.createdAt ||
+              order.created_at ||
+              order.paidAt,
+          );
+          if (!isNaN(orderDate.getTime())) {
+            const hour = orderDate.getHours();
+            hourlyOrders[hour] = (hourlyOrders[hour] || 0) + 1;
+          }
+        });
+
+        const peakHour = Object.keys(hourlyOrders).reduce(
+          (peak, hour) =>
+            hourlyOrders[parseInt(hour)] > hourlyOrders[parseInt(peak)]
+              ? hour
+              : peak,
+          "12",
+        );
+
+        const dashboardData = {
+          periodRevenue,
+          periodOrderCount,
+          periodCustomerCount,
+          dailyAverageRevenue,
+          activeOrders,
+          occupiedTables: occupiedTables.length,
+          monthRevenue,
+          averageOrderValue,
+          peakHour: parseInt(peakHour),
+          totalTables: tables.length,
+          filteredCompletedOrders,
+          orders: orders || [],
+          tables: tables || [],
+          transactions: transactions || [],
+          invoices: invoices || [],
+        };
+
+        console.log("Dashboard data calculated:", {
+          periodRevenue,
+          periodOrderCount,
+          periodCustomerCount,
+          filteredOrdersCount: filteredCompletedOrders.length,
+        });
+
+        res.json(dashboardData);
+      } catch (error) {
+        console.error("Error in dashboard data API:", error);
+        res.status(500).json({
+          error: "Failed to fetch dashboard data",
+        });
+      }
+    },
+  );
+
+  // Transactions API with enhanced filtering
+  app.get(
+    "/api/transactions/:startDate/:endDate/:salesMethod/:salesChannel/:analysisType/:concernType/:selectedEmployee",
+    async (req: TenantRequest, res) => {
+      try {
+        const {
+          startDate,
+          endDate,
+          salesMethod,
+          salesChannel,
+          analysisType,
+          concernType,
+          selectedEmployee,
+        } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Transactions API called with params:", {
+          startDate,
+          endDate,
+          salesMethod,
+          salesChannel,
+          analysisType,
+          concernType,
+          selectedEmployee,
+        });
+
+        // Get transactions data
+        const transactions = await storage.getTransactions(tenantDb);
+
+        // Filter transactions based on parameters
+        const filteredTransactions = transactions.filter((transaction) => {
+          const transactionDate = new Date(transaction.createdAt);
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+
+          const dateMatch = transactionDate >= start && transactionDate <= end;
+
+          // Enhanced sales method filtering
+          let salesMethodMatch = true;
+          if (salesMethod !== "all") {
+            const paymentMethod = transaction.paymentMethod || "cash";
+            switch (salesMethod) {
+              case "no_delivery":
+                salesMethodMatch =
+                  !transaction.deliveryMethod ||
+                  transaction.deliveryMethod === "pickup" ||
+                  transaction.deliveryMethod === "takeaway";
+                break;
+              case "delivery":
+                salesMethodMatch = transaction.deliveryMethod === "delivery";
+                break;
+              default:
+                salesMethodMatch =
+                  paymentMethod.toLowerCase() === salesMethod.toLowerCase();
+            }
+          }
+
+          // Enhanced sales channel filtering
+          let salesChannelMatch = true;
+          if (salesChannel !== "all") {
+            const channel = transaction.salesChannel || "direct";
+            switch (salesChannel) {
+              case "direct":
+                salesChannelMatch =
+                  !transaction.salesChannel ||
+                  transaction.salesChannel === "direct" ||
+                  transaction.salesChannel === "pos";
+                break;
+              case "other":
+                salesChannelMatch =
+                  transaction.salesChannel &&
+                  transaction.salesChannel !== "direct" &&
+                  transaction.salesChannel !== "pos";
+                break;
+              default:
+                salesChannelMatch =
+                  channel.toLowerCase() === salesChannel.toLowerCase();
+            }
+          }
+
+          // Enhanced employee filtering
+          let employeeMatch = true;
+          if (selectedEmployee !== "all") {
+            employeeMatch =
+              transaction.cashierName === selectedEmployee ||
+              (transaction.cashierName &&
+                transaction.cashierName
+                  .toLowerCase()
+                  .includes(selectedEmployee.toLowerCase()));
+          }
+
+          return (
+            dateMatch && salesMethodMatch && salesChannelMatch && employeeMatch
+          );
+        });
+
+        console.log(
+          `Found ${filteredTransactions.length} filtered transactions out of ${transactions.length} total`,
+        );
+        res.json(filteredTransactions);
+      } catch (error) {
+        console.error("Error in transactions API:", error);
+        res.status(500).json({
+          error: "Failed to fetch transactions data",
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/api/orders/:startDate/:endDate/:selectedEmployee/:salesChannel/:salesMethod/:analysisType/:concernType",
+    async (req: TenantRequest, res) => {
+      try {
+        const {
+          startDate,
+          endDate,
+          selectedEmployee,
+          salesChannel,
+          salesMethod,
+          analysisType,
+          concernType,
+        } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Orders API called with params:", {
+          startDate,
+          endDate,
+          selectedEmployee,
+          salesChannel,
+          salesMethod,
+          analysisType,
+          concernType,
+        });
+
+        // Get orders data
+        const orders = await storage.getOrders(undefined, undefined, tenantDb);
+
+        // Filter orders based on parameters with enhanced logic
+        const filteredOrders = orders.filter((order) => {
+          const orderDate = new Date(order.orderedAt || order.createdAt);
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+
+          const dateMatch = orderDate >= start && orderDate <= end;
+
+          // Enhanced employee filtering
+          let employeeMatch = true;
+          if (selectedEmployee !== "all") {
+            employeeMatch =
+              order.employeeId?.toString() === selectedEmployee ||
+              (order.employeeName &&
+                order.employeeName
+                  .toLowerCase()
+                  .includes(selectedEmployee.toLowerCase()));
+          }
+
+          // Enhanced sales channel filtering
+          let salesChannelMatch = true;
+          if (salesChannel !== "all") {
+            const channel = order.salesChannel || "direct";
+            switch (salesChannel) {
+              case "direct":
+                salesChannelMatch =
+                  !order.salesChannel ||
+                  order.salesChannel === "direct" ||
+                  order.salesChannel === "pos";
+                break;
+              case "other":
+                salesChannelMatch =
+                  order.salesChannel &&
+                  order.salesChannel !== "direct" &&
+                  order.salesChannel !== "pos";
+                break;
+              default:
+                salesChannelMatch =
+                  channel.toLowerCase() === salesChannel.toLowerCase();
+            }
+          }
+
+          // Enhanced sales method filtering
+          let salesMethodMatch = true;
+          if (salesMethod !== "all") {
+            switch (salesMethod) {
+              case "no_delivery":
+                salesMethodMatch =
+                  !order.deliveryMethod ||
+                  order.deliveryMethod === "pickup" ||
+                  order.deliveryMethod === "takeaway";
+                break;
+              case "delivery":
+                salesMethodMatch = order.deliveryMethod === "delivery";
+                break;
+              default:
+                const paymentMethod = order.paymentMethod || "cash";
+                salesMethodMatch =
+                  paymentMethod.toLowerCase() === salesMethod.toLowerCase();
+            }
+          }
+
+          // Only include paid orders for analysis
+          const statusMatch = order.status === "paid";
+
+          return (
+            dateMatch &&
+            employeeMatch &&
+            salesChannelMatch &&
+            salesMethodMatch &&
+            statusMatch
+          );
+        });
+
+        console.log(
+          `Found ${filteredOrders.length} filtered orders out of ${orders.length} total`,
+        );
+        res.json(filteredOrders);
+      } catch (error) {
+        console.error("Error in orders API:", error);
+        res.status(500).json({
+          error: "Failed to fetch orders data",
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/api/products/:selectedCategory/:productType/:productSearch?",
+    async (req: TenantRequest, res) => {
+      try {
+        const { selectedCategory, productType, productSearch } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log("Products API called with params:", {
+          selectedCategory,
+          productType,
+          productSearch,
+        });
+
+        let products;
+
+        // Get products by category or all products
+        if (
+          selectedCategory &&
+          selectedCategory !== "all" &&
+          selectedCategory !== "undefined"
+        ) {
+          const categoryId = parseInt(selectedCategory);
+          if (!isNaN(categoryId)) {
+            products = await storage.getProductsByCategory(
+              categoryId,
+              true,
+              tenantDb,
+            );
+          } else {
+            products = await storage.getAllProducts(true, tenantDb);
+          }
+        } else {
+          products = await storage.getAllProducts(true, tenantDb);
+        }
+
+        // Filter by product type if specified
+        if (
+          productType &&
+          productType !== "all" &&
+          productType !== "undefined"
+        ) {
+          const typeMap = {
+            combo: 3,
+            "combo-dongoi": 3,
+            product: 1,
+            "hang-hoa": 1,
+            service: 2,
+            "dich-vu": 2,
+          };
+          const typeValue =
+            typeMap[productType.toLowerCase() as keyof typeof typeMap];
+          if (typeValue) {
+            products = products.filter(
+              (product) => product.productType === typeValue,
+            );
+          }
+        }
+
+        // Filter by product search if provided
+        if (
+          productSearch &&
+          productSearch !== "" &&
+          productSearch !== "undefined" &&
+          productSearch !== "all"
+        ) {
+          const searchTerm = productSearch.toLowerCase();
+          products = products.filter(
+            (product) =>
+              product.name?.toLowerCase().includes(searchTerm) ||
+              product.sku?.toLowerCase().includes(searchTerm) ||
+              product.description?.toLowerCase().includes(searchTerm),
+          );
+        }
+
+        console.log(`Found ${products.length} products after filtering`);
+        res.json(products);
+      } catch (error) {
+        console.error("Error in products API:", error);
+        res.status(500).json({
+          error: "Failed to fetch products data",
+        });
+      }
+    },
+  );
+
+  app.get(
+    "/api/customers/:customerSearch?/:customerStatus?",
+    async (req: TenantRequest, res) => {
+      try {
+        const { customerSearch, customerStatus } = req.params;
+        const tenantDb = await getTenantDatabase(req);
+
+        console.log(
+          "Customers API called with search:",
+          customerSearch,
+          "status:",
+          customerStatus,
+        );
+
+        let customers = await storage.getCustomers(tenantDb);
+
+        // Filter by search if provided
+        if (
+          customerSearch &&
+          customerSearch !== "" &&
+          customerSearch !== "undefined" &&
+          customerSearch !== "all"
+        ) {
+          const searchTerm = customerSearch.toLowerCase();
+          customers = customers.filter(
+            (customer) =>
+              customer.name?.toLowerCase().includes(searchTerm) ||
+              customer.phone?.includes(customerSearch) ||
+              customer.email?.toLowerCase().includes(searchTerm) ||
+              customer.customerId?.toLowerCase().includes(searchTerm) ||
+              customer.address?.toLowerCase().includes(searchTerm),
+          );
+        }
+
+        // Filter by status if provided
+        if (
+          customerStatus &&
+          customerStatus !== "all" &&
+          customerStatus !== "undefined"
+        ) {
+          const now = new Date();
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+          customers = customers.filter((customer) => {
+            const totalSpent = Number(customer.totalSpent || 0);
+            const lastVisit = customer.lastVisit
+              ? new Date(customer.lastVisit)
+              : null;
+
+            switch (customerStatus) {
+              case "active":
+                return lastVisit && lastVisit >= thirtyDaysAgo;
+              case "inactive":
+                return !lastVisit || lastVisit < thirtyDaysAgo;
+              case "vip":
+                return totalSpent >= 500000; // VIP customers with total spent >= 500k VND
+              case "new":
+                const joinDate = customer.createdAt
+                  ? new Date(customer.createdAt)
+                  : null;
+                return joinDate && joinDate >= thirtyDaysAgo;
+              default:
+                return true;
+            }
+          });
+        }
+
+        console.log(`Found ${customers.length} customers after filtering`);
+        res.json(customers);
+      } catch (error) {
+        console.error("Error in customers API:", error);
+        res.status(500).json({
+          error: "Failed to fetch customers data",
+        });
+      }
+    },
+  );
+
+  // Tax code lookup proxy endpoint
+  app.post("/api/tax-code-lookup", async (req: TenantRequest, res) => {
+    try {
+      const { taxCode } = req.body;
+      const tenantDb = await getTenantDatabase(req);
+
+      if (!taxCode) {
+        return res.status(400).json({
+          success: false,
+          message: "Mã số thuế không được để trống",
+        });
+      }
+
+      // Call the external tax code API
+      const response = await fetch(
+        "https://infoerpvn.com:9440/api/CheckListTaxCode/v2",
+        {
+          method: "POST",
+          headers: {
+            token: "EnURbbnPhUm4GjNgE4Ogrw==",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify([taxCode]),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `External API error: ${response.status} ${response.statusText}`,
+        );
+      }
+
+      const result = await response.json();
+
+      res.json({
+        success: true,
+        data: result,
+        message: "Tra cứu thành công",
+      });
+    } catch (error) {
+      console.error("Tax code lookup error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Có lỗi xảy ra khi tra cứu mã số thuế",
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // E-invoice publish proxy endpoint
+  app.post("/api/einvoice/publish", async (req: TenantRequest, res) => {
+    try {
+      const publishRequest = req.body;
+      const tenantDb = await getTenantDatabase(req);
+      console.log(
+        "Publishing invoice with data:",
+        JSON.stringify(publishRequest, null, 2),
+      );
+
+      // Call the real e-invoice API
+      const response = await fetch(
+        "https://infoerpvn.com:9440/api/invoice/publish",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            token: "EnURbbnPhUm4GjNgE4Ogrw==",
+          },
+          body: JSON.stringify(publishRequest),
+        },
+      );
+
+      if (!response.ok) {
+        console.error(
+          "E-invoice API error:",
+          response.status,
+          response.statusText,
+        );
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+
+        return res.status(response.status).json({
+          error: "Failed to publish invoice",
+          details: `API returned ${response.status}: ${response.statusText}`,
+          apiResponse: errorText,
+        });
+      }
+
+      const result = await response.json();
+      console.log("E-invoice API response:", result);
+
+      // Check if the API returned success
+      if (result.status === true) {
+        console.log("Invoice published successfully:", result);
+
+        // Return standardized response format
+        res.json({
+          success: true,
+          message:
+            result.message || "Hóa đơn điện tử đã được phát hành thành công",
+          data: {
+            invoiceNo: result.data?.invoiceNo,
+            invDate: result.data?.invDate,
+            transactionID: result.data?.transactionID,
+            macqt: result.data?.macqt,
+            originalRequest: {
+              transactionID: publishRequest.transactionID,
+              invRef: publishRequest.invRef,
+              totalAmount: publishRequest.invTotalAmount,
+              customer: publishRequest.Customer,
+            },
+          },
+        });
+      } else {
+        // API returned failure
+        console.error("E-invoice API returned failure:", result);
+        res.status(400).json({
+          error: "E-invoice publication failed",
+          message: result.message || "Unknown error from e-invoice service",
+          details: result,
+        });
+      }
+    } catch (error) {
+      console.error("E-invoice publish proxy error details:");
+      console.error("- Error type:", error?.constructor.name);
+      console.error("- Error message:", error?.message);
+      console.error("- Full error:", error);
+
+      res.status(500).json({
+        error: "Failed to publish invoice",
+        details: error?.message,
+        errorType: error?.constructor.name,
+      });
+    }
+  });
+
+  // Income Voucher Routes
+  app.get("/api/income-vouchers", async (req: TenantRequest, res: Response) => {
+    try {
+      const vouchers = await storage.getIncomeVouchers();
+      res.json(vouchers);
+    } catch (error) {
+      console.error("Error fetching income vouchers:", error);
+      res.status(500).json({ error: "Failed to fetch income vouchers" });
+    }
+  });
+
+  app.post(
+    "/api/income-vouchers",
+    async (req: TenantRequest, res: Response) => {
+      try {
+        const voucherData = req.body;
+        const voucher = await storage.createIncomeVoucher(voucherData);
+        res.json(voucher);
+      } catch (error) {
+        console.error("Error creating income voucher:", error);
+        res.status(500).json({ error: "Failed to create income voucher" });
+      }
+    },
+  );
+
+  app.put(
+    "/api/income-vouchers/:id",
+    async (req: TenantRequest, res: Response) => {
+      try {
+        const { id } = req.params;
+        const voucherData = req.body;
+        const voucher = await storage.updateIncomeVoucher(id, voucherData);
+        res.json(voucher);
+      } catch (error) {
+        console.error("Error updating income voucher:", error);
+        res.status(500).json({ error: "Failed to update income voucher" });
+      }
+    },
+  );
+
+  app.delete(
+    "/api/income-vouchers/:id",
+    async (req: TenantRequest, res: Response) => {
+      try {
+        const { id } = req.params;
+        await storage.deleteIncomeVoucher(id);
+        res.json({ success: true });
+      } catch (error) {
+        console.error("Error deleting income voucher:", error);
+        res.status(500).json({ error: "Failed to delete income voucher" });
+      }
+    },
+  );
 
   const httpServer = createServer(app);
   return httpServer;

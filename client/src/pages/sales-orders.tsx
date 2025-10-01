@@ -133,6 +133,7 @@ export default function SalesOrders() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showInvoiceDetails, setShowInvoiceDetails] = useState(false);
   const [showEInvoiceModal, setShowEInvoiceModal] = useState(false);
+  const [storeSettings, setStoreSettings] = useState<any>(null); // To store store settings for priceIncludesTax
 
   // Listen for print completion event
   useEffect(() => {
@@ -239,6 +240,23 @@ export default function SalesOrders() {
   const [printReceiptData, setPrintReceiptData] = useState<any>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
+
+  // Fetch store settings
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await apiRequest("GET", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        setStoreSettings(data);
+      } catch (error) {
+        console.error("Error fetching store settings:", error);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   // Query orders by date range - load all orders regardless of salesChannel
   const {
@@ -618,7 +636,7 @@ export default function SalesOrders() {
     if (method === null || method === undefined) {
       return "Chưa thanh toán";
     }
-    
+
     switch (method) {
       case 1:
       case "cash":
@@ -634,10 +652,12 @@ export default function SalesOrders() {
       case "vnpay":
       case "grabpay":
         return "QR Code InfoCAMS";
-      case "Đối trừ công nợ": // Assuming this might come from order data
+      case "Đối trừ công nợ":
         return "Đối trừ công nợ";
+      case "unpaid":
+        return "Chưa thanh toán";
       default:
-        return "Tiền mặt"; // Default to cash if unknown
+        return "Chưa thanh toán"; // Changed default from "Tiền mặt" to "Chưa thanh toán"
     }
   };
 
@@ -1759,11 +1779,12 @@ export default function SalesOrders() {
                                                             )}
                                                           </td>
                                                           <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                            Phương thức thanh toán:
+                                                            Phương thức thanh
+                                                            toán:
                                                           </td>
                                                           <td className="py-1 pr-6">
                                                             {getPaymentMethodName(
-                                                              selectedInvoice.paymentMethod
+                                                              selectedInvoice.paymentMethod,
                                                             )}
                                                           </td>
                                                           <td className="py-1 pr-4 font-medium whitespace-nowrap">
@@ -1781,7 +1802,8 @@ export default function SalesOrders() {
                                                                 statusLabels[
                                                                   selectedInvoice
                                                                     .displayStatus
-                                                                ] || "Đang phục vụ"
+                                                                ] ||
+                                                                "Đang phục vụ"
                                                               );
                                                             })()}
                                                           </td>
@@ -1946,7 +1968,7 @@ export default function SalesOrders() {
                                                       </div>
                                                       <div className="col-span-1">
                                                         {t(
-                                                          "common.subtotalAmount",
+                                                          "common.totalAmountSubtotal",
                                                         )}
                                                       </div>
                                                       <div className="col-span-1">
@@ -1987,66 +2009,320 @@ export default function SalesOrders() {
                                                               {index + 1}
                                                             </div>
                                                             <div className="col-span-2 text-left py-1">
-                                                              SP{String(item.productId).padStart(3, "0")}
+                                                              SP
+                                                              {String(
+                                                                item.productId,
+                                                              ).padStart(
+                                                                3,
+                                                                "0",
+                                                              )}
                                                             </div>
-                                                            <div className="col-span-2 text-left py-1 truncate" title={item.productName}>
+                                                            <div
+                                                              className="col-span-2 text-left py-1 truncate"
+                                                              title={
+                                                                item.productName
+                                                              }
+                                                            >
                                                               {item.productName}
                                                             </div>
-                                                            <div className="col-span-1 text-center py-1">
+                                                            <div className="col-span-1 py-1">
                                                               Cái
                                                             </div>
-                                                            <div className="col-span-1 text-center py-1">
+                                                            <div className="col-span-1 py-1">
                                                               {item.quantity}
                                                             </div>
-                                                            <div className="col-span-1 text-right py-1">
-                                                              {formatCurrency(item.unitPrice)}
+                                                            <div className="col-span-1 py-1">
+                                                              {formatCurrency(
+                                                                item.unitPrice,
+                                                              )}
                                                             </div>
-                                                            <div className="col-span-1 text-right py-1">
+                                                            <div className="col-span-1 py-1">
                                                               {(() => {
-                                                                const unitPrice = parseFloat(item.unitPrice || "0");
-                                                                const quantity = parseInt(item.quantity || "0");
-                                                                const total = unitPrice * quantity;
-                                                                return formatCurrency(total.toString());
+                                                                const unitPrice =
+                                                                  parseFloat(
+                                                                    item.unitPrice ||
+                                                                      "0",
+                                                                  );
+                                                                const quantity =
+                                                                  parseInt(
+                                                                    item.quantity ||
+                                                                      "0",
+                                                                  );
+                                                                const product =
+                                                                  products?.find(
+                                                                    (p: any) =>
+                                                                      p.id ===
+                                                                      item.productId,
+                                                                  );
+                                                                const priceIncludeTax =
+                                                                  selectedInvoice.priceIncludeTax ||
+                                                                  false;
+
+                                                                // Calculate subtotal, tax, and discount for this item
+                                                                const itemSubtotal =
+                                                                  unitPrice *
+                                                                  quantity;
+
+                                                                // Calculate tax for this item
+                                                                let itemTax = 0;
+                                                                if (
+                                                                  product?.taxRate &&
+                                                                  parseFloat(
+                                                                    product.taxRate,
+                                                                  ) > 0
+                                                                ) {
+                                                                  const taxRate =
+                                                                    parseFloat(
+                                                                      product.taxRate,
+                                                                    ) / 100;
+                                                                  if (
+                                                                    priceIncludeTax
+                                                                  ) {
+                                                                    // When price includes tax: tax = subtotal - (subtotal / (1 + taxRate))
+                                                                    itemTax =
+                                                                      itemSubtotal -
+                                                                      itemSubtotal /
+                                                                        (1 +
+                                                                          taxRate);
+                                                                  } else {
+                                                                    // When price doesn't include tax: tax = subtotal * taxRate
+                                                                    itemTax =
+                                                                      itemSubtotal *
+                                                                      taxRate;
+                                                                  }
+                                                                }
+
+                                                                // Calculate discount for this item (proportional to its subtotal)
+                                                                const orderDiscount =
+                                                                  parseFloat(
+                                                                    selectedInvoice.discount ||
+                                                                      "0",
+                                                                  );
+                                                                let itemDiscount = 0;
+                                                                if (
+                                                                  orderDiscount >
+                                                                  0
+                                                                ) {
+                                                                  // Get total subtotal of all items to calculate proportional discount
+                                                                  const totalOrderSubtotal =
+                                                                    orderItems.reduce(
+                                                                      (
+                                                                        sum,
+                                                                        orderItem,
+                                                                      ) => {
+                                                                        const orderItemPrice =
+                                                                          parseFloat(
+                                                                            orderItem.unitPrice ||
+                                                                              "0",
+                                                                          );
+                                                                        const orderItemQty =
+                                                                          parseInt(
+                                                                            orderItem.quantity ||
+                                                                              "0",
+                                                                          );
+                                                                        return (
+                                                                          sum +
+                                                                          orderItemPrice *
+                                                                            orderItemQty
+                                                                        );
+                                                                      },
+                                                                      0,
+                                                                    );
+
+                                                                  if (
+                                                                    totalOrderSubtotal >
+                                                                    0
+                                                                  ) {
+                                                                    itemDiscount =
+                                                                      (orderDiscount *
+                                                                        itemSubtotal) /
+                                                                      totalOrderSubtotal;
+                                                                  }
+                                                                }
+
+                                                                // Apply formula: tổng tiền = priceIncludeTax ? subtotal - discount : subtotal - discount + tax
+                                                                let itemTotal;
+                                                                if (
+                                                                  priceIncludeTax
+                                                                ) {
+                                                                  itemTotal =
+                                                                    itemSubtotal -
+                                                                    itemDiscount;
+                                                                } else {
+                                                                  itemTotal =
+                                                                    itemSubtotal -
+                                                                    itemDiscount +
+                                                                    itemTax;
+                                                                }
+
+                                                                return formatCurrency(
+                                                                  itemTotal.toString(),
+                                                                );
                                                               })()}
                                                             </div>
-                                                            <div className="col-span-1 text-right text-red-600 py-1">
-                                                              -{formatCurrency(item.discount || "0")}
+                                                            <div className="col-span-1 text-red-600 py-1">
+                                                              -
+                                                              {formatCurrency(
+                                                                item.discount ||
+                                                                  "0",
+                                                              )}
                                                             </div>
                                                             {(() => {
-                                                              // Calculate tax using the same logic as other components
-                                                              let unitPrice = parseFloat(item.unitPrice || "0");
-                                                              let quantity = parseInt(item.quantity || "0");
-                                                              let discount = parseFloat(item.discount || "0");
+                                                              const unitPrice =
+                                                                parseFloat(
+                                                                  item.unitPrice ||
+                                                                    "0",
+                                                                );
+                                                              const quantity =
+                                                                parseInt(
+                                                                  item.quantity ||
+                                                                    "0",
+                                                                );
+                                                              const discount =
+                                                                parseFloat(
+                                                                  item.discount ||
+                                                                    "0",
+                                                                );
+                                                              const priceIncludesTax =
+                                                                storeSettings?.priceIncludesTax ||
+                                                                false;
 
-                                                              // Find the product to get afterTaxPrice and taxRate
-                                                              const product = products.find((p: any) => p.id === item.productId);
+                                                              // Find the product to get taxRate
+                                                              const product =
+                                                                Array.isArray(
+                                                                  products,
+                                                                )
+                                                                  ? products.find(
+                                                                      (
+                                                                        p: any,
+                                                                      ) =>
+                                                                        p.id ===
+                                                                        item.productId,
+                                                                    )
+                                                                  : null;
+
                                                               let taxAmount = 0;
+                                                              let itemDiscountAmount = 0;
+                                                              let totalSum = 0;
+
+                                                              // Calculate discount for this item first
+                                                              if (
+                                                                discount > 0
+                                                              ) {
+                                                                const totalBeforeDiscount =
+                                                                  orderItems.reduce(
+                                                                    (
+                                                                      sum,
+                                                                      orderItem,
+                                                                    ) => {
+                                                                      return (
+                                                                        sum +
+                                                                        parseFloat(
+                                                                          orderItem.unitPrice ||
+                                                                            "0",
+                                                                        ) *
+                                                                          parseInt(
+                                                                            orderItem.quantity ||
+                                                                              "0",
+                                                                          )
+                                                                      );
+                                                                    },
+                                                                    0,
+                                                                  );
+
+                                                                if (
+                                                                  totalBeforeDiscount >
+                                                                  0
+                                                                ) {
+                                                                  const itemTotal =
+                                                                    unitPrice *
+                                                                    quantity;
+                                                                  itemDiscountAmount =
+                                                                    Math.floor(
+                                                                      (discount *
+                                                                        itemTotal) /
+                                                                        totalBeforeDiscount,
+                                                                    );
+                                                                }
+                                                              }
 
                                                               if (
-                                                                product?.afterTaxPrice &&
-                                                                product.afterTaxPrice !== null &&
-                                                                product.afterTaxPrice !== ""
-                                                              ) {
-                                                                // Use afterTaxPrice method: tax = (afterTaxPrice - unitPrice) * quantity
-                                                                const afterTaxPrice = parseFloat(product.afterTaxPrice);
-                                                                const taxPerUnit = Math.max(0, afterTaxPrice - unitPrice);
-                                                                taxAmount = taxPerUnit * quantity;
-                                                              } else if (
                                                                 product?.taxRate &&
-                                                                parseFloat(product.taxRate) > 0
+                                                                parseFloat(
+                                                                  product.taxRate,
+                                                                ) > 0
                                                               ) {
-                                                                // Use taxRate method: tax = (unitPrice * taxRate/100) * quantity
-                                                                const taxRate = parseFloat(product.taxRate);
-                                                                taxAmount = ((unitPrice * taxRate) / 100) * quantity;
+                                                                const taxRate =
+                                                                  parseFloat(
+                                                                    product.taxRate,
+                                                                  ) / 100;
+
+                                                                if (
+                                                                  priceIncludesTax
+                                                                ) {
+                                                                  // When price includes tax:
+                                                                  const discountPerUnit =
+                                                                    itemDiscountAmount /
+                                                                    quantity;
+                                                                  const adjustedPrice =
+                                                                    Math.max(
+                                                                      0,
+                                                                      unitPrice -
+                                                                        discountPerUnit,
+                                                                    );
+                                                                  const giaGomThue =
+                                                                    adjustedPrice *
+                                                                    quantity;
+                                                                  const tamTinh =
+                                                                    Math.round(
+                                                                      giaGomThue /
+                                                                        (1 +
+                                                                          taxRate),
+                                                                    );
+                                                                  taxAmount =
+                                                                    giaGomThue -
+                                                                    tamTinh;
+                                                                  totalSum =
+                                                                    giaGomThue;
+                                                                } else {
+                                                                  // When price doesn't include tax:
+                                                                  const discountPerUnit =
+                                                                    itemDiscountAmount /
+                                                                    quantity;
+                                                                  const adjustedPrice =
+                                                                    Math.max(
+                                                                      0,
+                                                                      unitPrice -
+                                                                        discountPerUnit,
+                                                                    );
+                                                                  const tamTinh =
+                                                                    adjustedPrice *
+                                                                    quantity;
+                                                                  taxAmount =
+                                                                    Math.round(
+                                                                      tamTinh *
+                                                                        taxRate,
+                                                                    );
+                                                                  totalSum =
+                                                                    tamTinh -
+                                                                    discountPerUnit +
+                                                                    taxAmount;
+                                                                }
                                                               }
 
                                                               return (
                                                                 <>
-                                                                  <div className="col-span-1 text-right py-1">
-                                                                    {formatCurrency(Math.floor(taxAmount))}
+                                                                  <div className="col-span-1 py-1">
+                                                                    {formatCurrency(
+                                                                      taxAmount,
+                                                                    )}
                                                                   </div>
-                                                                  <div className="col-span-1 text-right font-medium py-1">
-                                                                    {formatCurrency(Math.floor(unitPrice * quantity - discount + taxAmount))}
+                                                                  <div className="col-span-1 py-1">
+                                                                    {formatCurrency(
+                                                                      Math.round(
+                                                                        totalSum,
+                                                                      ),
+                                                                    )}
                                                                   </div>
                                                                 </>
                                                               );
@@ -2058,210 +2334,242 @@ export default function SalesOrders() {
                                                   </div>
                                                 </div>
 
-                                                <div className="bg-blue-50 p-4 rounded-lg">
-                                                  <div className="grid grid-cols-2 gap-4 text-sm">
-                                                    <div className="space-y-2">
-                                                      {(() => {
-                                                        // Calculate correct amounts based on priceIncludeTax
-                                                        const priceIncludeTax = selectedInvoice.priceIncludeTax;
-                                                        const storedSubtotal = parseFloat(selectedInvoice.subtotal || "0");
-                                                        const storedTax = parseFloat(selectedInvoice.tax || "0");
-                                                        const storedDiscount = parseFloat(selectedInvoice.discount || "0");
+                                                <div>
+                                                  <h4 className="font-medium mb-3">
+                                                    {t("common.summary")}
+                                                  </h4>
+                                                  <div className="bg-blue-50 p-4 rounded-lg">
+                                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                                      <div className="space-y-2">
+                                                        {(() => {
+                                                          const priceIncludeTax =
+                                                            selectedInvoice.priceIncludeTax;
+                                                          const storedSubtotal =
+                                                            parseFloat(
+                                                              selectedInvoice.subtotal ||
+                                                                "0",
+                                                            );
+                                                          const storedTax =
+                                                            parseFloat(
+                                                              selectedInvoice.tax ||
+                                                                "0",
+                                                            );
+                                                          const storedDiscount =
+                                                            parseFloat(
+                                                              selectedInvoice.discount ||
+                                                                "0",
+                                                            );
 
-                                                        let thanhTien, tax, subtotal;
+                                                          let thanhTien,
+                                                            tax,
+                                                            subtotal;
 
-                                                        if (priceIncludeTax) {
-                                                          // priceIncludeTax = true: thành tiền = subtotal (price / (1 + taxRate))
-                                                          thanhTien = storedSubtotal;
-                                                          tax = storedTax;
-                                                          subtotal = storedSubtotal;
-                                                        } else {
-                                                          // priceIncludeTax = false: thành tiền = subtotal (price * quantity)
-                                                          thanhTien = storedSubtotal;
-                                                          tax = storedTax;
-                                                          subtotal = storedSubtotal;
-                                                        }
+                                                          if (priceIncludeTax) {
+                                                            thanhTien =
+                                                              storedSubtotal;
+                                                            tax = storedTax;
+                                                            subtotal =
+                                                              storedSubtotal;
+                                                          } else {
+                                                            thanhTien =
+                                                              storedSubtotal;
+                                                            tax = storedTax;
+                                                            subtotal =
+                                                              storedSubtotal;
+                                                          }
 
-                                                        const totalPayment = parseFloat(selectedInvoice.total || "0");
-                                                        return (
-                                                          <>
-                                                            <div className="flex justify-between">
-                                                              <span>
-                                                                {t(
-                                                                  "common.totalPayment",
-                                                                )}
-                                                                :
-                                                              </span>
-                                                              <span className="font-bold">
-                                                                {formatCurrency(
-                                                                  totalPayment,
-                                                                )}
-                                                              </span>
-                                                            </div>
-                                                            <div className="flex justify-between">
-                                                              <span>
-                                                                {t(
-                                                                  "common.subtotalAmount",
-                                                                )}
-                                                                :
-                                                              </span>
-                                                              <span className="font-bold">
-                                                                {formatCurrency(thanhTien)}
-                                                              </span>
-                                                            </div>
-                                                            {(() => {
-                                                              const discountAmount = storedDiscount;
-                                                              return discountAmount >
-                                                                0 ? (
-                                                                <div className="flex justify-between text-red-600">
-                                                                  <span>
-                                                                    {t(
-                                                                      "common.discount",
-                                                                    )}
-                                                                    :
-                                                                  </span>
-                                                                  <span className="font-bold">
-                                                                    -
-                                                                    {formatCurrency(
-                                                                      discountAmount,
-                                                                    )}
-                                                                  </span>
-                                                                </div>
-                                                              ) : null;
-                                                            })()}
-                                                            <div className="flex justify-between">
-                                                              <span>
-                                                                {t(
-                                                                  "common.totalTax",
-                                                                )}
-                                                                :
-                                                              </span>
-                                                              <span className="font-bold">
-                                                                {formatCurrency(
-                                                                  tax,
-                                                                )}
-                                                              </span>
-                                                            </div>
-                                                          </>
-                                                        );
-                                                      })()}
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                      {(() => {
-                                                        const isPaid =
-                                                          selectedInvoice.displayStatus ===
-                                                            1 ||
-                                                          selectedInvoice.status ===
-                                                            "paid" ||
-                                                          selectedInvoice.paymentStatus ===
-                                                            "paid";
-
-                                                        // Calculate the actual total amount (subtotal + tax - discount)
-                                                        const subtotal =
-                                                          parseFloat(
-                                                            selectedInvoice.subtotal ||
-                                                              "0",
+                                                          const totalPayment =
+                                                            parseFloat(
+                                                              selectedInvoice.total ||
+                                                                "0",
+                                                            );
+                                                          return (
+                                                            <>
+                                                              <div className="flex justify-between">
+                                                                <span>
+                                                                  {t(
+                                                                    "common.totalPayment",
+                                                                  )}
+                                                                  :
+                                                                </span>
+                                                                <span className="font-bold">
+                                                                  {formatCurrency(
+                                                                    totalPayment,
+                                                                  )}
+                                                                </span>
+                                                              </div>
+                                                              <div className="flex justify-between">
+                                                                <span>
+                                                                  {t(
+                                                                    "common.subtotalAmount",
+                                                                  )}
+                                                                  :
+                                                                </span>
+                                                                <span className="font-bold">
+                                                                  {formatCurrency(
+                                                                    thanhTien,
+                                                                  )}
+                                                                </span>
+                                                              </div>
+                                                              {(() => {
+                                                                const discountAmount =
+                                                                  storedDiscount;
+                                                                return discountAmount >
+                                                                  0 ? (
+                                                                  <div className="flex justify-between text-red-600">
+                                                                    <span>
+                                                                      {t(
+                                                                        "common.discount",
+                                                                      )}
+                                                                      :
+                                                                    </span>
+                                                                    <span className="font-bold">
+                                                                      -
+                                                                      {formatCurrency(
+                                                                        discountAmount,
+                                                                      )}
+                                                                    </span>
+                                                                  </div>
+                                                                ) : null;
+                                                              })()}
+                                                              <div className="flex justify-between">
+                                                                <span>
+                                                                  {t(
+                                                                    "common.totalTax",
+                                                                  )}
+                                                                  :
+                                                                </span>
+                                                                <span className="font-bold">
+                                                                  {formatCurrency(
+                                                                    tax,
+                                                                  )}
+                                                                </span>
+                                                              </div>
+                                                            </>
                                                           );
-                                                        const tax = parseFloat(
-                                                          selectedInvoice.tax ||
-                                                            "0",
-                                                        );
-                                                        const discount =
-                                                          parseFloat(
-                                                            selectedInvoice.discount ||
-                                                              "0",
-                                                          );
-                                                        const totalAmount =
-                                                          Math.max(
-                                                            0,
-                                                            subtotal + tax,
-                                                          );
+                                                        })()}
+                                                      </div>
+                                                      <div className="space-y-2">
+                                                        {(() => {
+                                                          const isPaid =
+                                                            selectedInvoice.displayStatus ===
+                                                              1 ||
+                                                            selectedInvoice.status ===
+                                                              "paid" ||
+                                                            selectedInvoice.paymentStatus ===
+                                                              "paid";
 
-                                                        let paidAmount = isPaid
-                                                          ? totalAmount
-                                                          : 0;
-                                                        const paymentMethod =
-                                                          selectedInvoice.paymentMethod;
+                                                          const subtotal =
+                                                            parseFloat(
+                                                              selectedInvoice.subtotal ||
+                                                                "0",
+                                                            );
+                                                          const tax =
+                                                            parseFloat(
+                                                              selectedInvoice.tax ||
+                                                                "0",
+                                                            );
+                                                          const discount =
+                                                            parseFloat(
+                                                              selectedInvoice.discount ||
+                                                                "0",
+                                                            );
+                                                          const totalAmount =
+                                                            Math.max(
+                                                              0,
+                                                              subtotal +
+                                                                tax -
+                                                                discount,
+                                                            );
 
-                                                        return (
-                                                          <>
-                                                            <div className="flex justify-between">
-                                                              <span>
-                                                                {t(
-                                                                  "common.customerPaid",
-                                                                )}
-                                                                :
-                                                              </span>
-                                                              <span className="font-bold">
-                                                                {formatCurrency(
-                                                                  paidAmount,
-                                                                )}
-                                                              </span>
-                                                            </div>
-                                                            <div className="flex justify-between">
-                                                              <span>
-                                                                {t(
-                                                                  "common.cashPayment",
-                                                                )}
-                                                                :
-                                                              </span>
-                                                              <span className="font-bold">
-                                                                {isPaid &&
-                                                                paymentMethod ===
-                                                                  1
-                                                                  ? formatCurrency(
-                                                                      paidAmount,
-                                                                    )
-                                                                  : "0"}
-                                                              </span>
-                                                            </div>
-                                                            <div className="flex justify-between">
-                                                              <span>
-                                                                {t(
-                                                                  "common.bankTransfer",
-                                                                )}
-                                                                :
-                                                              </span>
-                                                              <span className="font-bold">
-                                                                {isPaid &&
-                                                                paymentMethod ===
-                                                                  2
-                                                                  ? formatCurrency(
-                                                                      paidAmount,
-                                                                    )
-                                                                  : "0"}
-                                                              </span>
-                                                            </div>
-                                                            <div className="flex justify-between">
-                                                              <span>
-                                                                {t(
-                                                                  "common.qrPayment",
-                                                                )}
-                                                                :
-                                                              </span>
-                                                              <span className="font-bold">
-                                                                {isPaid &&
-                                                                paymentMethod ===
-                                                                  3
-                                                                  ? formatCurrency(
-                                                                      paidAmount,
-                                                                    )
-                                                                  : "0"}
-                                                              </span>
-                                                            </div>
-                                                            <div className="flex justify-between border-t pt-2 mt-2">
-                                                              <span className="font-semibold">
-                                                                Phương thức thanh toán:
-                                                              </span>
-                                                              <span className="font-bold text-blue-600">
-                                                                {getPaymentMethodName(
-                                                                  selectedInvoice.paymentMethod
-                                                                )}
-                                                              </span>
-                                                            </div>
-                                                          </>
-                                                        );
-                                                      })()}
+                                                          let paidAmount =
+                                                            isPaid
+                                                              ? totalAmount
+                                                              : 0;
+                                                          const paymentMethod =
+                                                            selectedInvoice.paymentMethod;
+
+                                                          return (
+                                                            <>
+                                                              <div className="flex justify-between">
+                                                                <span>
+                                                                  {t(
+                                                                    "common.customerPaid",
+                                                                  )}
+                                                                  :
+                                                                </span>
+                                                                <span className="font-bold">
+                                                                  {formatCurrency(
+                                                                    paidAmount,
+                                                                  )}
+                                                                </span>
+                                                              </div>
+                                                              <div className="flex justify-between">
+                                                                <span>
+                                                                  {t(
+                                                                    "common.cashPayment",
+                                                                  )}
+                                                                  :
+                                                                </span>
+                                                                <span className="font-bold">
+                                                                  {isPaid &&
+                                                                  paymentMethod ===
+                                                                    1
+                                                                    ? formatCurrency(
+                                                                        paidAmount,
+                                                                      )
+                                                                    : "0"}
+                                                                </span>
+                                                              </div>
+                                                              <div className="flex justify-between">
+                                                                <span>
+                                                                  {t(
+                                                                    "common.bankTransfer",
+                                                                  )}
+                                                                  :
+                                                                </span>
+                                                                <span className="font-bold">
+                                                                  {isPaid &&
+                                                                  paymentMethod ===
+                                                                    2
+                                                                    ? formatCurrency(
+                                                                        paidAmount,
+                                                                      )
+                                                                    : "0"}
+                                                                </span>
+                                                              </div>
+                                                              <div className="flex justify-between">
+                                                                <span>
+                                                                  {t(
+                                                                    "common.qrPayment",
+                                                                  )}
+                                                                  :
+                                                                </span>
+                                                                <span className="font-bold">
+                                                                  {isPaid &&
+                                                                  paymentMethod ===
+                                                                    3
+                                                                    ? formatCurrency(
+                                                                        paidAmount,
+                                                                      )
+                                                                    : "0"}
+                                                                </span>
+                                                              </div>
+                                                              <div className="flex justify-between border-t pt-2 mt-2">
+                                                                <span className="font-semibold">
+                                                                  Phương thức
+                                                                  thanh toán:
+                                                                </span>
+                                                                <span className="font-bold text-blue-600">
+                                                                  {getPaymentMethodName(
+                                                                    selectedInvoice.paymentMethod,
+                                                                  )}
+                                                                </span>
+                                                              </div>
+                                                            </>
+                                                          );
+                                                        })()}
+                                                      </div>
                                                     </div>
                                                   </div>
                                                 </div>
@@ -2367,7 +2675,6 @@ export default function SalesOrders() {
                                                               "📄 Sales Orders: Showing receipt modal for invoice printing",
                                                             );
 
-                                                            // Create receipt data for the modal
                                                             const receiptData =
                                                               {
                                                                 id: selectedInvoice.id,
@@ -2483,7 +2790,6 @@ export default function SalesOrders() {
                                                               correcttax -
                                                               correctdiscount;
 
-                                                            // Show receipt modal directly
                                                             setSelectedReceipt(
                                                               receiptData,
                                                             );
@@ -2778,12 +3084,8 @@ export default function SalesOrders() {
             );
             setShowEInvoiceModal(false);
 
-            // Handle the e-invoice result
             if (eInvoiceData.success) {
-              // Refresh orders data
               queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-
-              // Show success message
               toast({
                 title: "Thành công",
                 description: "Hóa đơn điện tử đã được xử lý thành công",

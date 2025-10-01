@@ -2575,6 +2575,7 @@ export function PaymentMethodModal({
                 };
               });
             })()}
+            orderId={receipt.id || orderInfo.id || orderForPayment.id}
           />
         )}
 

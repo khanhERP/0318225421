@@ -78,9 +78,9 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
 
   // Fetch purchase receipts with filters
   const {
-    data: purchaseOrdersResponse = { data: [] },
+    data: purchaseReceiptsResponse = { data: [] },
     isLoading: isOrdersLoading,
-  } = useQuery<{ data: PurchaseOrder[] }>({
+  } = useQuery<{ data: PurchaseOrder[]; success: boolean; message: string }>({
     queryKey: [
       "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts",
       { startDate, endDate, productFilter, searchTerm },
@@ -112,14 +112,14 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
       const responseData = await response.json();
       console.log("📦 Purchase receipts response:", responseData);
 
-      // Handle different response structures
-      if (Array.isArray(responseData)) {
-        return { data: responseData };
-      } else if (responseData.data && Array.isArray(responseData.data)) {
+      // The API returns { success: true, message: "OK", data: [] }
+      if (responseData.success && responseData.data && Array.isArray(responseData.data)) {
         return responseData;
+      } else if (Array.isArray(responseData)) {
+        return { data: responseData, success: true, message: "OK" };
       } else {
         console.warn("Unexpected response structure:", responseData);
-        return { data: [] };
+        return { data: [], success: false, message: "Invalid response" };
       }
     },
     staleTime: 0, // Always consider data stale to ensure fresh data
@@ -129,7 +129,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
   });
 
   // Extract the array from the response
-  const purchaseOrders = purchaseOrdersResponse?.data || [];
+  const purchaseOrders = purchaseReceiptsResponse?.data || [];
 
   // Fetch suppliers for filtering
   const { data: suppliers = [] } = useQuery<Supplier[]>({
@@ -438,28 +438,26 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
                   <ClipboardCheck className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">
                     {purchaseOrders.length === 0
-                      ? t("purchases.noOrders")
-                      : t("purchases.noOrdersFound")}
+                      ? "Không có phiếu nhập nào"
+                      : "Không tìm thấy phiếu nhập"}
                   </h3>
                   <p className="text-sm sm:text-base text-gray-500 mb-4 sm:mb-6 max-w-md mx-auto">
                     {purchaseOrders.length === 0
-                      ? t("purchases.createFirstOrder")
-                      : t("purchases.tryDifferentFilters")}
+                      ? "Tạo phiếu nhập đầu tiên để bắt đầu quản lý hàng hóa"
+                      : "Thử thay đổi bộ lọc để tìm phiếu nhập phù hợp"}
                   </p>
-                  {purchaseOrders.length === 0 && (
-                    <Button
-                      className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 sm:px-6 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 text-sm sm:text-base"
-                      onClick={() => navigate("/purchases/create")}
-                      data-testid="button-create-first-order"
-                      size="lg"
-                    >
-                      <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                      <span className="hidden sm:inline">
-                        {t("purchases.createNewPurchaseOrder")}
-                      </span>
-                      <span className="sm:hidden">Tạo phiếu nhập</span>
-                    </Button>
-                  )}
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 sm:px-6 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 text-sm sm:text-base"
+                    onClick={() => navigate("/purchases/create")}
+                    data-testid="button-create-first-order"
+                    size="lg"
+                  >
+                    <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                    <span className="hidden sm:inline">
+                      Tạo phiếu nhập mới
+                    </span>
+                    <span className="sm:hidden">Tạo phiếu nhập</span>
+                  </Button>
                 </div>
               ) : (
                 <div className="overflow-x-auto">

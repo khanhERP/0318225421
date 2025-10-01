@@ -27,12 +27,6 @@ class TenantManager {
         isActive: true,
       },
       {
-        subdomain: "demo-edpos",
-        databaseUrl: process.env.EXTERNAL_DB_URL || process.env.DATABASE_URL!,
-        storeName: "Demo Store - Cửa hàng demo",
-        isActive: true,
-      },
-      {
         subdomain: "hazkitchen",
         databaseUrl: process.env.EXTERNAL_DB_URL || process.env.DATABASE_URL!,
         storeName: "Store 1 - Cửa hàng số 1",
@@ -42,6 +36,14 @@ class TenantManager {
         subdomain: "0318225421",
         databaseUrl: process.env.EXTERNAL_DB_URL || process.env.DATABASE_URL!,
         storeName: "Store 1 - Cửa hàng số 1",
+        isActive: true,
+      },
+      {
+        subdomain: "0111156080",
+        databaseUrl:
+          process.env.DATABASE_0111156080 ||
+          process.env.EXTERNAL_DB_0111156080!,
+        storeName: "Store 2 - Cửa hàng số 2",
         isActive: true,
       },
       // Add more tenants as needed
@@ -61,9 +63,9 @@ class TenantManager {
       return this.dbConnections.get(subdomain);
     }
 
-    const tenant = this.getTenantBySubdomain(subdomain);
+    let tenant = this.getTenantBySubdomain(subdomain);
     if (!tenant) {
-      throw new Error(`Tenant not found: ${subdomain}`);
+      tenant = this.getTenantBySubdomain("demo");
     }
 
     const pool = new Pool({

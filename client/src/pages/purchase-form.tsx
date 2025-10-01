@@ -450,108 +450,7 @@ export default function PurchaseFormPage({
     form.setValue("items", schemaItems);
   }, [selectedItems, form]);
 
-  // Create/Update mutation
-  const saveMutation = useMutation({
-    mutationFn: async (data: any) => {
-      console.log("Starting mutation with data:", data);
-
-      // Validate data
-      if (!data.items || data.items.length === 0) {
-        throw new Error("Vui lòng thêm ít nhất một sản phẩm hợp lệ");
-      }
-
-      // Validate required fields
-      const missingFields = [];
-
-      if (!data.supplierId || data.supplierId === 0) {
-        missingFields.push('Nhà cung cấp');
-      }
-
-      // receiptNumber is now validated in onSubmit, so we don't need to check it here again unless it's the only way to check.
-      // However, the original logic in onSubmit already handles the finalPONumber.
-
-      if (!data.purchaseDate) {
-        missingFields.push('Ngày nhập');
-      }
-
-      if (!data.purchaseType) {
-        missingFields.push('Loại mua hàng');
-      }
-
-      if (missingFields.length > 0) {
-        toast({
-          title: "Lỗi",
-          description: `Vui lòng nhập đầy đủ thông tin cho các trường bắt buộc sau: ${missingFields.join(', ')}`,
-          variant: "destructive",
-        });
-        setIsSubmitting(false);
-        return; // Stop mutation if required fields are missing
-      }
-
-      console.log("API payload:", data);
-
-      const response = isEditMode
-        ? await apiRequest("PUT", `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts/${id}`, data)
-        : await apiRequest("POST", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts", data);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log("API response:", result);
-      return result;
-    },
-    onSuccess: (response) => {
-      console.log("✅ Mutation success:", response);
-
-      // Reset submitting state
-      setIsSubmitting(false);
-
-      toast({
-        title: "Thành công",
-        description: isEditMode
-          ? "Phiếu nhập hàng đã được cập nhật thành công"
-          : "Phiếu nhập hàng đã được tạo thành công",
-      });
-
-      // Refresh data
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/suppliers"] });
-
-      // Navigate back to purchases list
-      setTimeout(() => {
-        navigate("/purchases");
-      }, 1000);
-    },
-    onError: (error: any) => {
-      console.error("❌ Mutation error:", error);
-
-      // Reset submitting state
-      setIsSubmitting(false);
-
-      let errorMessage = "Có lỗi xảy ra khi lưu phiếu nhập hàng";
-
-      if (error?.message) {
-        errorMessage = error.message;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      }
-
-      toast({
-        title: "Lỗi",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    },
-    onSettled: () => {
-      // Always reset submitting state as final fallback
-      setIsSubmitting(false);
-    },
-  });
+  // Remove the complex saveMutation since we're now handling submission directly in onSubmit
 
   // Create new product mutation
   const createProductMutation = useMutation({
@@ -750,22 +649,10 @@ export default function PurchaseFormPage({
     const formData = form.getValues();
     const hasSupplier = formData.supplierId && formData.supplierId > 0;
     const hasValidItems = selectedItems.some(item =>
-      (item.productId > 0 || (item.productName && item.productName.trim() !== "")) &&
+      item.productName && item.productName.trim() !== "" &&
       item.quantity > 0 &&
       item.unitPrice >= 0
     );
-
-    console.log("🔍 Form validation check:", {
-      hasSupplier,
-      hasValidItems,
-      supplierValue: formData.supplierId,
-      itemsCount: selectedItems.length,
-      validItemsCount: selectedItems.filter(item =>
-        (item.productId > 0 || (item.productName && item.productName.trim() !== "")) &&
-        item.quantity > 0 &&
-        item.unitPrice >= 0
-      ).length
-    });
 
     return hasSupplier && hasValidItems;
   };
@@ -860,6 +747,7 @@ export default function PurchaseFormPage({
       setIsSubmitting(true);
       console.log("🔍 Form submission values:", values);
 
+      // Check if we have any items
       if (selectedItems.length === 0) {
         toast({
           title: "Lỗi",
@@ -870,121 +758,151 @@ export default function PurchaseFormPage({
         return;
       }
 
-      // Filter out items that have actual product data
+      // Filter out valid items - be more lenient with validation
       const validItems = selectedItems.filter(item => {
-        // Allow items that have productId OR have productName filled
-        const hasProduct = item.productId > 0 || (item.productName && item.productName.trim() !== "");
-        const hasValidQuantity = item.quantity > 0;
-        const hasValidPrice = item.unitPrice >= 0;
-
-        return hasProduct && hasValidQuantity && hasValidPrice;
+        const hasProductName = item.productName && item.productName.trim() !== "";
+        const hasQuantity = item.quantity > 0;
+        const hasPrice = item.unitPrice >= 0;
+        
+        return hasProductName && hasQuantity && hasPrice;
       });
 
       console.log("📋 Item validation result:", {
         totalItems: selectedItems.length,
         validItems: validItems.length,
-        details: selectedItems.map(item => ({
-          productId: item.productId,
-          productName: item.productName,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          isValid: (item.productId > 0 || (item.productName && item.productName.trim() !== "")) &&
-                   item.quantity > 0 && item.unitPrice >= 0
-        }))
+        invalidItems: selectedItems.length - validItems.length
       });
 
       if (validItems.length === 0) {
-        console.log("❌ Validation failed: No valid items");
         toast({
           title: "Lỗi",
-          description: "Vui lòng thêm ít nhất một sản phẩm với số lượng và giá hợp lệ",
+          description: "Vui lòng thêm ít nhất một sản phẩm với tên, số lượng và giá hợp lệ",
           variant: "destructive",
         });
         setIsSubmitting(false);
         return;
       }
 
-      // Auto-generate PO Number if empty
-      let finalPONumber = values.receiptNumber?.trim();
-
-      // If receiptNumber is not available, try to use nextPONumber (fetched from query)
-      if (!finalPONumber && nextPONumber) {
-        finalPONumber = nextPONumber;
-        console.log("🔢 Using auto-generated PO number:", finalPONumber);
+      // Get form values
+      const formValues = form.getValues();
+      
+      // Auto-generate receipt number if empty
+      let finalReceiptNumber = formValues.receiptNumber?.trim();
+      if (!finalReceiptNumber) {
+        if (nextPONumber) {
+          finalReceiptNumber = nextPONumber;
+        } else {
+          // Generate fallback receipt number with correct format
+          const currentYear = new Date().getFullYear().toString().slice(-2);
+          const timestamp = Date.now().toString().slice(-6);
+          finalReceiptNumber = `PN${timestamp}/${currentYear}`;
+        }
+        console.log("🔢 Using auto-generated receipt number:", finalReceiptNumber);
       }
 
       // Validate required fields
-      const missingFields = [];
-
-      if (!values.supplierId || values.supplierId === 0) {
-        missingFields.push('Nhà cung cấp');
-      }
-
-      if (!finalPONumber) {
-        missingFields.push('Số phiếu nhập');
-      }
-
-      if (!values.purchaseDate) {
-        missingFields.push('Ngày nhập');
-      }
-
-      // Lấy giá trị Loại mua hàng từ form control
-      const currentPurchaseType = form.getValues("purchaseType");
-      if (!currentPurchaseType || currentPurchaseType.trim() === "") {
-        missingFields.push('Loại mua hàng');
-      }
-
-      if (missingFields.length > 0) {
+      if (!formValues.supplierId || formValues.supplierId === 0) {
         toast({
-          title: "Lỗi",
-          description: `Vui lòng nhập đầy đủ thông tin cho các trường bắt buộc sau: ${missingFields.join(', ')}`,
+          title: "Lỗi", 
+          description: "Vui lòng chọn nhà cung cấp",
           variant: "destructive",
         });
         setIsSubmitting(false);
         return;
       }
 
+      if (!finalReceiptNumber) {
+        toast({
+          title: "Lỗi",
+          description: "Số phiếu nhập không được để trống",
+          variant: "destructive", 
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      
+
+      if (!formValues.purchaseDate) {
+        toast({
+          title: "Lỗi",
+          description: "Vui lòng chọn ngày nhập hàng",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
 
       // Calculate totals
-      const subtotalAmount = validItems.reduce((sum, item) => sum + item.total, 0);
+      const subtotalAmount = validItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
 
-      // Prepare the final data object
-      const mutationData = {
-        receiptNumber: finalPONumber,
-        supplierId: Number(values.supplierId),
-        employeeId: values.employeeId ? Number(values.employeeId) : null,
-        purchaseDate: values.purchaseDate || null,
-        notes: values.notes?.trim() || null,
+      // Prepare submission data
+      const submissionData = {
+        receiptNumber: finalReceiptNumber,
+        supplierId: formValues.supplierId,
+        employeeId: formValues.employeeId || null,
+        purchaseDate: formValues.purchaseDate,
+        actualDeliveryDate: formValues.actualDeliveryDate || null,
         subtotal: subtotalAmount.toFixed(2),
         tax: "0.00",
         total: subtotalAmount.toFixed(2),
+        notes: formValues.notes?.trim() || null,
         items: validItems.map((item) => ({
-          productId: item.productId || 0,
-          productName: item.productName || "Sản phẩm chưa rõ",
+          productId: item.productId || null,
+          productName: item.productName,
           sku: item.sku || "",
           quantity: item.quantity,
           receivedQuantity: item.receivedQuantity || 0,
           unitPrice: item.unitPrice.toFixed(2),
-          total: item.total.toFixed(2),
+          total: (item.quantity * item.unitPrice).toFixed(2),
+          taxRate: "0.00"
         })),
       };
 
-      console.log("🚀 Final submission data:", mutationData);
+      console.log("🚀 Final submission data:", submissionData);
 
-      // Use the existing saveMutation
-      await saveMutation.mutateAsync(mutationData);
+      // Submit data
+      const response = isEditMode
+        ? await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(submissionData)
+          })
+        : await fetch('https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts', {
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(submissionData)
+          });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("✅ API response:", result);
+
+      toast({
+        title: "Thành công",
+        description: isEditMode 
+          ? "Phiếu nhập hàng đã được cập nhật thành công"
+          : "Phiếu nhập hàng đã được tạo thành công",
+      });
+
+      // Refresh queries and navigate
+      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/suppliers"] });
+      
+      setTimeout(() => {
+        navigate("/purchases");
+      }, 1000);
 
     } catch (error: any) {
       console.error("❌ Error in form submission:", error);
-      setIsSubmitting(false);
-
+      
       let errorMessage = "Có lỗi xảy ra khi lưu phiếu nhập hàng";
       if (error?.message) {
         errorMessage = error.message;
-      } else if (typeof error === 'string') {
-        errorMessage = error;
-      } else if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message;
       }
 
       toast({
@@ -992,6 +910,8 @@ export default function PurchaseFormPage({
         description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1134,8 +1054,8 @@ export default function PurchaseFormPage({
                                   {...field}
                                   placeholder={
                                     !isEditMode && isLoadingPONumber
-                                      ? "Đang tạo số PO tự động..."
-                                      : "Nhập số phiếu hoặc để trống để tự động sinh"
+                                      ? "Đang tạo số phiếu tự động..."
+                                      : "Nhập số phiếu (PNxxxxxx/YY) hoặc để trống để tự động sinh"
                                   }
                                   disabled={viewOnly}
                                   data-testid="input-receipt-number" // Updated data-testid
@@ -1910,11 +1830,11 @@ export default function PurchaseFormPage({
 
                   <Button
                     type="submit"
-                    disabled={saveMutation.isPending || isSubmitting || !hasValidData()}
-                    className={`${(saveMutation.isPending || isSubmitting) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={isSubmitting || !hasValidData()}
+                    className={`${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                     data-testid="button-submit"
                   >
-                    {saveMutation.isPending || isSubmitting ? (
+                    {isSubmitting ? (
                       <div className="flex items-center gap-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                         Đang lưu...

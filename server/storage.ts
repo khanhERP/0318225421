@@ -20,23 +20,46 @@ import {
   invoices,
   invoiceItems,
   printerConfigs, // Import printerConfigs schema
+  purchaseReceipts, // Maps to purchase_receipts table
+  purchaseReceiptItems, // Maps to purchase_receipt_items table
+  purchaseReceiptDocuments, // Maps to purchase_receipt_documents table
+  incomeVouchers, // Import incomeVouchers schema
+  expenseVouchers, // Import expenseVouchers schema
+  type PurchaseReceipt,
+  type PurchaseReceiptItem,
+  type PurchaseReceiptDocument,
+  type InsertPurchaseReceipt,
+  type InsertPurchaseReceiptItem,
+  type InsertPurchaseReceiptDocument,
 } from "@shared/schema";
-import { db } from "./db";
-import { eq, ilike, and, gte, lte, or, sql, desc, not, like } from "drizzle-orm";
+import { db, dbManager, getTenantDatabase as getDbForTenant } from "./db";
+import {
+  eq,
+  ilike,
+  and,
+  gte,
+  lte,
+  or,
+  sql,
+  desc,
+  not,
+  like,
+  ne,
+} from "drizzle-orm";
 
 // Validate database connection on module load
 if (!db) {
-  console.error('❌ CRITICAL: Database connection is undefined on module load');
-  throw new Error('Database connection failed to initialize');
+  console.error("❌ CRITICAL: Database connection is undefined on module load");
+  throw new Error("Database connection failed to initialize");
 }
 
 // Additional validation to ensure db has required methods
-if (!db.select || typeof db.select !== 'function') {
-  console.error('❌ CRITICAL: Database connection is missing select method');
-  throw new Error('Database connection is invalid - missing required methods');
+if (!db.select || typeof db.select !== "function") {
+  console.error("❌ CRITICAL: Database connection is missing select method");
+  throw new Error("Database connection is invalid - missing required methods");
 }
 
-console.log('✅ Database connection validated successfully');
+console.log("✅ Database connection validated successfully");
 
 export interface IStorage {
   // Categories
@@ -115,8 +138,10 @@ export interface IStorage {
     id: number,
     status: string,
   ): Promise<AttendanceRecord | undefined>;
-  getAttendanceRecordsByRange(startDate: string, endDate: string): Promise<AttendanceRecord[]>;
-
+  getAttendanceRecordsByRange(
+    startDate: string,
+    endDate: string,
+  ): Promise<AttendanceRecord[]>;
 
   // Tables
   getTables(): Promise<Table[]>;
@@ -131,7 +156,11 @@ export interface IStorage {
   deleteTable(id: number): Promise<boolean>;
 
   // Orders
-  getOrders(tableId?: number, status?: string, salesChannel?: string): Promise<Order[]>;
+  getOrders(
+    tableId?: number,
+    status?: string,
+    salesChannel?: string,
+  ): Promise<Order[]>;
   getOrder(id: number): Promise<Order | undefined>;
   getOrderByNumber(orderNumber: string): Promise<Order | undefined>;
   createOrder(order: InsertOrder, items: InsertOrderItem[]): Promise<Order>;
@@ -139,7 +168,10 @@ export interface IStorage {
     id: number,
     order: Partial<InsertOrder>,
   ): Promise<Order | undefined>;
-  updateOrderStatus(id: number | string, status: string): Promise<Order | undefined>;
+  updateOrderStatus(
+    id: number | string,
+    status: string,
+  ): Promise<Order | undefined>;
   addOrderItems(
     orderId: number,
     items: InsertOrderItem[],
@@ -212,18 +244,18 @@ export interface IStorage {
   getActiveProducts(): Promise<Product[]>;
 
   // Invoice methods
-  getInvoices(tenantDb?: any): Promise<any[]>;
-  getInvoice(id: number, tenantDb?: any): Promise<any>;
-  createInvoice(invoiceData: any, tenantDb?: any): Promise<any>;
-  updateInvoice(id: number, updateData: any, tenantDb?: any): Promise<any>;
-  deleteInvoice(id: number, tenantDb?: any): Promise<boolean>;
+  getInvoices(): Promise<any[]>;
+  getInvoice(id: number): Promise<any>;
+  createInvoice(invoiceData: any): Promise<any>;
+  updateInvoice(id: number, updateData: any): Promise<any>;
+  deleteInvoice(id: number): Promise<boolean>;
 
   // Invoice template methods
-  getInvoiceTemplates(tenantDb?: any): Promise<any[]>;
+  getInvoiceTemplates(): Promise<any[]>;
   getActiveInvoiceTemplates(): Promise<any[]>;
-  createInvoiceTemplate(templateData: any, tenantDb?: any): Promise<any>;
-  updateInvoiceTemplate(id: number, templateData: any, tenantDb?: any): Promise<any>;
-  deleteInvoiceTemplate(id: number, tenantDb?: any): Promise<boolean>;
+  createInvoiceTemplate(templateData: any): Promise<any>;
+  updateInvoiceTemplate(id: number, templateData: any): Promise<any>;
+  deleteInvoiceTemplate(id: number): Promise<boolean>;
 
   // E-invoice connections
   getEInvoiceConnections(): Promise<any[]>;
@@ -235,10 +267,90 @@ export interface IStorage {
   getEmployeeByEmail(email: string): Promise<Employee | undefined>;
 
   // Printer configuration management
-  getPrinterConfigs(tenantDb?: any): Promise<PrinterConfig[]>;
-  createPrinterConfig(configData: any, tenantDb?: any): Promise<PrinterConfig>;
-  updatePrinterConfig(id: number, configData: any, tenantDb?: any): Promise<PrinterConfig | null>;
-  deletePrinterConfig(id: number, tenantDb?: any): Promise<boolean>;
+  getPrinterConfigs(): Promise<PrinterConfig[]>;
+  createPrinterConfig(configData: any): Promise<PrinterConfig>;
+  updatePrinterConfig(
+    id: number,
+    configData: any,
+  ): Promise<PrinterConfig | null>;
+  deletePrinterConfig(id: number): Promise<boolean>;
+
+  // Purchase Order Management
+  getPurchaseOrders(): Promise<PurchaseReceipt[]>;
+  getPurchaseOrder(id: number): Promise<PurchaseReceipt | null>;
+  getPurchaseOrdersBySupplier(supplierId: number): Promise<PurchaseReceipt[]>;
+  getPurchaseOrdersByStatus(status: string): Promise<PurchaseReceipt[]>;
+  searchPurchaseOrders(query: string): Promise<PurchaseReceipt[]>;
+  createPurchaseOrder(
+    orderData: InsertPurchaseReceipt,
+    items: InsertPurchaseReceiptItem[],
+  ): Promise<PurchaseReceipt>;
+  updatePurchaseOrder(
+    id: number,
+    updateData: Partial<InsertPurchaseReceipt>,
+  ): Promise<PurchaseReceipt | null>;
+  deletePurchaseOrder(id: number): Promise<boolean>;
+  updatePurchaseOrderStatus(
+    id: number,
+    status: string,
+  ): Promise<PurchaseReceipt | null>;
+  getNextPONumber(): Promise<string>;
+  checkReceiptNumberExists(receiptNumber: string, excludeId?: number): Promise<boolean>;
+  getPurchaseOrdersWithDetails(options?: any): Promise<any>; // Added method
+
+  // Purchase Receipt Management (new method names)
+  getPurchaseReceipts(options: any): Promise<PurchaseReceipt[]>;
+  createPurchaseReceipt(
+    receiptData: InsertPurchaseReceipt,
+    items: InsertPurchaseReceiptItem[],
+  ): Promise<PurchaseReceipt>;
+  uploadPurchaseReceiptDocument(
+    documentData: InsertPurchaseReceiptDocument,
+  ): Promise<PurchaseReceiptDocument>;
+
+  // Purchase Order Items Management (keep for compatibility)
+  getPurchaseOrderItems(
+    purchaseOrderId: number,
+  ): Promise<PurchaseReceiptItem[]>;
+  addPurchaseOrderItems(
+    purchaseOrderId: number,
+    items: InsertPurchaseReceiptItem[],
+  ): Promise<PurchaseReceiptItem[]>;
+  updatePurchaseOrderItem(
+    id: number,
+    updateData: Partial<InsertPurchaseReceiptItem>,
+  ): Promise<PurchaseReceiptItem | null>;
+  deletePurchaseOrderItem(id: number): Promise<boolean>;
+  receiveItems(
+    purchaseOrderId: number,
+    receivedItems: Array<{
+      id: number;
+      receivedQuantity: number;
+      productId?: number;
+    }>,
+  ): Promise<{ success: boolean; status: string }>;
+
+  // Purchase Order Documents Management
+  getPurchaseOrderDocuments(
+    purchaseOrderId: number,
+  ): Promise<PurchaseReceiptDocument[]>;
+  uploadPurchaseOrderDocument(
+    documentData: InsertPurchaseReceiptDocument,
+  ): Promise<PurchaseReceiptDocument>;
+  deletePurchaseOrderDocument(id: number): Promise<boolean>;
+
+  // Income Voucher methods
+  getIncomeVouchers(): Promise<any[]>;
+  createIncomeVoucher(voucherData: any): Promise<any>;
+  updateIncomeVoucher(id: string, voucherData: any): Promise<any>;
+  deleteIncomeVoucher(id: string): Promise<void>;
+
+  // Expense Voucher methods
+  getExpenseVouchers(): Promise<any[]>;
+  createExpenseVoucher(voucherData: any): Promise<any>;
+  updateExpenseVoucher(id: string, voucherData: any): Promise<any>;
+  deleteExpenseVoucher(id: string): Promise<void>;
+  getNextExpenseVoucherSequence(): Promise<number>;
 }
 
 // Define interfaces for the schemas
@@ -265,6 +377,9 @@ interface Product {
   imageUrl: string | null;
   isActive: boolean;
   afterTaxPrice: number | null;
+  priceIncludesTax: boolean; // Added for clarity
+  beforeTaxPrice: number | null; // Added field
+  floor: string; // Added floor field
 }
 
 interface InsertProduct {
@@ -277,6 +392,10 @@ interface InsertProduct {
   trackInventory?: boolean;
   imageUrl?: string | null;
   isActive?: boolean;
+  priceIncludesTax?: boolean; // Added for clarity
+  beforeTaxPrice?: number | null; // Added field
+  floor?: string; // Added floor field
+  taxRate?: string; // Added for explicit tax rate input
 }
 
 interface Transaction {
@@ -413,6 +532,7 @@ interface Order {
   invoiceId?: number | null;
   templateNumber?: string | null;
   symbol?: string | null;
+  priceIncludeTax?: boolean; // Added for clarity
 }
 
 interface InsertOrder {
@@ -437,6 +557,7 @@ interface InsertOrder {
   invoiceId?: number | null;
   templateNumber?: string | null;
   symbol?: string | null;
+  priceIncludeTax?: boolean; // Added for clarity
 }
 
 interface OrderItem {
@@ -473,8 +594,13 @@ interface StoreSettings {
   taxRate?: string;
   goldThreshold?: string;
   vipThreshold?: string;
+  priceIncludesTax?: boolean; // Added for clarity
   createdAt: string;
   updatedAt: string;
+  defaultFloor?: string; // Added for default floor
+  defaultZone?: string; // Added for default zone
+  floorPrefix?: string; // Added for floor prefix
+  zonePrefix?: string; // Added for zone prefix
 }
 
 interface InsertStoreSettings {
@@ -488,6 +614,11 @@ interface InsertStoreSettings {
   taxRate?: string;
   goldThreshold?: string;
   vipThreshold?: string;
+  priceIncludesTax?: boolean; // Added for clarity
+  defaultFloor?: string; // Added for default floor
+  defaultZone?: string; // Added for default zone
+  floorPrefix?: string; // Added for floor prefix
+  zonePrefix?: string; // Added for zone prefix
 }
 
 interface Supplier {
@@ -636,73 +767,285 @@ interface PrinterConfig {
 export class DatabaseStorage implements IStorage {
   // Store db connection for reuse
   private db: any;
+  private tenant: string | null = null; // Property to store tenant context if needed
+  private dbManager: any;
 
   constructor() {
     this.db = db;
+    this.dbManager = dbManager;
   }
 
-  // Get safe database connection with fallback
-  private getSafeDatabase(tenantDb?: any, operation: string = 'operation'): any {
-    console.log(`🔍 Getting safe database for operation: ${operation}`);
+  // Expense Voucher methods
+  private async getExpenseVouchers(tenantDb?: any): Promise<any[]> {
+    const database = tenantDb || this.getSafeDatabase("getExpenseVouchers");
+    try {
+      const result = await database.execute(sql`
+        SELECT * FROM expense_vouchers 
+        ORDER BY created_at DESC
+      `);
+      return result.rows || [];
+    } catch (error) {
+      console.error("Error fetching expense vouchers:", error);
+      return [];
+    }
+  }
 
-    let database = tenantDb || this.db;
+  private async createExpenseVoucher(
+    voucherData: any,
+    tenantDb?: any,
+  ): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("createExpenseVoucher");
+    try {
+      const result = await database.execute(sql`
+        INSERT INTO expense_vouchers (
+          voucher_number, date, amount, account, recipient, 
+          receiver_name, phone, category, description, 
+          created_at, updated_at
+        ) VALUES (
+          ${voucherData.voucherNumber}, 
+          ${voucherData.date}, 
+          ${voucherData.amount}, 
+          ${voucherData.account}, 
+          ${voucherData.recipient},
+          ${voucherData.receiverName || null}, 
+          ${voucherData.phone || null}, 
+          ${voucherData.category}, 
+          ${voucherData.description || null},
+          ${new Date()}, 
+          ${new Date()}
+        ) RETURNING *
+      `);
+      return result.rows[0];
+    } catch (error) {
+      console.error("Error creating expense voucher:", error);
+      throw error;
+    }
+  }
 
-    // If both tenantDb and db are undefined/null, throw critical error
+  private async updateExpenseVoucher(
+    id: string,
+    voucherData: any,
+    tenantDb?: any,
+  ): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("updateExpenseVoucher");
+    try {
+      console.log("Storage: Updating expense voucher with data:", voucherData);
+
+      const [voucher] = await database
+        .update(expenseVouchers)
+        .set({
+          voucherNumber: voucherData.voucherNumber,
+          date: voucherData.date,
+          amount: voucherData.amount.toString(), // Ensure amount is string
+          account: voucherData.account,
+          recipient: voucherData.recipient,
+          phone: voucherData.phone || null,
+          category: voucherData.category,
+          description: voucherData.description || null,
+          updatedAt: new Date(), // Always use new Date() for updatedAt
+        })
+        .where(eq(expenseVouchers.id, parseInt(id)))
+        .returning();
+
+      console.log("Storage: Expense voucher updated successfully:", voucher);
+      return voucher;
+    } catch (error) {
+      console.error("Storage: Error updating expense voucher:", error);
+      throw error;
+    }
+  }
+
+  private async deleteExpenseVoucher(
+    id: string,
+    tenantDb?: any,
+  ): Promise<void> {
+    const database = tenantDb || this.getSafeDatabase("deleteExpenseVoucher");
+    try {
+      await database.execute(sql`
+        DELETE FROM expense_vouchers WHERE id = ${id}
+      `);
+    } catch (error) {
+      console.error("Error deleting expense voucher:", error);
+      throw error;
+    }
+  }
+
+  async getExpenseVouchers(tenantDb?: any): Promise<any[]> {
+    const database = tenantDb || this.getSafeDatabase("getExpenseVouchers");
+    try {
+      const result = await database.execute(sql`
+        SELECT * FROM expense_vouchers 
+        ORDER BY created_at DESC
+      `);
+      return result.rows || [];
+    } catch (error) {
+      console.error("Error fetching expense vouchers:", error);
+      return [];
+    }
+  }
+
+  async createExpenseVoucher(voucherData: any, tenantDb?: any): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("createExpenseVoucher");
+    try {
+      const result = await database.execute(sql`
+        INSERT INTO expense_vouchers (
+          voucher_number, date, amount, account, recipient, 
+          receiver_name, phone, category, description, 
+          created_at, updated_at
+        ) VALUES (
+          ${voucherData.voucherNumber}, 
+          ${voucherData.date}, 
+          ${voucherData.amount}, 
+          ${voucherData.account}, 
+          ${voucherData.recipient},
+          ${voucherData.receiverName || null}, 
+          ${voucherData.phone || null}, 
+          ${voucherData.category}, 
+          ${voucherData.description || null},
+          ${new Date()}, 
+          ${new Date()}
+        ) RETURNING *
+      `);
+      return result.rows[0];
+    } catch (error) {
+      console.error("Error creating expense voucher:", error);
+      throw error;
+    }
+  }
+
+  async updateExpenseVoucher(
+    id: string,
+    voucherData: any,
+    tenantDb?: any,
+  ): Promise<any> {
+    try {
+      const database = tenantDb || this.getSafeDatabase("updateExpenseVoucher");
+
+      console.log("Storage: Updating expense voucher with data:", voucherData);
+
+      const [voucher] = await database
+        .update(expenseVouchers)
+        .set({
+          voucherNumber: voucherData.voucherNumber,
+          date: voucherData.date,
+          amount: voucherData.amount.toString(), // Ensure amount is string
+          account: voucherData.account,
+          recipient: voucherData.recipient,
+          phone: voucherData.phone || null,
+          category: voucherData.category,
+          description: voucherData.description || null,
+          updatedAt: new Date(), // Always use new Date() for updatedAt
+        })
+        .where(eq(expenseVouchers.id, parseInt(id)))
+        .returning();
+
+      console.log("Storage: Expense voucher updated successfully:", voucher);
+      return voucher;
+    } catch (error) {
+      console.error("Storage: Error updating expense voucher:", error);
+      throw error;
+    }
+  }
+
+  async deleteExpenseVoucher(id: string, tenantDb?: any): Promise<void> {
+    try {
+      const database = tenantDb || this.getSafeDatabase("deleteExpenseVoucher");
+      await database
+        .delete(expenseVouchers)
+        .where(eq(expenseVouchers.id, parseInt(id)));
+    } catch (error) {
+      console.error("Error deleting expense voucher:", error);
+      throw error;
+    }
+  }
+
+  async checkReceiptNumberExists(receiptNumber: string, excludeId?: number, tenantDb?: any): Promise<boolean> {
+    try {
+      const database = tenantDb || this.getSafeDatabase("checkReceiptNumberExists");
+
+      let conditions = [eq(purchaseReceipts.receiptNumber, receiptNumber)];
+
+      // Exclude specific ID if provided (for updates)
+      if (excludeId) {
+        conditions.push(ne(purchaseReceipts.id, excludeId));
+      }
+
+      const result = await database
+        .select({ id: purchaseReceipts.id })
+        .from(purchaseReceipts)
+        .where(and(...conditions))
+        .limit(1);
+
+      return result.length > 0;
+    } catch (error) {
+      console.error("Error checking receipt number:", error);
+      return false;
+    }
+  }
+
+  // Get safe database connection with tenant support and fallback
+  private getSafeDatabase(operation: string, tenantSubdomain?: string): any {
+    console.log(
+      `🔍 Getting safe database for operation: ${operation}${tenantSubdomain ? ` (tenant: ${tenantSubdomain})` : ""}`,
+    );
+
+    let database;
+
+    // Use tenant-specific database if tenant is provided
+    if (tenantSubdomain) {
+      database = this.dbManager.getTenantDatabase(tenantSubdomain);
+      console.log(`🏢 Using tenant database for ${tenantSubdomain}`);
+    } else {
+      database = this.db; // Default to global db
+      console.log(`🏠 Using default database`);
+    }
+
     if (!database) {
-      console.error(`❌ CRITICAL: No database connection available for ${operation}`);
-      console.error(`❌ tenantDb:`, !!tenantDb);
-      console.error(`❌ global db:`, !!this.db);
-      throw new Error(`Database connection is completely unavailable for ${operation}`);
+      console.error(
+        `❌ CRITICAL: No database connection available for ${operation}`,
+      );
+      throw new Error(
+        `Database connection is completely unavailable for ${operation}`,
+      );
     }
 
     // Comprehensive validation of database object
-    if (typeof database !== 'object' || database === null) {
+    if (typeof database !== "object" || database === null) {
       console.error(`❌ Database is not a valid object in ${operation}:`, {
         type: typeof database,
         isNull: database === null,
-        isUndefined: database === undefined
+        isUndefined: database === undefined,
       });
-
-      // Try falling back to global db if tenantDb is invalid
-      if (tenantDb && this.db && typeof this.db === 'object' && this.db !== null) {
-        console.log(`🔄 Falling back to global db for ${operation}`);
-        database = this.db;
-      } else {
-        throw new Error(`Invalid database connection for ${operation} - no valid fallback available`);
-      }
+      throw new Error(`Invalid database connection for ${operation}`);
     }
 
     // Validate required methods exist
-    const requiredMethods = ['select', 'insert', 'update', 'delete'];
-    const missingMethods = requiredMethods.filter(method => !database[method] || typeof database[method] !== 'function');
+    const requiredMethods = ["select", "insert", "update", "delete"];
+    const missingMethods = requiredMethods.filter(
+      (method) => !database[method] || typeof database[method] !== "function",
+    );
 
     if (missingMethods.length > 0) {
-      console.error(`❌ Database missing required methods in ${operation}:`, {
+      console.error(`od Database missing required methods in ${operation}:`, {
         missingMethods,
-        availableMethods: Object.keys(database).filter(key => typeof database[key] === 'function')
+        availableMethods: Object.keys(database).filter(
+          (key) => typeof database[key] === "function",
+        ),
       });
-
-      // Try falling back to global db if methods are missing
-      if (tenantDb && this.db && typeof this.db === 'object') {
-        const globalDbMissingMethods = requiredMethods.filter(method => !this.db[method] || typeof this.db[method] !== 'function');
-        if (globalDbMissingMethods.length === 0) {
-          console.log(`🔄 Falling back to global db with complete methods for ${operation}`);
-          database = this.db;
-        } else {
-          throw new Error(`Both tenant and global database connections are invalid for ${operation}`);
-        }
-      } else {
-        throw new Error(`Database connection is invalid - missing methods: ${missingMethods.join(', ')} for ${operation}`);
-      }
+      throw new Error(
+        `Database connection is invalid - missing methods: ${missingMethods.join(", ")} for ${operation}`,
+      );
     }
 
-    console.log(`✅ Database validation passed for ${operation}`);
+    console.log(
+      `✅ Database validation passed for ${operation}${tenantSubdomain ? ` (tenant: ${tenantSubdomain})` : ""}`,
+    );
     return database;
   }
 
   async getCategories(tenantDb?: any): Promise<Category[]> {
     try {
-      const database = this.getSafeDatabase(tenantDb, 'getCategories');
+      const database = tenantDb || this.getSafeDatabase("getCategories");
       const result = await database.select().from(categories);
       return result || [];
     } catch (error) {
@@ -712,8 +1055,11 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createCategory(insertCategory: InsertCategory, tenantDb?: any): Promise<Category> {
-    const database = tenantDb || this.db;
+  async createCategory(
+    insertCategory: InsertCategory,
+    tenantDb?: any,
+  ): Promise<Category> {
+    const database = tenantDb || this.getSafeDatabase("createCategory");
     const [category] = await database
       .insert(categories)
       .values(insertCategory)
@@ -726,7 +1072,7 @@ export class DatabaseStorage implements IStorage {
     updateData: Partial<InsertCategory>,
     tenantDb?: any,
   ): Promise<Category> {
-    const database = tenantDb || this.db;
+    const database = tenantDb || this.getSafeDatabase("updateCategory");
     const [category] = await database
       .update(categories)
       .set(updateData)
@@ -736,13 +1082,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteCategory(id: number, tenantDb?: any): Promise<void> {
-    const database = tenantDb || this.db;
+    const database = tenantDb || this.getSafeDatabase("deleteCategory");
     await database.delete(categories).where(eq(categories.id, id));
   }
 
   async getProducts(tenantDb?: any): Promise<Product[]> {
     try {
-      const database = this.getSafeDatabase(tenantDb, 'getProducts');
+      const database = tenantDb || this.getSafeDatabase("getProducts");
       const result = await database
         .select()
         .from(products)
@@ -751,7 +1097,9 @@ export class DatabaseStorage implements IStorage {
       return result.map((product) => ({
         ...product,
         productType: product.productType || 1,
-        afterTaxPrice: product.afterTaxPrice || null
+        afterTaxPrice: product.afterTaxPrice || null,
+        beforeTaxPrice: product.beforeTaxPrice || null,
+        floor: product.floor || "1", // Default floor
       }));
     } catch (error) {
       console.error(`❌ Error in getProducts:`, error);
@@ -765,7 +1113,8 @@ export class DatabaseStorage implements IStorage {
     tenantDb?: any,
   ): Promise<Product[]> {
     try {
-      const database = this.getSafeDatabase(tenantDb, 'getProductsByCategory');
+      const database =
+        tenantDb || this.getSafeDatabase("getProductsByCategory");
       let whereCondition = eq(products.categoryId, categoryId);
 
       if (!includeInactive) {
@@ -778,10 +1127,12 @@ export class DatabaseStorage implements IStorage {
         .where(whereCondition)
         .orderBy(products.name);
 
-      // Ensure afterTaxPrice is properly returned
+      // Ensure afterTaxPrice and beforeTaxPrice are properly returned
       return result.map((product) => ({
         ...product,
-        afterTaxPrice: product.afterTaxPrice || null
+        afterTaxPrice: product.afterTaxPrice || null,
+        beforeTaxPrice: product.beforeTaxPrice || null,
+        floor: product.floor || "1", // Default floor
       }));
     } catch (error) {
       console.error(`❌ Error in getProductsByCategory:`, error);
@@ -790,28 +1141,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProduct(id: number, tenantDb?: any): Promise<Product | undefined> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in getProduct`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("getProduct");
     const [product] = await database
       .select()
       .from(products)
       .where(and(eq(products.id, id), eq(products.isActive, true)));
+    // Ensure default floor if missing
+    if (product) {
+      product.floor = product.floor || "1";
+    }
     return product || undefined;
   }
 
-  async getProductBySku(sku: string, tenantDb?: any): Promise<Product | undefined> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in getProductBySku`);
-      throw new Error(`Database connection is not available`);
-    }
+  async getProductBySku(
+    sku: string,
+    tenantDb?: any,
+  ): Promise<Product | undefined> {
+    const database = tenantDb || this.getSafeDatabase("getProductBySku");
     const [product] = await database
       .select()
       .from(products)
       .where(and(eq(products.sku, sku), eq(products.isActive, true)));
+    // Ensure default floor if missing
+    if (product) {
+      product.floor = product.floor || "1";
+    }
     return product || undefined;
   }
 
@@ -820,42 +1174,92 @@ export class DatabaseStorage implements IStorage {
     includeInactive: boolean = false,
     tenantDb?: any,
   ): Promise<Product[]> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in searchProducts`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("searchProducts");
     let whereCondition = or(
       ilike(products.name, `%${query}%`),
-      ilike(products.sku, `%${query}%`)
+      ilike(products.sku, `%${query}%`),
     );
 
     if (!includeInactive) {
       whereCondition = and(whereCondition, eq(products.isActive, true));
     }
 
-    return await database.select().from(products).where(whereCondition);
+    const results = await database
+      .select()
+      .from(products)
+      .where(whereCondition);
+    // Ensure default floor if missing
+    return results.map((product) => ({
+      ...product,
+      floor: product.floor || "1",
+    }));
   }
 
-  async createProduct(insertProduct: InsertProduct, tenantDb?: any): Promise<Product> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in createProduct`);
-      throw new Error(`Database connection is not available`);
-    }
+  async createProduct(
+    insertProduct: InsertProduct,
+    tenantDb?: any,
+  ): Promise<Product> {
+    const database = tenantDb || this.getSafeDatabase("createProduct");
     try {
       console.log("Storage: Creating product with data:", insertProduct);
+      console.log(
+        "Storage: PriceIncludesTax value:",
+        insertProduct.priceIncludesTax,
+        typeof insertProduct.priceIncludesTax,
+      );
+
+      // Fetch store settings to determine tax rate and priceIncludeTax logic
+      const storeSettings = await this.getStoreSettings(tenantDb);
+
+      // Use the taxRate provided in insertProduct if available, otherwise default to storeSettings.taxRate or "10.00"
+      const explicitTaxRate = insertProduct.taxRate; // This is the input value, e.g., "10.00"
+      const taxRate = parseFloat(
+        explicitTaxRate || storeSettings?.taxRate || "0",
+      );
+
+      console.log("Storage: Tax rate preservation debug:", {
+        inputTaxRate: insertProduct.taxRate,
+        parsedTaxRate: taxRate,
+        willUseValue: explicitTaxRate || storeSettings?.taxRate || "0",
+      });
+
+      const priceIncludesTax =
+        insertProduct.priceIncludesTax !== undefined
+          ? insertProduct.priceIncludesTax
+          : storeSettings?.priceIncludesTax || false;
+
+      let beforeTaxPrice = insertProduct.price;
+      if (priceIncludesTax) {
+        if (taxRate > 0) {
+          beforeTaxPrice = insertProduct.price / (1 + taxRate / 100);
+        }
+      }
+
       const productData = {
         name: insertProduct.name,
         sku: insertProduct.sku,
-        price: insertProduct.price,
+        price: insertProduct.price, // This will be the price_with_tax if priceIncludesTax is true
         stock: insertProduct.stock,
         categoryId: insertProduct.categoryId,
         productType: insertProduct.productType || 1,
         trackInventory: insertProduct.trackInventory !== false,
         imageUrl: insertProduct.imageUrl || null,
         isActive: true,
+        priceIncludesTax: priceIncludesTax,
+        beforeTaxPrice: beforeTaxPrice,
+        afterTaxPrice: priceIncludesTax
+          ? insertProduct.price
+          : beforeTaxPrice * (1 + taxRate / 100), // Ensure afterTaxPrice is set correctly
+        taxRate: explicitTaxRate || storeSettings?.taxRate || "0", // Use the explicit tax rate from input
+        floor: insertProduct.floor || storeSettings?.defaultFloor || "1", // Use provided floor or default from store settings
       };
+
+      console.log("Storage: PriceIncludesTax save debug:", {
+        inputValue: insertProduct.priceIncludesTax,
+        inputType: typeof insertProduct.priceIncludesTax,
+        savedValue: productData.priceIncludesTax,
+        savedType: typeof productData.priceIncludesTax,
+      });
 
       console.log("Storage: Inserting product data:", productData);
 
@@ -865,9 +1269,66 @@ export class DatabaseStorage implements IStorage {
         .returning();
 
       console.log("Storage: Product created successfully:", product);
+      console.log(
+        "Created product priceIncludesTax:",
+        product.priceIncludesTax,
+      );
       return product;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Storage: Error creating product:", error);
+
+      // Handle duplicate key error by fixing sequence
+      if (error?.code === "23505" && error?.constraint === "products_pkey") {
+        console.log(
+          "🔧 Fixing products sequence due to duplicate key error...",
+        );
+        try {
+          // Get max ID from products table using Drizzle SQL
+          const maxIdResult = await database.execute(
+            sql`SELECT COALESCE(MAX(id), 0) as max_id FROM products`,
+          );
+          const maxId = maxIdResult.rows[0]?.max_id || 0;
+          const newSeqValue = maxId + 100; // Set sequence well above current max
+
+          console.log(
+            `📊 Current max ID: ${maxId}, setting sequence to: ${newSeqValue}`,
+          );
+
+          // Reset sequence using Drizzle SQL
+          await database.execute(
+            sql`SELECT setval('products_id_seq', ${newSeqValue}, true)`,
+          );
+          console.log(`✅ Products sequence reset to ${newSeqValue}`);
+
+          // Retry the insert
+          console.log("🔄 Retrying product creation...");
+          const [product] = await database
+            .insert(products)
+            .values(productData) // Make sure productData is accessible here
+            .returning();
+
+          console.log("✅ Product created successfully on retry:", product);
+          return product;
+        } catch (retryError) {
+          console.error("❌ Failed to fix sequence and retry:", retryError);
+          // Even if sequence fix fails, try with a random high ID
+          try {
+            console.log("🎲 Attempting with random high ID...");
+            const randomId = new Date(); // Use timestamp as ID
+            const productWithId = { ...productData, id: randomId }; // Make sure productData is accessible here
+            const [product] = await database
+              .insert(products)
+              .values(productWithId)
+              .returning();
+            console.log("✅ Product created with random ID:", product);
+            return product;
+          } catch (finalError) {
+            console.error("❌ All retry attempts failed:", finalError);
+            throw retryError;
+          }
+        }
+      }
+
       throw error;
     }
   }
@@ -877,28 +1338,108 @@ export class DatabaseStorage implements IStorage {
     updateData: Partial<InsertProduct>,
     tenantDb?: any,
   ): Promise<Product | undefined> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in updateProduct`);
-      throw new Error(`Database connection is not available`);
-    }
-    const [product] = await database
-      .update(products)
-      .set({
+    const database = tenantDb || this.getSafeDatabase("updateProduct");
+    try {
+      console.log("Updating product with data:", updateData);
+      console.log(
+        "PriceIncludesTax value:",
+        updateData.priceIncludesTax,
+        typeof updateData.priceIncludesTax,
+      );
+
+      // Fetch store settings to determine default tax rate and priceIncludesTax logic
+      const storeSettings = await this.getStoreSettings(tenantDb);
+
+      // Use the taxRate provided in updateData if available, otherwise from storeSettings, default to "10.00"
+      const explicitTaxRate = updateData.taxRate; // This is the input value, e.g., "10.00"
+      const taxRate = parseFloat(
+        explicitTaxRate || storeSettings?.taxRate || "0",
+      );
+
+      console.log("Storage: Tax rate preservation debug:", {
+        inputTaxRate: updateData.taxRate,
+        parsedTaxRate: taxRate,
+        willUseValue: explicitTaxRate || storeSettings?.taxRate || "0",
+      });
+
+      // If priceIncludesTax is not provided in updateData, use store setting
+      const priceIncludesTax =
+        updateData.priceIncludesTax !== undefined
+          ? updateData.priceIncludesTax
+          : storeSettings?.priceIncludesTax || false;
+
+      let beforeTaxPrice;
+      let afterTaxPrice;
+
+      if (priceIncludesTax) {
+        // If store setting is true: prices include tax
+        if (taxRate > 0) {
+          beforeTaxPrice = updateData.price
+            ? updateData.price / (1 + taxRate / 100)
+            : 0;
+        } else {
+          beforeTaxPrice = updateData.price || 0;
+        }
+        afterTaxPrice = updateData.price || 0; // The provided price is the after-tax price
+      } else {
+        // If store setting is false: prices exclude tax
+        beforeTaxPrice = updateData.price || 0; // The provided price is the before-tax price
+        afterTaxPrice = updateData.price
+          ? updateData.price * (1 + taxRate / 100)
+          : 0;
+      }
+
+      // Ensure the price field in the database accurately reflects the price_with_tax if priceIncludesTax is true
+      const finalPrice = priceIncludesTax ? afterTaxPrice : beforeTaxPrice;
+
+      const processedUpdates = {
         ...updateData,
-        imageUrl: updateData.imageUrl || null,
-      })
-      .where(and(eq(products.id, id), eq(products.isActive, true)))
-      .returning();
-    return product || undefined;
+        price: updateData.price !== undefined ? finalPrice : undefined, // Only update if price is provided
+        priceIncludesTax: priceIncludesTax,
+        beforeTaxPrice: beforeTaxPrice,
+        afterTaxPrice: afterTaxPrice,
+        taxRate: explicitTaxRate || storeSettings?.taxRate || "0", // Use the explicit tax rate from input
+        imageUrl:
+          updateData.imageUrl === undefined
+            ? undefined
+            : updateData.imageUrl || null, // Ensure imageUrl is handled
+        floor: updateData.floor || storeSettings?.defaultFloor || "1", // Use provided floor or default from store settings
+      };
+
+      // Remove undefined values to avoid overwriting existing fields with undefined
+      Object.keys(processedUpdates).forEach((key) => {
+        if (processedUpdates[key] === undefined) {
+          delete processedUpdates[key];
+        }
+      });
+
+      console.log("Storage: Update PriceIncludesTax debug:", {
+        inputValue: updateData.priceIncludesTax,
+        inputType: typeof updateData.priceIncludesTax,
+        processedValue: processedUpdates.priceIncludesTax,
+        processedType: typeof processedUpdates.priceIncludesTax,
+      });
+
+      const [product] = await database
+        .update(products)
+        .set(processedUpdates)
+        .where(and(eq(products.id, id), eq(products.isActive, true)))
+        .returning();
+
+      console.log("Product updated:", product);
+      console.log(
+        "Updated product priceIncludesTax:",
+        product?.priceIncludesTax,
+      );
+      return product || undefined;
+    } catch (error) {
+      console.error("Error updating product:", error);
+      throw error;
+    }
   }
 
   async deleteProduct(id: number, tenantDb?: any): Promise<boolean> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in deleteProduct`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("deleteProduct");
     try {
       // Check if product exists in transactions
       const transactionItemsCheck = await database
@@ -938,11 +1479,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteInactiveProducts(tenantDb?: any): Promise<number> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in deleteInactiveProducts`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("deleteInactiveProducts");
     const result = await database
       .delete(products)
       .where(eq(products.isActive, false))
@@ -955,14 +1492,12 @@ export class DatabaseStorage implements IStorage {
     quantity: number,
     tenantDb?: any,
   ): Promise<Product | undefined> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in updateProductStock`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("updateProductStock");
 
     try {
-      console.log(`🔍 Starting stock update for product ID: ${id}, quantity change: ${quantity}`);
+      console.log(
+        `🔍 Starting stock update for product ID: ${id}, quantity change: ${quantity}`,
+      );
 
       const [product] = await database
         .select()
@@ -974,11 +1509,15 @@ export class DatabaseStorage implements IStorage {
         throw new Error(`Product with ID ${id} not found`);
       }
 
-      console.log(`📋 Product found: ${product.name}, current stock: ${product.stock}, tracks inventory: ${product.trackInventory}`);
+      console.log(
+        `📋 Product found: ${product.name}, current stock: ${product.stock}, tracks inventory: ${product.trackInventory}`,
+      );
 
       // Check if product tracks inventory before updating
       if (!product.trackInventory) {
-        console.log(`⏭️ Product ${product.name} does not track inventory - skipping stock update`);
+        console.log(
+          `⏭️ Product ${product.name} does not track inventory - skipping stock update`,
+        );
         return product; // Return the original product without updating stock
       }
 
@@ -987,7 +1526,9 @@ export class DatabaseStorage implements IStorage {
       const newStock = currentStock - Math.abs(quantity);
 
       // Log the stock calculation
-      console.log(`📦 Simple stock calculation for ${product.name} (ID: ${id}):`);
+      console.log(
+        `📦 Simple stock calculation for ${product.name} (ID: ${id}):`,
+      );
       console.log(`   - Current stock: ${currentStock}`);
       console.log(`   - Quantity to subtract: ${Math.abs(quantity)}`);
       console.log(`   - New stock: ${newStock}`);
@@ -1006,7 +1547,9 @@ export class DatabaseStorage implements IStorage {
         .returning();
 
       if (updatedProduct) {
-        console.log(`✅ Stock updated successfully for ${product.name}: ${currentStock} → ${newStock}`);
+        console.log(
+          `✅ Stock updated successfully for ${product.name}: ${currentStock} → ${newStock}`,
+        );
 
         // Create inventory transaction record
         try {
@@ -1014,7 +1557,7 @@ export class DatabaseStorage implements IStorage {
             INSERT INTO inventory_transactions
             (product_id, type, quantity, previous_stock, new_stock, notes, created_at)
             VALUES (${id}, 'subtract', ${Math.abs(quantity)}, ${currentStock}, ${newStock},
-                   'Stock deduction from sale', ${new Date().toISOString()})
+                   'Stock deduction from sale', ${new Date()})
           `);
           console.log(`📝 Inventory transaction recorded for ${product.name}`);
         } catch (invError) {
@@ -1024,7 +1567,9 @@ export class DatabaseStorage implements IStorage {
 
         return updatedProduct;
       } else {
-        console.error(`❌ Failed to update stock for ${product.name} - no updated product returned`);
+        console.error(
+          `❌ Failed to update stock for ${product.name} - no updated product returned`,
+        );
         throw new Error(`Failed to update stock for product: ${product.name}`);
       }
     } catch (error) {
@@ -1038,14 +1583,13 @@ export class DatabaseStorage implements IStorage {
     items: InsertTransactionItem[],
     tenantDb?: any,
   ): Promise<Receipt> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in createTransaction`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("createTransaction");
     console.log(`🔄 Creating transaction: ${insertTransaction.transactionId}`);
     console.log(`📦 Processing ${items.length} items for inventory deduction`);
-    console.log(`📋 Transaction details:`, JSON.stringify(insertTransaction, null, 2));
+    console.log(
+      `📋 Transaction details:`,
+      JSON.stringify(insertTransaction, null, 2),
+    );
 
     try {
       // Create the main transaction record
@@ -1061,12 +1605,18 @@ export class DatabaseStorage implements IStorage {
       console.log(`✅ Transaction record created with ID: ${transaction.id}`);
 
       const transactionItemsWithIds: TransactionItem[] = [];
-      const stockUpdateResults: Array<{productName: string, success: boolean, error?: string}> = [];
+      const stockUpdateResults: Array<{
+        productName: string;
+        success: boolean;
+        error?: string;
+      }> = [];
 
       // Process each item
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
-        console.log(`📝 Processing item ${i + 1}/${items.length}: ${item.productName} (ID: ${item.productId}) - Qty: ${item.quantity}`);
+        console.log(
+          `📝 Processing item ${i + 1}/${items.length}: ${item.productName} (ID: ${item.productId}) - Qty: ${item.quantity}`,
+        );
 
         try {
           // Create transaction item record
@@ -1078,19 +1628,29 @@ export class DatabaseStorage implements IStorage {
             })
             .returning();
 
-          console.log(`✅ Transaction item created with ID: ${transactionItem.id}`);
+          console.log(
+            `✅ Transaction item created with ID: ${transactionItem.id}`,
+          );
 
           // Update product stock - trừ tồn kho đơn giản
-          console.log(`🔢 Updating stock for product ID ${item.productId}: subtract ${item.quantity}`);
+          console.log(
+            `🔢 Updating stock for product ID ${item.productId}: subtract ${item.quantity}`,
+          );
 
           try {
-            const updatedProduct = await this.updateProductStock(item.productId, item.quantity, tenantDb);
+            const updatedProduct = await this.updateProductStock(
+              item.productId,
+              item.quantity,
+              tenantDb,
+            );
 
             if (updatedProduct) {
-              console.log(`✅ Stock successfully updated for ${item.productName}: New stock = ${updatedProduct.stock}`);
+              console.log(
+                `✅ Stock successfully updated for ${item.productName}: New stock = ${updatedProduct.stock}`,
+              );
               stockUpdateResults.push({
                 productName: item.productName,
-                success: true
+                success: true,
               });
             } else {
               const errorMsg = `Failed to update stock for ${item.productName} - no product returned`;
@@ -1098,32 +1658,45 @@ export class DatabaseStorage implements IStorage {
               stockUpdateResults.push({
                 productName: item.productName,
                 success: false,
-                error: errorMsg
+                error: errorMsg,
               });
             }
           } catch (stockError) {
-            const errorMsg = stockError instanceof Error ? stockError.message : String(stockError);
-            console.error(`❌ Stock update error for ${item.productName}:`, errorMsg);
+            const errorMsg =
+              stockError instanceof Error
+                ? stockError.message
+                : String(stockError);
+            console.error(
+              `❌ Stock update error for ${item.productName}:`,
+              errorMsg,
+            );
             stockUpdateResults.push({
               productName: item.productName,
               success: false,
-              error: errorMsg
+              error: errorMsg,
             });
           }
 
           transactionItemsWithIds.push(transactionItem);
         } catch (itemError) {
-          console.error(`❌ Error processing transaction item ${item.productName}:`, itemError);
-          throw new Error(`Failed to process item ${item.productName}: ${itemError instanceof Error ? itemError.message : String(itemError)}`);
+          console.error(
+            `❌ Error processing transaction item ${item.productName}:`,
+            itemError,
+          );
+          throw new Error(
+            `Failed to process item ${item.productName}: ${itemError instanceof Error ? itemError.message : String(itemError)}`,
+          );
         }
       }
 
       // Log stock update summary
-      const successfulUpdates = stockUpdateResults.filter(r => r.success);
-      const failedUpdates = stockUpdateResults.filter(r => !r.success);
+      const successfulUpdates = stockUpdateResults.filter((r) => r.success);
+      const failedUpdates = stockUpdateResults.filter((r) => !r.success);
 
       console.log(`📊 Stock update summary:`);
-      console.log(`   - Successful: ${successfulUpdates.length}/${items.length}`);
+      console.log(
+        `   - Successful: ${successfulUpdates.length}/${items.length}`,
+      );
       console.log(`   - Failed: ${failedUpdates.length}/${items.length}`);
 
       if (failedUpdates.length > 0) {
@@ -1131,31 +1704,38 @@ export class DatabaseStorage implements IStorage {
         // Log but don't fail the transaction - the transaction was created successfully
       }
 
-      console.log(`✅ Transaction created successfully: ${transaction.transactionId} with ${transactionItemsWithIds.length} items`);
+      console.log(
+        `✅ Transaction created successfully: ${transaction.transactionId} with ${transactionItemsWithIds.length} items`,
+      );
 
       return {
         ...transaction,
         items: transactionItemsWithIds,
       };
     } catch (error) {
-      console.error(`❌ Error creating transaction ${insertTransaction.transactionId}:`, error);
-      throw new Error(`Failed to create transaction: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `❌ Error creating transaction ${insertTransaction.transactionId}:`,
+        error,
+      );
+      throw new Error(
+        `Failed to create transaction: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
-  async getTransaction(id: number): Promise<Receipt | undefined> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in getTransaction`);
-      throw new Error(`Database connection is not available`);
-    }
-    const [transaction] = await this.db
+  async getTransaction(
+    id: number,
+    tenantDb?: any,
+  ): Promise<Receipt | undefined> {
+    const database = tenantDb || this.getSafeDatabase("getTransaction");
+    const [transaction] = await database
       .select()
       .from(transactions)
       .where(eq(transactions.id, id));
 
     if (!transaction) return undefined;
 
-    const items = await this.db
+    const items = await database
       .select()
       .from(transactionItems)
       .where(eq(transactionItems.transactionId, id));
@@ -1165,19 +1745,18 @@ export class DatabaseStorage implements IStorage {
 
   async getTransactionByTransactionId(
     transactionId: string,
+    tenantDb?: any,
   ): Promise<Receipt | undefined> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in getTransactionByTransactionId`);
-      throw new Error(`Database connection is not available`);
-    }
-    const [transaction] = await this.db
+    const database =
+      tenantDb || this.getSafeDatabase("getTransactionByTransactionId");
+    const [transaction] = await database
       .select()
       .from(transactions)
       .where(eq(transactions.transactionId, transactionId));
 
     if (!transaction) return undefined;
 
-    const items = await this.db
+    const items = await database
       .select()
       .from(transactionItems)
       .where(eq(transactionItems.transactionId, transaction.id));
@@ -1186,21 +1765,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTransactions(tenantDb?: any): Promise<Transaction[]> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in getTransactions`);
-      throw new Error(`Database connection is not available`);
-    }
-    return await database.select().from(transactions).orderBy(transactions.createdAt);
+    const database = tenantDb || this.getSafeDatabase("getTransactions");
+    return await database
+      .select()
+      .from(transactions)
+      .orderBy(transactions.createdAt);
   }
 
   // Get next employee ID in sequence
   async getNextEmployeeId(tenantDb?: any): Promise<string> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in getNextEmployeeId`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("getNextEmployeeId");
     try {
       const lastEmployee = await database
         .select()
@@ -1232,11 +1806,7 @@ export class DatabaseStorage implements IStorage {
 
   // Generate next customer ID
   async getNextCustomerId(tenantDb?: any): Promise<string> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in getNextCustomerId`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("getNextCustomerId");
     try {
       // Get all customer IDs that match the CUST pattern and extract numbers
       const allCustomers = await database
@@ -1250,11 +1820,11 @@ export class DatabaseStorage implements IStorage {
 
       // Extract all numbers from existing customer IDs
       const existingNumbers = allCustomers
-        .map(customer => {
+        .map((customer) => {
           const match = customer.customerId.match(/CUST(\d+)/);
           return match ? parseInt(match[1], 10) : 0;
         })
-        .filter(num => num > 0)
+        .filter((num) => num > 0)
         .sort((a, b) => b - a); // Sort descending
 
       // Find the highest number and increment
@@ -1270,11 +1840,7 @@ export class DatabaseStorage implements IStorage {
 
   // Employee methods
   async getEmployees(tenantDb?: any): Promise<Employee[]> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in getEmployees`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("getEmployees");
     return await database
       .select()
       .from(employees)
@@ -1282,11 +1848,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getEmployee(id: number, tenantDb?: any): Promise<Employee | undefined> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in getEmployee`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("getEmployee");
     const [employee] = await database
       .select()
       .from(employees)
@@ -1298,11 +1860,8 @@ export class DatabaseStorage implements IStorage {
     employeeId: string,
     tenantDb?: any,
   ): Promise<Employee | undefined> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in getEmployeeByEmployeeId`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database =
+      tenantDb || this.getSafeDatabase("getEmployeeByEmployeeId");
     const [employee] = await database
       .select()
       .from(employees)
@@ -1312,12 +1871,11 @@ export class DatabaseStorage implements IStorage {
     return employee || undefined;
   }
 
-  async createEmployee(insertEmployee: InsertEmployee, tenantDb?: any): Promise<Employee> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in createEmployee`);
-      throw new Error(`Database connection is not available`);
-    }
+  async createEmployee(
+    insertEmployee: InsertEmployee,
+    tenantDb?: any,
+  ): Promise<Employee> {
+    const database = tenantDb || this.getSafeDatabase("createEmployee");
     const [employee] = await database
       .insert(employees)
       .values(insertEmployee)
@@ -1330,11 +1888,7 @@ export class DatabaseStorage implements IStorage {
     updateData: Partial<InsertEmployee>,
     tenantDb?: any,
   ): Promise<Employee | undefined> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in updateEmployee`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("updateEmployee");
     const [employee] = await database
       .update(employees)
       .set(updateData)
@@ -1344,11 +1898,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteEmployee(id: number, tenantDb?: any): Promise<boolean> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in deleteEmployee`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("deleteEmployee");
     try {
       // Check if employee has attendance records
       const attendanceCheck = await database
@@ -1358,7 +1908,9 @@ export class DatabaseStorage implements IStorage {
         .limit(1);
 
       if (attendanceCheck.length > 0) {
-        throw new Error("Cannot delete employee: employee has attendance records");
+        throw new Error(
+          "Cannot delete employee: employee has attendance records",
+        );
       }
 
       // Check if employee has orders
@@ -1391,7 +1943,7 @@ export class DatabaseStorage implements IStorage {
     tenantDb?: any,
   ): Promise<AttendanceRecord[]> {
     try {
-      const database = this.getSafeDatabase(tenantDb, 'getAttendanceRecords');
+      const database = tenantDb || this.getSafeDatabase("getAttendanceRecords");
 
       const conditions = [];
 
@@ -1429,11 +1981,13 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getAttendanceRecord(id: number, tenantDb?: any): Promise<AttendanceRecord | undefined> {
-    const database = tenantDb || this.db;
+  async getAttendanceRecord(
+    id: number,
+    tenantDb?: any,
+  ): Promise<AttendanceRecord | undefined> {
+    const database = tenantDb || this.getSafeDatabase("getAttendanceRecord");
 
     try {
-      this.validateDatabase(database, 'getAttendanceRecord');
       const [record] = await database
         .select()
         .from(attendanceRecords)
@@ -1449,11 +2003,9 @@ export class DatabaseStorage implements IStorage {
     employeeId: number,
     tenantDb?: any,
   ): Promise<AttendanceRecord | undefined> {
-    const database = tenantDb || this.db;
+    const database = tenantDb || this.getSafeDatabase("getTodayAttendance");
 
     try {
-      this.validateDatabase(database, 'getTodayAttendance');
-
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const tomorrow = new Date(today);
@@ -1476,14 +2028,15 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async clockIn(employeeId: number, notes?: string): Promise<AttendanceRecord> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in clockIn`);
-      throw new Error(`Database connection is not available`);
-    }
+  async clockIn(
+    employeeId: number,
+    notes?: string,
+    tenantDb?: any,
+  ): Promise<AttendanceRecord> {
+    const database = tenantDb || this.getSafeDatabase("clockIn");
     try {
       // Check if employee exists
-      const [employee] = await this.db
+      const [employee] = await database
         .select()
         .from(employees)
         .where(eq(employees.id, employeeId))
@@ -1494,13 +2047,16 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Check if already clocked in today
-      const existingRecord = await this.getTodayAttendance(employeeId);
+      const existingRecord = await this.getTodayAttendance(
+        employeeId,
+        tenantDb,
+      );
       if (existingRecord) {
-        throw new Error('Employee already clocked in today');
+        throw new Error("Employee already clocked in today");
       }
 
       const clockInTime = new Date();
-      const [record] = await this.db
+      const [record] = await database
         .insert(attendanceRecords)
         .values({
           employeeId,
@@ -1511,23 +2067,23 @@ export class DatabaseStorage implements IStorage {
         .returning();
 
       if (!record) {
-        throw new Error('Failed to create attendance record');
+        throw new Error("Failed to create attendance record");
       }
 
       return record;
     } catch (error) {
-      console.error('Clock-in error:', error);
+      console.error("Clock-in error:", error);
       throw error;
     }
   }
 
-  async clockOut(attendanceId: number): Promise<AttendanceRecord | undefined> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in clockOut`);
-      throw new Error(`Database connection is not available`);
-    }
+  async clockOut(
+    attendanceId: number,
+    tenantDb?: any,
+  ): Promise<AttendanceRecord | undefined> {
+    const database = tenantDb || this.getSafeDatabase("clockOut");
     const clockOutTime = new Date();
-    const record = await this.getAttendanceRecord(attendanceId);
+    const record = await this.getAttendanceRecord(attendanceId, tenantDb);
     if (!record) return undefined;
 
     const clockInTime = new Date(record.clockIn);
@@ -1547,7 +2103,7 @@ export class DatabaseStorage implements IStorage {
     // Calculate overtime (assuming 8 hour work day)
     const overtime = Math.max(0, totalHours - 8);
 
-    const [updatedRecord] = await this.db
+    const [updatedRecord] = await database
       .update(attendanceRecords)
       .set({
         clockOut: clockOutTime,
@@ -1562,12 +2118,10 @@ export class DatabaseStorage implements IStorage {
 
   async startBreak(
     attendanceId: number,
+    tenantDb?: any,
   ): Promise<AttendanceRecord | undefined> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in startBreak`);
-      throw new Error(`Database connection is not available`);
-    }
-    const [record] = await this.db
+    const database = tenantDb || this.getSafeDatabase("startBreak");
+    const [record] = await database
       .update(attendanceRecords)
       .set({ breakStart: new Date() })
       .where(eq(attendanceRecords.id, attendanceId))
@@ -1575,12 +2129,12 @@ export class DatabaseStorage implements IStorage {
     return record || undefined;
   }
 
-  async endBreak(attendanceId: number): Promise<AttendanceRecord | undefined> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in endBreak`);
-      throw new Error(`Database connection is not available`);
-    }
-    const [record] = await this.db
+  async endBreak(
+    attendanceId: number,
+    tenantDb?: any,
+  ): Promise<AttendanceRecord | undefined> {
+    const database = tenantDb || this.getSafeDatabase("endBreak");
+    const [record] = await database
       .update(attendanceRecords)
       .set({ breakEnd: new Date() })
       .where(eq(attendanceRecords.id, attendanceId))
@@ -1591,12 +2145,10 @@ export class DatabaseStorage implements IStorage {
   async updateAttendanceStatus(
     id: number,
     status: string,
+    tenantDb?: any,
   ): Promise<AttendanceRecord | undefined> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in updateAttendanceStatus`);
-      throw new Error(`Database connection is not available`);
-    }
-    const [record] = await this.db
+    const database = tenantDb || this.getSafeDatabase("updateAttendanceStatus");
+    const [record] = await database
       .update(attendanceRecords)
       .set({ status })
       .where(eq(attendanceRecords.id, id))
@@ -1606,10 +2158,9 @@ export class DatabaseStorage implements IStorage {
 
   // Tables
   async getTables(tenantDb?: any): Promise<Table[]> {
-    const database = tenantDb || this.db;
+    const database = tenantDb || this.getSafeDatabase("getTables");
 
     try {
-      this.validateDatabase(database, 'getTables');
       return await database.select().from(tables).orderBy(tables.tableNumber);
     } catch (error) {
       console.error(`❌ Error in getTables:`, error);
@@ -1618,11 +2169,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTable(id: number, tenantDb?: any): Promise<Table | undefined> {
-    const database = tenantDb || this.db;
+    const database = tenantDb || this.getSafeDatabase("getTable");
 
     try {
-      this.validateDatabase(database, 'getTable');
-      const [table] = await database.select().from(tables).where(eq(tables.id, id));
+      const [table] = await database
+        .select()
+        .from(tables)
+        .where(eq(tables.id, id));
       return table || undefined;
     } catch (error) {
       console.error(`❌ Error in getTable:`, error);
@@ -1630,11 +2183,13 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getTableByNumber(tableNumber: string, tenantDb?: any): Promise<Table | undefined> {
-    const database = tenantDb || this.db;
+  async getTableByNumber(
+    tableNumber: string,
+    tenantDb?: any,
+  ): Promise<Table | undefined> {
+    const database = tenantDb || this.getSafeDatabase("getTableByNumber");
 
     try {
-      this.validateDatabase(database, 'getTableByNumber');
       const [table] = await database
         .select()
         .from(tables)
@@ -1647,11 +2202,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTable(table: InsertTable, tenantDb?: any): Promise<Table> {
-    const database = tenantDb || this.db;
+    const database = tenantDb || this.getSafeDatabase("createTable");
 
     try {
-      this.validateDatabase(database, 'createTable');
-      const [newTable] = await database.insert(tables).values(table).returning();
+      const [newTable] = await database
+        .insert(tables)
+        .values(table)
+        .returning();
       return newTable;
     } catch (error) {
       console.error(`❌ Error in createTable:`, error);
@@ -1664,10 +2221,9 @@ export class DatabaseStorage implements IStorage {
     table: Partial<InsertTable>,
     tenantDb?: any,
   ): Promise<Table | undefined> {
-    const database = tenantDb || this.db;
+    const database = tenantDb || this.getSafeDatabase("updateTable");
 
     try {
-      this.validateDatabase(database, 'updateTable');
       const [updatedTable] = await database
         .update(tables)
         .set(table)
@@ -1685,10 +2241,9 @@ export class DatabaseStorage implements IStorage {
     status: string,
     tenantDb?: any,
   ): Promise<Table | undefined> {
-    const database = tenantDb || this.db;
+    const database = tenantDb || this.getSafeDatabase("updateTableStatus");
 
     try {
-      this.validateDatabase(database, 'updateTableStatus');
       const [table] = await database
         .update(tables)
         .set({ status })
@@ -1702,10 +2257,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteTable(id: number, tenantDb?: any): Promise<boolean> {
-    const database = tenantDb || this.db;
+    const database = tenantDb || this.getSafeDatabase("deleteTable");
 
     try {
-      this.validateDatabase(database, 'deleteTable');
       const result = await database.delete(tables).where(eq(tables.id, id));
       return (result.rowCount ?? 0) > 0;
     } catch (error) {
@@ -1722,7 +2276,7 @@ export class DatabaseStorage implements IStorage {
     salesChannel?: string,
   ): Promise<any[]> {
     try {
-      const database = this.getSafeDatabase(tenantDb, 'getOrders');
+      const database = tenantDb || this.getSafeDatabase("getOrders");
 
       let query = database.select().from(orders);
 
@@ -1745,21 +2299,24 @@ export class DatabaseStorage implements IStorage {
       }
 
       const result = await query.orderBy(desc(orders.orderedAt));
-      console.log(`Storage: getOrders returned ${result?.length || 0} orders${salesChannel ? ` for channel: ${salesChannel}` : ''}`);
+      console.log(
+        `Storage: getOrders returned ${result?.length || 0} orders${salesChannel ? ` for channel: ${salesChannel}` : ""}`,
+      );
       return result || [];
     } catch (error) {
-      console.error('Storage: getOrders error:', error);
+      console.error("Storage: getOrders error:", error);
       return [];
     }
   }
 
-
   async getOrder(id: number, tenantDb?: any): Promise<Order | undefined> {
-    const database = tenantDb || this.db;
+    const database = tenantDb || this.getSafeDatabase("getOrder");
 
     try {
-      this.validateDatabase(database, 'getOrder');
-      const [order] = await database.select().from(orders).where(eq(orders.id, id));
+      const [order] = await database
+        .select()
+        .from(orders)
+        .where(eq(orders.id, id));
       return order || undefined;
     } catch (error) {
       console.error(`❌ Error in getOrder:`, error);
@@ -1767,11 +2324,13 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getOrderByNumber(orderNumber: string, tenantDb?: any): Promise<Order | undefined> {
-    const database = tenantDb || this.db;
+  async getOrderByNumber(
+    orderNumber: string,
+    tenantDb?: any,
+  ): Promise<Order | undefined> {
+    const database = tenantDb || this.getSafeDatabase("getOrderByNumber");
 
     try {
-      this.validateDatabase(database, 'getOrderByNumber');
       const [order] = await database
         .select()
         .from(orders)
@@ -1783,104 +2342,146 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createOrder(orderData: any, orderItems: any[], tenantDb?: any): Promise<any> {
-    try {
-      const database = this.getSafeDatabase(tenantDb, 'createOrder');
+  async createOrder(
+    orderData: InsertOrder,
+    items: InsertOrderItem[],
+    tenantDb?: any,
+  ): Promise<Order> {
+    const database = tenantDb || this.getSafeDatabase("createOrder");
 
-      console.log(`📝 Creating order with data:`, orderData);
-
-      // Ensure salesChannel is set properly
-      if (!orderData.salesChannel) {
-        orderData.salesChannel = orderData.tableId ? 'table' : 'pos';
+    // Get store settings to determine price_include_tax if not provided
+    let priceIncludeTax = orderData.priceIncludeTax;
+    if (priceIncludeTax === undefined) {
+      try {
+        const [storeSettings] = await database
+          .select({ priceIncludesTax: storeSettings.priceIncludesTax })
+          .from(storeSettings)
+          .limit(1);
+        priceIncludeTax = storeSettings?.priceIncludesTax || false;
+      } catch (error) {
+        console.warn(
+          "Could not fetch store settings, defaulting priceIncludeTax to false",
+        );
+        priceIncludeTax = false;
       }
+    }
 
-      console.log(`📝 Final order data with salesChannel: ${orderData.salesChannel}`, orderData);
+    console.log(`📝 Creating order with data:`, {
+      orderNumber: orderData.orderNumber,
+      tableId: orderData.tableId,
+      subtotal: orderData.subtotal,
+      tax: orderData.tax,
+      total: orderData.total,
+      salesChannel: orderData.salesChannel,
+      priceIncludeTax: priceIncludeTax,
+      itemsCount: items.length,
+    });
 
-      // Create the order - ensure proper field mapping (save discount without recalculating total)
-      const orderInsertData = {
-        orderNumber: orderData.orderNumber,
-        tableId: orderData.tableId,
-        employeeId: orderData.employeeId || null,
-        status: orderData.status,
-        customerName: orderData.customerName,
-        customerCount: orderData.customerCount,
-        subtotal: orderData.subtotal ? parseFloat(orderData.subtotal.toString()) : 0,
-        tax: orderData.tax ? parseFloat(orderData.tax.toString()) : 0,
-        discount: orderData.discount ? parseFloat(orderData.discount.toString()) : 0,
-        total: orderData.total ? parseFloat(orderData.total.toString()) : 0,
-        paymentMethod: orderData.paymentMethod,
-        paymentStatus: orderData.paymentStatus,
-        einvoiceStatus: orderData.einvoiceStatus || 0,
-        salesChannel: orderData.salesChannel,
-        notes: orderData.notes,
-        paidAt: orderData.paidAt,
-        orderedAt: new Date()
-      };
+    // Ensure salesChannel is set properly
+    if (!orderData.salesChannel) {
+      orderData.salesChannel = orderData.tableId ? "table" : "pos";
+    }
 
-      console.log(`📝 Final order insert data:`, orderInsertData);
+    console.log(
+      `📝 Final order data with salesChannel: ${orderData.salesChannel}`,
+      orderData,
+    );
 
-      const [order] = await database
-        .insert(orders)
-        .values(orderInsertData)
+    // Create the order - ensure proper field mapping (save discount without recalculating total)
+    const orderInsertData = {
+      orderNumber: orderData.orderNumber,
+      tableId: orderData.tableId,
+      employeeId: orderData.employeeId || null,
+      status: orderData.status,
+      customerName: orderData.customerName,
+      customerCount: orderData.customerCount,
+      subtotal: orderData.subtotal
+        ? parseFloat(orderData.subtotal.toString())
+        : 0,
+      tax: orderData.tax ? parseFloat(orderData.tax.toString()) : 0,
+      discount: orderData.discount
+        ? parseFloat(orderData.discount.toString())
+        : 0,
+      total: orderData.total ? parseFloat(orderData.total.toString()) : 0,
+      paymentMethod: orderData.paymentMethod,
+      paymentStatus: orderData.paymentStatus,
+      einvoiceStatus: orderData.einvoiceStatus || 0,
+      salesChannel: orderData.salesChannel,
+      notes: orderData.notes,
+      paidAt: orderData.paidAt,
+      orderedAt: new Date(),
+    };
+
+    console.log(`📝 Final order insert data:`, orderInsertData);
+
+    const [order] = await database
+      .insert(orders)
+      .values({
+        ...orderData,
+        priceIncludeTax: priceIncludeTax,
+        orderedAt: new Date(),
+      })
+      .returning();
+
+    console.log(
+      `Storage: Order created with ID ${order.id}, sales channel: ${order.salesChannel}`,
+    );
+
+    // Create order items
+    if (items && items.length > 0) {
+      const itemsToInsert = items.map((item: any) => ({
+        orderId: order.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        total: item.total,
+        discount: item.discount || "0.00", // Map discount here
+        notes: item.notes || null,
+      }));
+
+      console.log(`Storage: Inserting ${itemsToInsert.length} order items`);
+      const insertedItems = await database
+        .insert(orderItemsTable)
+        .values(itemsToInsert)
         .returning();
 
-      console.log(`Storage: Order created with ID ${order.id}, sales channel: ${order.salesChannel}`);
+      console.log(`Storage: ${insertedItems.length} order items created`);
 
-      // Create order items
-      if (orderItems && orderItems.length > 0) {
-        const itemsToInsert = orderItems.map((item: any) => ({
-          orderId: order.id,
-          productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          total: item.total,
-          discount: item.discount || "0.00", // Map discount here
-          notes: item.notes || null
-        }));
+      // Update product stock for items that track inventory
+      for (const item of items) {
+        const [product] = await database
+          .select()
+          .from(products)
+          .where(eq(products.id, item.productId))
+          .limit(1);
 
-        console.log(`Storage: Inserting ${itemsToInsert.length} order items`);
-        const insertedItems = await database
-          .insert(orderItemsTable)
-          .values(itemsToInsert)
-          .returning();
+        if (product && product.trackInventory) {
+          const newStock = Math.max(0, product.stock - item.quantity);
+          await database
+            .update(products)
+            .set({ stock: newStock })
+            .where(eq(products.id, item.productId));
 
-        console.log(`Storage: ${insertedItems.length} order items created`);
-
-        // Update product stock for items that track inventory
-        for (const item of orderItems) {
-          const [product] = await database
-            .select()
-            .from(products)
-            .where(eq(products.id, item.productId))
-            .limit(1);
-
-          if (product && product.trackInventory) {
-            const newStock = Math.max(0, product.stock - item.quantity);
-            await database
-              .update(products)
-              .set({ stock: newStock })
-              .where(eq(products.id, item.productId));
-
-            console.log(`Storage: Updated stock for product ${item.productId}: ${product.stock} -> ${newStock}`);
-          }
+          console.log(
+            `Storage: Updated stock for product ${item.productId}: ${product.stock} -> ${newStock}`,
+          );
         }
       }
-
-      // Update table status if this is a table order
-      if (orderData.tableId && orderData.salesChannel === "table") {
-        await database
-          .update(tables)
-          .set({ status: "occupied" })
-          .where(eq(tables.id, orderData.tableId));
-
-        console.log(`Storage: Updated table ${orderData.tableId} status to occupied`);
-      }
-
-      return order;
-    } catch (error) {
-      console.error('Storage: createOrder error:', error);
-      throw error;
     }
+
+    // Update table status if this is a table order
+    if (orderData.tableId && orderData.salesChannel === "table") {
+      await database
+        .update(tables)
+        .set({ status: "occupied" })
+        .where(eq(tables.id, orderData.tableId));
+
+      console.log(
+        `Storage: Updated table ${orderData.tableId} status to occupied`,
+      );
+    }
+
+    return order;
   }
 
   async updateOrder(
@@ -1907,24 +2508,23 @@ export class DatabaseStorage implements IStorage {
       paidAt: Date | null;
       discount: string;
     }>,
-    database?: any,
+    tenantDb?: any,
   ): Promise<Order | null> {
-    const db = database || this.db;
-    console.log(`💾 Storage: Starting order update for ID ${id} with data:`, orderData);
+    const db = tenantDb || this.getSafeDatabase("updateOrder");
+    console.log(
+      `💾 Storage: Starting order update for ID ${id} with data:`,
+      orderData,
+    );
 
     // Fix timestamp handling - ensure Date objects
-    if (orderData.paidAt && typeof orderData.paidAt === 'string') {
+    if (orderData.paidAt && typeof orderData.paidAt === "string") {
       orderData.paidAt = new Date(orderData.paidAt);
     }
 
-    // Calculate fields logic if needed
-    if (orderData.subtotal !== undefined && orderData.tax !== undefined) {
-      const calculatedTotal = Number(orderData.subtotal) + Number(orderData.tax);
-      if (!orderData.total) {
-        orderData.total = calculatedTotal.toString();
-        console.log(`✅ Storage: No calculation performed - saved exact frontend values`);
-      }
-    }
+    // NO calculation - use exact frontend values
+    console.log(
+      `✅ Storage: Saving exact frontend values without any calculation or modification`,
+    );
 
     const updateData = {
       ...orderData,
@@ -1959,7 +2559,6 @@ export class DatabaseStorage implements IStorage {
     return updatedOrder;
   }
 
-
   // Validate database connection with comprehensive checks
   private validateDatabase(database: any, operation: string): void {
     if (!database) {
@@ -1967,25 +2566,34 @@ export class DatabaseStorage implements IStorage {
       throw new Error(`Database connection is not available for ${operation}`);
     }
 
-    if (typeof database !== 'object') {
-      console.error(`❌ Database is not an object in ${operation}:`, typeof database);
+    if (typeof database !== "object") {
+      console.error(
+        `❌ Database is not an object in ${operation}:`,
+        typeof database,
+      );
       throw new Error(`Invalid database type for ${operation}`);
     }
 
-    if (!database.select || typeof database.select !== 'function') {
+    if (!database.select || typeof database.select !== "function") {
       console.error(`❌ Database missing select method in ${operation}`);
       console.error(`❌ Available methods:`, Object.keys(database));
-      throw new Error(`Database connection is invalid - missing select method for ${operation}`);
+      throw new Error(
+        `Database connection is invalid - missing select method for ${operation}`,
+      );
     }
 
-    if (!database.insert || typeof database.insert !== 'function') {
-      console.error(`❌ Database missing insert method in ${operation}`);
-      throw new Error(`Database connection is invalid - missing insert method for ${operation}`);
+    if (!database.insert || typeof database.insert !== "function") {
+      console.error(`) Database missing insert method in ${operation}`);
+      throw new Error(
+        `Database connection is invalid - missing insert method for ${operation}`,
+      );
     }
 
-    if (!database.update || typeof database.update !== 'function') {
+    if (!database.update || typeof database.update !== "function") {
       console.error(`❌ Database missing update method in ${operation}`);
-      throw new Error(`Database connection is invalid - missing update method for ${operation}`);
+      throw new Error(
+        `Database connection is invalid - missing update method for ${operation}`,
+      );
     }
   }
 
@@ -1993,23 +2601,30 @@ export class DatabaseStorage implements IStorage {
   private async safeDbQuery<T>(
     queryFn: () => Promise<T>,
     fallbackValue: T,
-    operation: string
+    operation: string,
   ): Promise<T> {
     try {
       console.log(`🔍 Executing safe database query for ${operation}`);
       const result = await queryFn();
-      console.log(`✅ Safe database query completed successfully for ${operation}`);
+      console.log(
+        `✅ Safe database query completed successfully for ${operation}`,
+      );
       return result || fallbackValue;
     } catch (error) {
       console.error(`❌ Database error in ${operation}:`, {
         errorMessage: error?.message,
         errorType: error?.constructor?.name,
-        errorStack: error?.stack
+        errorStack: error?.stack,
       });
 
       // Check if it's a connection error specifically
-      if (error?.message?.includes('select') || error?.message?.includes('undefined')) {
-        console.error(`❌ CRITICAL: Database connection lost during ${operation}`);
+      if (
+        error?.message?.includes("select") ||
+        error?.message?.includes("undefined")
+      ) {
+        console.error(
+          `❌ CRITICAL: Database connection lost during ${operation}`,
+        );
       }
 
       return fallbackValue;
@@ -2024,7 +2639,9 @@ export class DatabaseStorage implements IStorage {
     console.log(`🚀 ========================================`);
     console.log(`🚀 STORAGE FUNCTION CALLED: updateOrderStatus`);
     console.log(`🚀 ========================================`);
-    console.log(`📋 updateOrderStatus called with id: ${id}, status: ${status}`);
+    console.log(
+      `📋 updateOrderStatus called with id: ${id}, status: ${status}`,
+    );
     console.log(`🔍 updateOrderStatus parameters: {`);
     console.log(`  id: ${id},`);
     console.log(`  idType: '${typeof id}',`);
@@ -2034,13 +2651,15 @@ export class DatabaseStorage implements IStorage {
     console.log(`}`);
 
     // Handle temporary order IDs - return a success response to continue flow
-    if (typeof id === 'string' && id.startsWith('temp-')) {
-      console.log(`🟡 Temporary order ID detected: ${id} - allowing flow to continue to E-Invoice`);
+    if (typeof id === "string" && id.startsWith("temp-")) {
+      console.log(
+        `🟡 Temporary order ID detected: ${id} - allowing flow to continue to E-Invoice`,
+      );
 
       // Return a success order object that allows the flow to continue to E-Invoice modal
       const mockOrder = {
         id: id as any, // Keep the temp ID for reference
-        orderNumber: `TEMP-${Date.now()}`,
+        orderNumber: `TEMP-${new Date()}`,
         tableId: null,
         customerName: "Khách hàng",
         customerPhone: null,
@@ -2049,27 +2668,30 @@ export class DatabaseStorage implements IStorage {
         tax: "0.00",
         total: "0.00",
         status: status,
-        paymentMethod: status === 'paid' ? 'cash' : null,
-        paymentStatus: status === 'paid' ? 'paid' : 'pending',
+        paymentMethod: status === "paid" ? "cash" : null,
+        paymentStatus: status === "paid" ? "paid" : "pending",
         einvoiceStatus: 0, // Not published yet
         invoiceNumber: null,
         templateNumber: null,
         symbol: null,
         notes: `Temporary order - payment flow continuing to E-Invoice`,
         orderedAt: new Date(),
-        paidAt: status === 'paid' ? new Date() : null,
+        paidAt: status === "paid" ? new Date() : null,
         employeeId: null,
-        salesChannel: 'pos',
+        salesChannel: "pos",
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
 
-      console.log(`✅ Mock order created for temporary ID - flow will continue to E-Invoice:`, {
-        id: mockOrder.id,
-        status: mockOrder.status,
-        paymentMethod: mockOrder.paymentMethod,
-        allowsContinuation: true
-      });
+      console.log(
+        `✅ Mock order created for temporary ID - flow will continue to E-Invoice:`,
+        {
+          id: mockOrder.id,
+          status: mockOrder.status,
+          paymentMethod: mockOrder.paymentMethod,
+          allowsContinuation: true,
+        },
+      );
 
       return mockOrder;
     }
@@ -2077,42 +2699,58 @@ export class DatabaseStorage implements IStorage {
     // Enhanced database validation with comprehensive error handling
     let database;
     try {
-      database = this.getSafeDatabase(tenantDb, 'updateOrderStatus');
+      database = tenantDb || this.getSafeDatabase("updateOrderStatus");
 
       // Additional runtime validation
-      if (!database || typeof database !== 'object') {
-        console.error(`❌ CRITICAL: Invalid database object in updateOrderStatus`);
+      if (!database || typeof database !== "object") {
+        console.error(
+          `❌ CRITICAL: Invalid database object in updateOrderStatus`,
+        );
         throw new Error(`Database connection is completely invalid`);
       }
 
-      if (!database.select || typeof database.select !== 'function') {
-        console.error(`❌ CRITICAL: Database missing select method in updateOrderStatus`);
+      if (!database.select || typeof database.select !== "function") {
+        console.error(
+          `❌ CRITICAL: Database missing select method in updateOrderStatus`,
+        );
         console.error(`❌ Available methods:`, Object.keys(database));
         throw new Error(`Database connection is missing required methods`);
       }
 
-      if (!database.update || typeof database.update !== 'function') {
-        console.error(`❌ CRITICAL: Database missing update method in updateOrderStatus`);
+      if (!database.update || typeof database.update !== "function") {
+        console.error(
+          `❌ CRITICAL: Database missing update method in updateOrderStatus`,
+        );
         throw new Error(`Database connection is missing update method`);
       }
 
       console.log(`✅ Database validation passed for updateOrderStatus`);
-
     } catch (dbError) {
-      console.error(`❌ Database validation failed in updateOrderStatus:`, dbError);
+      console.error(
+        `❌ Database validation failed in updateOrderStatus:`,
+        dbError,
+      );
 
       // Try to fall back to global db if tenant db is problematic
-      if (tenantDb && this.db && typeof this.db === 'object' && this.db.select && this.db.update) {
+      if (
+        tenantDb &&
+        this.db &&
+        typeof this.db === "object" &&
+        this.db.select &&
+        this.db.update
+      ) {
         console.log(`🔄 Falling back to global database connection`);
         database = this.db;
       } else {
         console.error(`❌ No valid fallback database available`);
-        throw new Error(`Database connection is completely unavailable: ${dbError.message}`);
+        throw new Error(
+          `Database connection is completely unavailable: ${dbError.message}`,
+        );
       }
     }
 
     // Ensure id is a number for database operations
-    const orderId = typeof id === 'string' ? parseInt(id) : id;
+    const orderId = typeof id === "string" ? parseInt(id) : id;
     if (isNaN(orderId)) {
       console.error(`❌ Invalid order ID: ${id}`);
       throw new Error(`Invalid order ID: ${id}`);
@@ -2124,9 +2762,13 @@ export class DatabaseStorage implements IStorage {
       // First, get the current order to know its table
       console.log(`🔍 Fetching current order with ID: ${orderId}`);
       const result = await this.safeDbQuery(
-        () => database.select().from(orders).where(eq(orders.id, orderId as number)),
+        () =>
+          database
+            .select()
+            .from(orders)
+            .where(eq(orders.id, orderId as number)),
         [],
-        `fetchCurrentOrder-${orderId}`
+        `fetchCurrentOrder-${orderId}`,
       );
       const [currentOrder] = result;
 
@@ -2135,7 +2777,14 @@ export class DatabaseStorage implements IStorage {
         console.log(`🔍 Attempting to fetch all orders to debug...`);
         try {
           const allOrders = await database.select().from(orders).limit(5);
-          console.log(`🔍 Sample orders in database:`, allOrders.map(o => ({ id: o.id, orderNumber: o.orderNumber, status: o.status })));
+          console.log(
+            `🔍 Sample orders in database:`,
+            allOrders.map((o) => ({
+              id: o.id,
+              orderNumber: o.orderNumber,
+              status: o.status,
+            })),
+          );
         } catch (debugError) {
           console.error(`❌ Error fetching sample orders:`, debugError);
         }
@@ -2149,50 +2798,65 @@ export class DatabaseStorage implements IStorage {
         currentStatus: currentOrder.status,
         requestedStatus: status,
         paidAt: currentOrder.paidAt,
-        einvoiceStatus: currentOrder.einvoiceStatus
+        einvoiceStatus: currentOrder.einvoiceStatus,
       });
 
       // Update the order status with additional paid timestamp if needed
       const updateData: any = {
         status,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
 
       if (status === "paid") {
         updateData.paidAt = new Date();
-        console.log(`💳 Setting paidAt timestamp for order ${orderId}:`, updateData.paidAt);
+        console.log(
+          `💳 Setting paidAt timestamp for order ${orderId}:`,
+          updateData.paidAt,
+        );
       }
 
       console.log(`🔍 Update data being sent:`, updateData);
       console.log(`🔍 Update query targeting order ID: ${orderId}`);
 
-      const queryStartTime = Date.now();
-      console.log(`⏱️ DATABASE QUERY STARTED at:`, new Date().toISOString());
+      const queryStartTime = new Date();
+      console.log(`⏱️ DATABASE QUERY STARTED at:`, new Date());
 
       const updateResult = await this.safeDbQuery(
-        () => database.update(orders).set(updateData).where(eq(orders.id, orderId as number)).returning(),
+        () =>
+          database
+            .update(orders)
+            .set(updateData)
+            .where(eq(orders.id, orderId as number))
+            .returning(),
         [],
-        `updateOrderStatus-${orderId}`
+        `updateOrderStatus-${orderId}`,
       );
       const [order] = updateResult;
 
-      const queryEndTime = Date.now();
-      console.log(`⏱️ DATABASE QUERY COMPLETED in ${queryEndTime - queryEndTime}ms`);
+      const queryEndTime = new Date();
+      console.log(
+        `⏱️ DATABASE QUERY COMPLETED in ${queryEndTime - queryStartTime}ms`,
+      );
       console.log(`🔍 Database query execution result:`, {
         queryDuration: `${queryEndTime - queryStartTime}ms`,
         rowsAffected: order ? 1 : 0,
         orderReturned: !!order,
-        timestamp: new Date().toISOString()
+        timestamp: new Date(),
       });
 
       if (!order) {
-        console.error(`❌ No order returned after status update for ID: ${orderId}`);
+        console.error(
+          `❌ No order returned after status update for ID: ${orderId}`,
+        );
         console.log(`🔍 Verifying order still exists...`);
         const [verifyOrder] = await database
           .select()
           .from(orders)
           .where(eq(orders.id, orderId as number));
-        console.log(`🔍 Order verification result:`, verifyOrder ? 'EXISTS' : 'NOT FOUND');
+        console.log(
+          `🔍 Order verification result:`,
+          verifyOrder ? "EXISTS" : "NOT FOUND",
+        );
         return undefined;
       }
 
@@ -2204,17 +2868,19 @@ export class DatabaseStorage implements IStorage {
         newStatus: order.status,
         paidAt: order.paidAt,
         updatedAt: order.updatedAt,
-        einvoiceStatus: order.einvoiceStatus
+        einvoiceStatus: order.einvoiceStatus,
       });
 
       // CRITICAL: Handle table status update when order is paid
       if (status === "paid" && order.tableId) {
-        console.log(`💳 Order PAID - IMMEDIATELY processing table ${order.tableId} release`);
+        console.log(
+          `💳 Order PAID - IMMEDIATELY processing table ${order.tableId} release`,
+        );
         console.log(`🔍 DEBUG: Table release process started:`, {
           orderId: orderId,
           tableId: order.tableId,
           newStatus: status,
-          timestamp: new Date().toISOString()
+          timestamp: new Date(),
         });
 
         try {
@@ -2223,12 +2889,21 @@ export class DatabaseStorage implements IStorage {
           console.log(`✅ Tables schema imported successfully`);
 
           // Check for other ACTIVE orders on the same table (excluding current order and paid/cancelled orders)
-          const activeStatuses = ["pending", "confirmed", "preparing", "ready", "served"];
-          console.log(`🔍 DEBUG: Checking for other active orders on table ${order.tableId}:`, {
-            excludeOrderId: orderId,
-            activeStatuses: activeStatuses,
-            tableId: order.tableId
-          });
+          const activeStatuses = [
+            "pending",
+            "confirmed",
+            "preparing",
+            "ready",
+            "served",
+          ];
+          console.log(
+            `🔍 DEBUG: Checking for other active orders on table ${order.tableId}:`,
+            {
+              excludeOrderId: orderId,
+              activeStatuses: activeStatuses,
+              tableId: order.tableId,
+            },
+          );
 
           const otherActiveOrders = await database
             .select()
@@ -2238,20 +2913,24 @@ export class DatabaseStorage implements IStorage {
                 eq(orders.tableId, order.tableId),
                 not(eq(orders.id, orderId as number)), // Exclude current order
                 or(
-                  ...activeStatuses.map(activeStatus => eq(orders.status, activeStatus))
-                )
-              )
+                  ...activeStatuses.map((activeStatus) =>
+                    eq(orders.status, activeStatus),
+                  ),
+                ),
+              ),
             );
 
-          console.log(`🔍 DEBUG: Query completed - found ${otherActiveOrders.length} other active orders`);
+          console.log(
+            `🔍 DEBUG: Query completed - found ${otherActiveOrders.length} other active orders`,
+          );
 
           console.log(`🔍 Active orders remaining on table ${order.tableId}:`, {
             count: otherActiveOrders.length,
-            orders: otherActiveOrders.map(o => ({
+            orders: otherActiveOrders.map((o) => ({
               id: o.id,
               status: o.status,
-              orderNumber: o.orderNumber
-            }))
+              orderNumber: o.orderNumber,
+            })),
           });
 
           // Get current table status
@@ -2266,36 +2945,40 @@ export class DatabaseStorage implements IStorage {
             console.log(`📋 Current table status:`, {
               id: currentTable.id,
               tableNumber: currentTable.tableNumber,
-              status: currentTable.status
+              status: currentTable.status,
             });
 
             // FORCE table release if no other active orders exist
             if (otherActiveOrders.length === 0) {
-              console.log(`🔓 FORCING table ${order.tableId} release - no active orders remaining`);
+              console.log(
+                `🔓 FORCING table ${order.tableId} release - no active orders remaining`,
+              );
               console.log(`🔍 DEBUG: Table release attempt:`, {
                 tableId: order.tableId,
                 currentTableStatus: currentTable.status,
                 targetStatus: "available",
-                updateTimestamp: new Date().toISOString()
+                updateTimestamp: new Date(),
               });
 
               const [updatedTable] = await database
                 .update(tables)
                 .set({
                   status: "available",
-                  updatedAt: new Date()
+                  updatedAt: new Date(),
                 })
                 .where(eq(tables.id, order.tableId))
                 .returning();
 
               console.log(`🔍 DEBUG: Table update query result:`, {
                 updatedTableExists: !!updatedTable,
-                updatedTableData: updatedTable ? {
-                  id: updatedTable.id,
-                  tableNumber: updatedTable.tableNumber,
-                  status: updatedTable.status,
-                  updatedAt: updatedTable.updatedAt
-                } : null
+                updatedTableData: updatedTable
+                  ? {
+                      id: updatedTable.id,
+                      tableNumber: updatedTable.tableNumber,
+                      status: updatedTable.status,
+                      updatedAt: updatedTable.updatedAt,
+                    }
+                  : null,
               });
 
               if (updatedTable) {
@@ -2304,7 +2987,7 @@ export class DatabaseStorage implements IStorage {
                   tableNumber: updatedTable.tableNumber,
                   previousStatus: currentTable.status,
                   newStatus: updatedTable.status,
-                  updateSuccess: true
+                  updateSuccess: true,
                 });
 
                 console.log(`🔍 DEBUG: Verifying table status after update...`);
@@ -2316,11 +2999,12 @@ export class DatabaseStorage implements IStorage {
                 console.log(`🔍 DEBUG: Table verification result:`, {
                   tableFound: !!verifyTable,
                   verifiedStatus: verifyTable?.status,
-                  verifiedUpdatedAt: verifyTable?.updatedAt
+                  verifiedUpdatedAt: verifyTable?.updatedAt,
                 });
-
               } else {
-                console.error(`❌ CRITICAL: Failed to release table ${order.tableId} - no table returned`);
+                console.error(
+                  `❌ CRITICAL: Failed to release table ${order.tableId} - no table returned`,
+                );
                 console.log(`🔍 DEBUG: Table update failed - investigating...`);
 
                 // Debug: Check if table exists
@@ -2331,47 +3015,59 @@ export class DatabaseStorage implements IStorage {
 
                 console.log(`🔍 DEBUG: Table existence check:`, {
                   tableExists: !!checkTable,
-                  tableData: checkTable ? {
-                    id: checkTable.id,
-                    tableNumber: checkTable.tableNumber,
-                    status: checkTable.status
-                  } : null
+                  tableData: checkTable
+                    ? {
+                        id: checkTable.id,
+                        tableNumber: checkTable.tableNumber,
+                        status: checkTable.status,
+                      }
+                    : null,
                 });
               }
             } else {
-              console.log(`🔒 Table ${order.tableId} remains occupied due to ${otherActiveOrders.length} active orders:`);
+              console.log(
+                `🔒 Table ${order.tableId} remains occupied due to ${otherActiveOrders.length} active orders:`,
+              );
               console.log(`🔍 DEBUG: Active orders preventing table release:`, {
                 tableId: order.tableId,
                 activeOrdersCount: otherActiveOrders.length,
-                activeOrdersDetails: otherActiveOrders.map(o => ({
+                activeOrdersDetails: otherActiveOrders.map((o) => ({
                   id: o.id,
                   orderNumber: o.orderNumber,
-                  status: o.status
-                }))
+                  status: o.status,
+                })),
               });
 
               otherActiveOrders.forEach((activeOrder, index) => {
-                console.log(`   ${index + 1}. Order ${activeOrder.orderNumber} (${activeOrder.status}) - ID: ${activeOrder.id}`);
+                console.log(
+                  `   ${index + 1}. Order ${activeOrder.orderNumber} (${activeOrder.status}) - ID: ${activeOrder.id}`,
+                );
               });
             }
           }
         } catch (tableError) {
-          console.error(`❌ CRITICAL: Error processing table status update for table ${order.tableId}:`, tableError);
+          console.error(
+            `❌ CRITICAL: Error processing table status update for table ${order.tableId}:`,
+            tableError,
+          );
           console.log(`🔍 DEBUG: Table update error details:`, {
             errorType: tableError?.constructor?.name,
             errorMessage: tableError?.message,
             errorStack: tableError?.stack,
             tableId: order.tableId,
-            orderId: orderId
+            orderId: orderId,
           });
         }
       } else {
-        console.log(`🔍 DEBUG: Order status is not 'paid' or no tableId - skipping table update:`, {
-          orderStatus: status,
-          tableId: order.tableId,
-          isPaidStatus: status === "paid",
-          hasTableId: !!order.tableId
-        });
+        console.log(
+          `🔍 DEBUG: Order status is not 'paid' or no tableId - skipping table update:`,
+          {
+            orderStatus: status,
+            tableId: order.tableId,
+            isPaidStatus: status === "paid",
+            hasTableId: !!order.tableId,
+          },
+        );
       }
 
       console.log(`🔍 DEBUG: Final order state before return:`, {
@@ -2381,7 +3077,7 @@ export class DatabaseStorage implements IStorage {
         tableId: order.tableId,
         paidAt: order.paidAt,
         updatedAt: order.updatedAt,
-        updateSuccess: true
+        updateSuccess: true,
       });
       return order;
     } catch (error) {
@@ -2392,7 +3088,7 @@ export class DatabaseStorage implements IStorage {
         errorStack: error?.stack,
         orderId: orderId,
         requestedStatus: status,
-        timestamp: new Date().toISOString()
+        timestamp: new Date(),
       });
       throw error;
     }
@@ -2401,40 +3097,34 @@ export class DatabaseStorage implements IStorage {
   async addOrderItems(
     orderId: number,
     items: InsertOrderItem[],
+    tenantDb?: any,
   ): Promise<OrderItem[]> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in addOrderItems`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("addOrderItems");
     const itemsWithOrderId = items.map((item) => ({ ...item, orderId }));
-    return await this.db.insert(orderItemsTable).values(itemsWithOrderId).returning();
+    return await database
+      .insert(orderItemsTable)
+      .values(itemsWithOrderId)
+      .returning();
   }
 
-  async removeOrderItem(itemId: number): Promise<boolean> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in removeOrderItem`);
-      throw new Error(`Database connection is not available`);
-    }
-    const result = await this.db.delete(orderItemsTable).where(eq(orderItemsTable.id, itemId));
+  async removeOrderItem(itemId: number, tenantDb?: any): Promise<boolean> {
+    const database = tenantDb || this.getSafeDatabase("removeOrderItem");
+    const result = await database
+      .delete(orderItemsTable)
+      .where(eq(orderItemsTable.id, itemId));
     return (result.rowCount ?? 0) > 0;
   }
 
   async deleteOrderItem(itemId: number, tenantDb?: any): Promise<boolean> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in deleteOrderItem`);
-      throw new Error(`Database connection is not available`);
-    }
-    const result = await database.delete(orderItemsTable).where(eq(orderItemsTable.id, itemId));
+    const database = tenantDb || this.getSafeDatabase("deleteOrderItem");
+    const result = await database
+      .delete(orderItemsTable)
+      .where(eq(orderItemsTable.id, itemId));
     return (result.rowCount ?? 0) > 0;
   }
 
   async getOrderItems(orderId: number, tenantDb?: any): Promise<OrderItem[]> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in getOrderItems`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("getOrderItems");
 
     try {
       console.log(`🔍 Storage: Fetching order items for order ID ${orderId}`);
@@ -2452,23 +3142,28 @@ export class DatabaseStorage implements IStorage {
           quantity: orderItemsTable.quantity,
           unitPrice: orderItemsTable.unitPrice,
           total: orderItemsTable.total,
-          discount: orderItemsTable.discount, // Include discount
+          discount: orderItemsTable.discount,
           notes: orderItemsTable.notes,
-          productName: products.name,
-          productSku: products.sku,
+          productName: sql<string>`COALESCE(${products.name}, 'Unknown Product')`,
+          productSku: sql<string>`COALESCE(${products.sku}, '')`,
         })
         .from(orderItemsTable)
         .leftJoin(products, eq(orderItemsTable.productId, products.id))
         .where(eq(orderItemsTable.orderId, orderId));
 
-      console.log(`✅ Storage: Found ${items.length} order items for order ${orderId}`);
+      console.log(
+        `✅ Storage: Found ${items.length} order items for order ${orderId}`,
+      );
       return Array.isArray(items) ? items : [];
     } catch (error) {
-      console.error(`❌ Storage error fetching order items for order ${orderId}:`, error);
+      console.error(
+        `❌ Storage error fetching order items for order ${orderId}:`,
+        error,
+      );
       console.error("Error details:", {
-        message: error?.message || 'Unknown error',
-        code: error?.code || 'No code',
-        stack: error?.stack || 'No stack'
+        message: error?.message || "Unknown error",
+        code: error?.code || "No code",
+        stack: error?.stack || "No stack",
       });
 
       // Return empty array instead of throwing to prevent 500 errors
@@ -2482,12 +3177,10 @@ export class DatabaseStorage implements IStorage {
     quantity: number,
     type: "add" | "subtract" | "set",
     notes?: string,
+    tenantDb?: any,
   ): Promise<Product | undefined> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in updateInventoryStock`);
-      throw new Error(`Database connection is not available`);
-    }
-    const product = await this.getProduct(productId);
+    const database = tenantDb || this.getSafeDatabase("updateInventoryStock");
+    const product = await this.getProduct(productId, tenantDb);
     if (!product) return undefined;
 
     let newStock: number;
@@ -2497,7 +3190,7 @@ export class DatabaseStorage implements IStorage {
         newStock = product.stock + quantity;
         break;
       case "subtract":
-        newStock = Math.max(0, product.stock - quantity);
+        newStock = product.stock - quantity; // Use quantity directly, assuming it's already positive for subtraction
         break;
       case "set":
         newStock = quantity;
@@ -2506,101 +3199,138 @@ export class DatabaseStorage implements IStorage {
         return undefined;
     }
 
-    const [updatedProduct] = await this.db
+    // Ensure stock doesn't go below zero if tracking inventory
+    if (product.trackInventory && newStock < 0) {
+      console.warn(
+        `Product ${product.name} stock would go below zero. Setting to 0.`,
+      );
+      newStock = 0;
+    }
+
+    const [updatedProduct] = await database
       .update(products)
       .set({ stock: newStock })
       .where(eq(products.id, productId))
       .returning();
 
+    // Optionally, create an inventory transaction record here for audit purposes
+    if (updatedProduct && notes) {
+      await database.insert(inventoryTransactions).values({
+        productId: productId,
+        type: type,
+        quantity: Math.abs(quantity), // Store absolute quantity
+        unitPrice: product.price, // Or fetch from a price history if needed
+        totalAmount: (product.price * Math.abs(quantity)).toFixed(2),
+        referenceType: "manual_update", // Example reference type
+        referenceId: null, // No specific reference ID for manual updates
+        employeeId: null, // Could be passed as a parameter
+        notes: notes,
+        created_at: new Date(),
+      });
+    }
+
     return updatedProduct || undefined;
   }
 
   // Store Settings
-  async getStoreSettings(tenantDb?: any): Promise<StoreSettings> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in getStoreSettings`);
-      throw new Error(`Database connection is not available`);
-    }
-    const [settings] = await database.select().from(storeSettings).limit(1);
+  async getStoreSettings(tenantDb?: any): Promise<StoreSettings | null> {
+    try {
+      const database = tenantDb || this.getSafeDatabase("getStoreSettings");
+      const [settings] = await database.select().from(storeSettings).limit(1);
 
-    // If no settings exist, create default settings
-    if (!settings) {
-      const [newSettings] = await database
-        .insert(storeSettings)
-        .values({
+      // If no settings exist, create default settings
+      if (!settings) {
+        const defaultSettings: InsertStoreSettings = {
           storeName: "EDPOS 레스토랑",
           storeCode: "STORE001",
           businessType: "restaurant",
           openTime: "09:00",
           closeTime: "22:00",
-        })
-        .returning();
-      return newSettings;
-    }
+          currency: "VND", // Default currency
+          taxRate: "8.00", // Default tax rate to 8%
+          priceIncludesTax: false, // Default setting
+          goldThreshold: "300000",
+          vipThreshold: "1000000",
+          defaultFloor: "1층", // Default floor
+          defaultZone: "A", // Default zone
+          floorPrefix: "층", // Floor prefix
+          zonePrefix: "구역", // Zone prefix
+        };
+        const [newSettings] = await database
+          .insert(storeSettings)
+          .values(defaultSettings)
+          .returning();
+        return newSettings;
+      }
 
-    return settings;
+      // Ensure default floor and zone are present, even if not in DB
+      return {
+        ...settings,
+        defaultFloor: settings.defaultFloor || "1층",
+        defaultZone: settings.defaultZone || "A",
+        floorPrefix: settings.floorPrefix || "층",
+        zonePrefix: settings.zonePrefix || "구역",
+      };
+    } catch (error) {
+      console.error("❌ Error fetching store settings:", error);
+      return null;
+    }
   }
 
   async updateStoreSettings(
-    settings: Partial<InsertStoreSettings>,
+    data: Partial<InsertStoreSettings>,
     tenantDb?: any,
   ): Promise<StoreSettings> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in updateStoreSettings`);
-      throw new Error(`Database connection is not available`);
+    const database = tenantDb || this.getSafeDatabase("updateStoreSettings");
+
+    // Check if store settings exist
+    const [existing] = await database.select().from(storeSettings).limit(1);
+
+    if (existing) {
+      // Update existing
+      const [updated] = await database
+        .update(storeSettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(storeSettings.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      // Create new
+      const [created] = await database
+        .insert(storeSettings)
+        .values({ ...data, createdAt: new Date(), updatedAt: new Date() })
+        .returning();
+      return created;
     }
-    const currentSettings = await this.getStoreSettings(tenantDb);
-
-    const [updatedSettings] = await database
-      .update(storeSettings)
-      .set({ ...settings, updatedAt: new Date() })
-      .where(eq(storeSettings.id, currentSettings.id))
-      .returning();
-
-    return updatedSettings;
   }
 
   // Suppliers
-  async getSuppliers(): Promise<any> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in getSuppliers`);
-      throw new Error(`Database connection is not available`);
-    }
-    return await this.db.select().from(suppliers).orderBy(suppliers.name);
+  async getSuppliers(tenantDb?: any): Promise<any[]> {
+    const database = tenantDb || this.getSafeDatabase("getSuppliers");
+    return await database.select().from(suppliers).orderBy(suppliers.name);
   }
 
-  async getSupplier(id: number): Promise<any> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in getSupplier`);
-      throw new Error(`Database connection is not available`);
-    }
-    const [result] = await this.db
+  async getSupplier(id: number, tenantDb?: any): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("getSupplier");
+    const [result] = await database
       .select()
       .from(suppliers)
       .where(eq(suppliers.id, id));
     return result;
   }
 
-  async getSuppliersByStatus(status: string): Promise<any> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in getSuppliersByStatus`);
-      throw new Error(`Database connection is not available`);
-    }
-    return await this.db
+  async getSuppliersByStatus(status: string, tenantDb?: any): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("getSuppliersByStatus");
+    return await database
       .select()
       .from(suppliers)
       .where(eq(suppliers.status, status))
       .orderBy(suppliers.name);
   }
 
-  async searchSuppliers(query: string): Promise<any> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in searchSuppliers`);
-      throw new Error(`Database connection is not available`);
-    }
-    return await this.db
+  async searchSuppliers(query: string, tenantDb?: any): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("searchSuppliers");
+    return await database
       .select()
       .from(suppliers)
       .where(
@@ -2613,24 +3343,19 @@ export class DatabaseStorage implements IStorage {
       .orderBy(suppliers.name);
   }
 
-  async createSupplier(data: InsertSupplier): Promise<any> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in createSupplier`);
-      throw new Error(`Database connection is not available`);
-    }
-    const [result] = await this.db.insert(suppliers).values(data).returning();
+  async createSupplier(data: InsertSupplier, tenantDb?: any): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("createSupplier");
+    const [result] = await database.insert(suppliers).values(data).returning();
     return result;
   }
 
   async updateSupplier(
     id: number,
     data: Partial<InsertSupplier>,
+    tenantDb?: any,
   ): Promise<any> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in updateSupplier`);
-      throw new Error(`Database connection is not available`);
-    }
-    const [result] = await this.db
+    const database = tenantDb || this.getSafeDatabase("updateSupplier");
+    const [result] = await database
       .update(suppliers)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(suppliers.id, id))
@@ -2639,12 +3364,9 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async deleteSupplier(id: number): Promise<boolean> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in deleteSupplier`);
-      throw new Error(`Database connection is not available`);
-    }
-    const result = await this.db
+  async deleteSupplier(id: number, tenantDb?: any): Promise<boolean> {
+    const database = tenantDb || this.getSafeDatabase("deleteSupplier");
+    const result = await database
       .delete(suppliers)
       .where(eq(suppliers.id, id))
       .returning();
@@ -2653,14 +3375,10 @@ export class DatabaseStorage implements IStorage {
 
   // Customers
   async getCustomers(tenantDb?: any): Promise<Customer[]> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in getCustomers`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("getCustomers");
 
     // Get membership thresholds
-    const thresholds = await this.getMembershipThresholds();
+    const thresholds = await this.getMembershipThresholds(tenantDb);
 
     // Get all customers
     const allCustomers = await database
@@ -2697,12 +3415,9 @@ export class DatabaseStorage implements IStorage {
     return updatedCustomers;
   }
 
-  async searchCustomers(query: string): Promise<Customer[]> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in searchCustomers`);
-      throw new Error(`Database connection is not available`);
-    }
-    return await this.db
+  async searchCustomers(query: string, tenantDb?: any): Promise<Customer[]> {
+    const database = tenantDb || this.getSafeDatabase("searchCustomers");
+    return await database
       .select()
       .from(customers)
       .where(
@@ -2716,12 +3431,9 @@ export class DatabaseStorage implements IStorage {
       .orderBy(customers.name);
   }
 
-  async getCustomer(id: number): Promise<Customer | undefined> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in getCustomer`);
-      throw new Error(`Database connection is not available`);
-    }
-    const [result] = await this.db
+  async getCustomer(id: number, tenantDb?: any): Promise<Customer | undefined> {
+    const database = tenantDb || this.getSafeDatabase("getCustomer");
+    const [result] = await database
       .select()
       .from(customers)
       .where(eq(customers.id, id));
@@ -2730,33 +3442,32 @@ export class DatabaseStorage implements IStorage {
 
   async getCustomerByCustomerId(
     customerId: string,
+    tenantDb?: any,
   ): Promise<Customer | undefined> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in getCustomerByCustomerId`);
-      throw new Error(`Database connection is not available`);
-    }
-    const [result] = await this.db
+    const database =
+      tenantDb || this.getSafeDatabase("getCustomerByCustomerId");
+    const [result] = await database
       .select()
       .from(customers)
       .where(eq(customers.customerId, customerId));
     return result || undefined;
   }
 
-  async createCustomer(customerData: InsertCustomer): Promise<Customer> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in createCustomer`);
-      throw new Error(`Database connection is not available`);
-    }
+  async createCustomer(
+    customerData: InsertCustomer,
+    tenantDb?: any,
+  ): Promise<Customer> {
+    const database = tenantDb || this.getSafeDatabase("createCustomer");
     // Generate customer ID if not provided
     if (!customerData.customerId) {
-      const count = await this.db
+      const count = await database
         .select({ count: sql<number>`count(*)` })
         .from(customers);
       const customerCount = count[0]?.count || 0;
       customerData.customerId = `CUST${String(customerCount + 1).padStart(3, "0")}`;
     }
 
-    const [result] = await this.db
+    const [result] = await database
       .insert(customers)
       .values(customerData)
       .returning();
@@ -2766,12 +3477,10 @@ export class DatabaseStorage implements IStorage {
   async updateCustomer(
     id: number,
     customerData: Partial<InsertCustomer>,
+    tenantDb?: any,
   ): Promise<Customer | undefined> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in updateCustomer`);
-      throw new Error(`Database connection is not available`);
-    }
-    const [result] = await this.db
+    const database = tenantDb || this.getSafeDatabase("updateCustomer");
+    const [result] = await database
       .update(customers)
       .set({ ...customerData, updatedAt: new Date() })
       .where(eq(customers.id, id))
@@ -2779,12 +3488,9 @@ export class DatabaseStorage implements IStorage {
     return result || undefined;
   }
 
-  async deleteCustomer(id: number): Promise<boolean> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in deleteCustomer`);
-      throw new Error(`Database connection is not available`);
-    }
-    const result = await this.db
+  async deleteCustomer(id: number, tenantDb?: any): Promise<boolean> {
+    const database = tenantDb || this.getSafeDatabase("deleteCustomer");
+    const result = await database
       .delete(customers)
       .where(eq(customers.id, id))
       .returning();
@@ -2795,12 +3501,10 @@ export class DatabaseStorage implements IStorage {
     customerId: number,
     amount: number,
     points: number,
+    tenantDb?: any,
   ) {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in updateCustomerVisit`);
-      throw new Error(`Database connection is not available`);
-    }
-    const [customer] = await this.db
+    const database = tenantDb || this.getSafeDatabase("updateCustomerVisit");
+    const [customer] = await database
       .select()
       .from(customers)
       .where(eq(customers.id, customerId));
@@ -2814,14 +3518,14 @@ export class DatabaseStorage implements IStorage {
     const newPoints = (customer.points || 0) + points;
 
     // Get membership thresholds and calculate new level
-    const thresholds = await this.getMembershipThresholds();
+    const thresholds = await this.getMembershipThresholds(tenantDb);
     const newMembershipLevel = this.calculateMembershipLevel(
       newTotalSpent,
       thresholds.GOLD,
       thresholds.VIP,
     );
 
-    const [updated] = await this.db
+    const [updated] = await database
       .update(customers)
       .set({
         visitCount: newVisitCount,
@@ -2839,12 +3543,10 @@ export class DatabaseStorage implements IStorage {
   // Point Management Methods
   async getCustomerPoints(
     customerId: number,
+    tenantDb?: any,
   ): Promise<{ points: number } | undefined> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in getCustomerPoints`);
-      throw new Error(`Database connection is not available`);
-    }
-    const customer = await this.getCustomer(customerId);
+    const database = tenantDb || this.getSafeDatabase("getCustomerPoints");
+    const customer = await this.getCustomer(customerId, tenantDb);
     if (!customer) return undefined;
     return { points: customer.points || 0 };
   }
@@ -2856,12 +3558,10 @@ export class DatabaseStorage implements IStorage {
     type: "earned" | "redeemed" | "adjusted",
     employeeId?: number,
     orderId?: number,
+    tenantDb?: any,
   ): Promise<PointTransaction> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in updateCustomerPoints`);
-      throw new Error(`Database connection is not available`);
-    }
-    const customer = await this.getCustomer(customerId);
+    const database = tenantDb || this.getSafeDatabase("updateCustomerPoints");
+    const customer = await this.getCustomer(customerId, tenantDb);
     if (!customer) throw new Error("Customer not found");
 
     const previousBalance = customer.points || 0;
@@ -2880,7 +3580,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Update customer points
-    await this.db
+    await database
       .update(customers)
       .set({
         points: newBalance,
@@ -2889,7 +3589,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(customers.id, customerId));
 
     // Create point transaction record
-    const [pointTransaction] = await this.db
+    const [pointTransaction] = await database
       .insert(pointTransactions)
       .values({
         customerId,
@@ -2909,12 +3609,10 @@ export class DatabaseStorage implements IStorage {
   async getPointHistory(
     customerId: number,
     limit: number = 50,
+    tenantDb?: any,
   ): Promise<PointTransaction[]> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in getPointHistory`);
-      throw new Error(`Database connection is not available`);
-    }
-    return await this.db
+    const database = tenantDb || this.getSafeDatabase("getPointHistory");
+    return await database
       .select()
       .from(pointTransactions)
       .where(eq(pointTransactions.customerId, customerId))
@@ -2924,12 +3622,11 @@ export class DatabaseStorage implements IStorage {
 
   async getAllPointTransactions(
     limit: number = 100,
+    tenantDb?: any,
   ): Promise<PointTransaction[]> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in getAllPointTransactions`);
-      throw new Error(`Database connection is not available`);
-    }
-    return await this.db
+    const database =
+      tenantDb || this.getSafeDatabase("getAllPointTransactions");
+    return await database
       .select()
       .from(pointTransactions)
       .orderBy(sql`${pointTransactions.createdAt} DESC`)
@@ -2937,13 +3634,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Get membership thresholds
-  async getMembershipThresholds(): Promise<{ GOLD: number; VIP: number }> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in getMembershipThresholds`);
-      throw new Error(`Database connection is not available`);
-    }
+  async getMembershipThresholds(
+    tenantDb?: any,
+  ): Promise<{ GOLD: number; VIP: number }> {
+    const database =
+      tenantDb || this.getSafeDatabase("getMembershipThresholds");
     try {
-      const [settings] = await this.db.select().from(storeSettings).limit(1);
+      const [settings] = await database.select().from(storeSettings).limit(1);
 
       if (!settings) {
         // Return default values if no settings exist
@@ -2973,19 +3670,20 @@ export class DatabaseStorage implements IStorage {
     return "SILVER";
   }
 
-  async updateMembershipThresholds(thresholds: {
-    GOLD: number;
-    VIP: number;
-  }): Promise<{ GOLD: number; VIP: number }> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in updateMembershipThresholds`);
-      throw new Error(`Database connection is not available`);
-    }
+  async updateMembershipThresholds(
+    thresholds: {
+      GOLD: number;
+      VIP: number;
+    },
+    tenantDb?: any,
+  ): Promise<{ GOLD: number; VIP: number }> {
+    const database =
+      tenantDb || this.getSafeDatabase("updateMembershipThresholds");
     try {
       // Update or insert store settings with thresholds
-      const currentSettings = await this.getStoreSettings();
+      const currentSettings = await this.getStoreSettings(tenantDb);
 
-      await this.db
+      await database
         .update(storeSettings)
         .set({
           goldThreshold: thresholds.GOLD.toString(),
@@ -2998,6 +3696,7 @@ export class DatabaseStorage implements IStorage {
       await this.recalculateAllMembershipLevels(
         thresholds.GOLD,
         thresholds.VIP,
+        tenantDb,
       );
 
       return thresholds;
@@ -3011,12 +3710,11 @@ export class DatabaseStorage implements IStorage {
   async recalculateAllMembershipLevels(
     goldThreshold: number,
     vipThreshold: number,
+    tenantDb?: any,
   ) {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in recalculateAllMembershipLevels`);
-      throw new Error(`Database connection is not available`);
-    }
-    const allCustomers = await this.db.select().from(customers);
+    const database =
+      tenantDb || this.getSafeDatabase("recalculateAllMembershipLevels");
+    const allCustomers = await database.select().from(customers);
 
     for (const customer of allCustomers) {
       const totalSpent = parseFloat(customer.totalSpent || "0");
@@ -3027,20 +3725,23 @@ export class DatabaseStorage implements IStorage {
       );
 
       if (customer.membershipLevel !== calculatedLevel) {
-        await this.db
+        await database
           .update(customers)
           .set({
             membershipLevel: calculatedLevel,
             updatedAt: new Date(),
           })
-          .where(eq(customers.id, customer.id));
+          .where(eq(customer.id, customer.id));
       }
     }
   }
 
-  async getAllProducts(includeInactive: boolean = false, tenantDb?: any): Promise<Product[]> {
+  async getAllProducts(
+    includeInactive: boolean = false,
+    tenantDb?: any,
+  ): Promise<Product[]> {
     try {
-      const database = this.getSafeDatabase(tenantDb, 'getAllProducts');
+      const database = tenantDb || this.getSafeDatabase("getAllProducts");
       let result;
       if (includeInactive) {
         result = await database.select().from(products).orderBy(products.name);
@@ -3052,10 +3753,12 @@ export class DatabaseStorage implements IStorage {
           .orderBy(products.name);
       }
 
-      // Ensure afterTaxPrice is properly returned
+      // Ensure afterTaxPrice and beforeTaxPrice are properly returned
       return result.map((product) => ({
         ...product,
-        afterTaxPrice: product.afterTaxPrice || null
+        afterTaxPrice: product.afterTaxPrice || null,
+        beforeTaxPrice: product.beforeTaxPrice || null,
+        floor: product.floor || "1층", // Default floor
       }));
     } catch (error) {
       console.error(`❌ Error in getAllProducts:`, error);
@@ -3064,42 +3767,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveProducts(tenantDb?: any): Promise<Product[]> {
-    const database = tenantDb || this.db;
-    if (!database) {
-      console.error(`❌ Database is undefined in getActiveProducts`);
-      throw new Error(`Database connection is not available`);
-    }
+    const database = tenantDb || this.getSafeDatabase("getActiveProducts");
     const result = await database
       .select()
       .from(products)
       .where(eq(products.isActive, true))
       .orderBy(products.name);
 
-    // Ensure afterTaxPrice is properly returned
+    // Ensure afterTaxPrice and beforeTaxPrice are properly returned
     return result.map((product) => ({
       ...product,
-      afterTaxPrice: product.afterTaxPrice || null
+      afterTaxPrice: product.afterTaxPrice || null,
+      beforeTaxPrice: product.beforeTaxPrice || null,
+      floor: product.floor || "1층", // Default floor
     }));
   }
 
-  async createProduct(productData: Omit<Product, "id">): Promise<Product> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in createProduct`);
-      throw new Error(`Database connection is not available`);
-    }
-    const [product] = await this.db
-      .insert(products)
-      .values({
-        ...productData,
-        productType: productData.productType || 1,
-      })
-      .returning();
-    return product;
-  }
+  // Note: Removed duplicate createProduct method to avoid conflicts
+  // All product creation now uses the createProduct method with tenantDb parameter (line 872)
 
   // Invoice template methods
   async getInvoiceTemplates(tenantDb: any = null): Promise<any[]> {
-    const database = tenantDb || db;
+    const database = tenantDb || this.getSafeDatabase("getInvoiceTemplates");
     try {
       const templates = await database
         .select()
@@ -3113,7 +3802,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveInvoiceTemplates(tenantDb: any = null): Promise<any[]> {
-    const database = tenantDb || db;
+    const database =
+      tenantDb || this.getSafeDatabase("getActiveInvoiceTemplates");
     try {
       const templates = await database
         .select()
@@ -3127,8 +3817,11 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createInvoiceTemplate(templateData: any, tenantDb: any = null): Promise<any> {
-    const database = tenantDb || db;
+  async createInvoiceTemplate(
+    templateData: any,
+    tenantDb: any = null,
+  ): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("createInvoiceTemplate");
     try {
       const [template] = await database
         .insert(invoiceTemplates)
@@ -3150,8 +3843,12 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async updateInvoiceTemplate(id: number, templateData: any, tenantDb: any = null): Promise<any> {
-    const database = tenantDb || db;
+  async updateInvoiceTemplate(
+    id: number,
+    templateData: any,
+    tenantDb: any = null,
+  ): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("updateInvoiceTemplate");
     try {
       const [template] = await database
         .update(invoiceTemplates)
@@ -3174,8 +3871,11 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async deleteInvoiceTemplate(id: number, tenantDb: any = null): Promise<boolean> {
-    const database = tenantDb || db;
+  async deleteInvoiceTemplate(
+    id: number,
+    tenantDb: any = null,
+  ): Promise<boolean> {
+    const database = tenantDb || this.getSafeDatabase("deleteInvoiceTemplate");
     try {
       const [deleted] = await database
         .delete(invoiceTemplates)
@@ -3190,29 +3890,38 @@ export class DatabaseStorage implements IStorage {
 
   // Invoice methods
   async getInvoices(tenantDb?: any): Promise<any[]> {
-    const database = tenantDb || this.db;
-    return await database.select().from(invoices).orderBy(desc(invoices.createdAt));
+    const database = tenantDb || this.getSafeDatabase("getInvoices");
+    return await database
+      .select()
+      .from(invoices)
+      .orderBy(desc(invoices.createdAt));
   }
 
   async getInvoice(id: number, tenantDb?: any): Promise<any> {
-    const database = tenantDb || this.db;
-    const [invoice] = await database.select().from(invoices).where(eq(invoices.id, id));
+    const database = tenantDb || this.getSafeDatabase("getInvoice");
+    const [invoice] = await database
+      .select()
+      .from(invoices)
+      .where(eq(invoices.id, id));
 
     if (!invoice) return null;
 
     // Get invoice items
-    const items = await database.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id));
+    const items = await database
+      .select()
+      .from(invoiceItems)
+      .where(eq(invoiceItems.invoiceId, id));
 
     return {
       ...invoice,
-      items: items
+      items: items,
     };
   }
 
   async createInvoice(invoiceData: any, tenantDb?: any): Promise<any> {
-    const database = tenantDb || this.db;
+    const database = tenantDb || this.getSafeDatabase("createInvoice");
 
-    console.log('💾 Creating invoice in database:', invoiceData);
+    console.log("💾 Creating invoice in database:", invoiceData);
 
     try {
       // Handle date conversion properly
@@ -3220,35 +3929,42 @@ export class DatabaseStorage implements IStorage {
       if (invoiceData.invoiceDate) {
         if (invoiceData.invoiceDate instanceof Date) {
           invoiceDate = invoiceData.invoiceDate;
-        } else if (typeof invoiceData.invoiceDate === 'string') {
+        } else if (typeof invoiceData.invoiceDate === "string") {
           invoiceDate = new Date(invoiceData.invoiceDate);
         }
       }
 
       // Insert invoice
-      const [invoice] = await database.insert(invoices).values({
-        invoiceNumber: invoiceData.invoiceNumber || null,
-        templateNumber: invoiceData.templateNumber || null,
-        symbol: invoiceData.symbol || null,
-        customerName: invoiceData.customerName,
-        customerTaxCode: invoiceData.customerTaxCode || null,
-        customerAddress: invoiceData.customerAddress || null,
-        customerPhone: invoiceData.customerPhone || null,
-        customerEmail: invoiceData.customerEmail || null,
-        subtotal: invoiceData.subtotal,
-        tax: invoiceData.tax,
-        total: invoiceData.total,
-        paymentMethod: invoiceData.paymentMethod || 1,
-        invoiceDate: invoiceDate,
-        status: invoiceData.status || 'draft',
-        einvoiceStatus: invoiceData.einvoiceStatus || 0,
-        notes: invoiceData.notes || null
-      }).returning();
+      const [invoice] = await database
+        .insert(invoices)
+        .values({
+          invoiceNumber: invoiceData.invoiceNumber || null,
+          templateNumber: invoiceData.templateNumber || null,
+          symbol: invoiceData.symbol || null,
+          customerName: invoiceData.customerName,
+          customerTaxCode: invoiceData.customerTaxCode || null,
+          customerAddress: invoiceData.customerAddress || null,
+          customerPhone: invoiceData.customerPhone || null,
+          customerEmail: invoiceData.customerEmail || null,
+          subtotal: invoiceData.subtotal,
+          tax: invoiceData.tax,
+          total: invoiceData.total,
+          paymentMethod: invoiceData.paymentMethod || 1,
+          invoiceDate: invoiceDate,
+          status: invoiceData.status || "draft",
+          einvoiceStatus: invoiceData.einvoiceStatus || 0,
+          notes: invoiceData.notes || null,
+        })
+        .returning();
 
-      console.log('✅ Invoice created:', invoice);
+      console.log("✅ Invoice created:", invoice);
 
       // Insert invoice items if provided
-      if (invoiceData.items && Array.isArray(invoiceData.items) && invoiceData.items.length > 0) {
+      if (
+        invoiceData.items &&
+        Array.isArray(invoiceData.items) &&
+        invoiceData.items.length > 0
+      ) {
         const itemsToInsert = invoiceData.items.map((item: any) => ({
           invoiceId: invoice.id,
           productId: item.productId,
@@ -3256,7 +3972,7 @@ export class DatabaseStorage implements IStorage {
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           total: item.total,
-          taxRate: item.taxRate || "0.00"
+          taxRate: item.taxRate || "0.00",
         }));
 
         await database.insert(invoiceItems).values(itemsToInsert);
@@ -3265,18 +3981,23 @@ export class DatabaseStorage implements IStorage {
 
       return invoice;
     } catch (error) {
-      console.error('❌ Error creating invoice:', error);
+      console.error("❌ Error creating invoice:", error);
       throw error;
     }
   }
 
-  async updateInvoice(id: number, updateData: any, tenantDb?: any): Promise<any> {
-    const database = tenantDb || this.db;
+  async updateInvoice(
+    id: number,
+    updateData: any,
+    tenantDb?: any,
+  ): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("updateInvoice");
 
-    const [invoice] = await database.update(invoices)
+    const [invoice] = await database
+      .update(invoices)
       .set({
         ...updateData,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       })
       .where(eq(invoices.id, id))
       .returning();
@@ -3285,7 +4006,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteInvoice(id: number, tenantDb?: any): Promise<boolean> {
-    const database = tenantDb || this.db;
+    const database = tenantDb || this.getSafeDatabase("deleteInvoice");
 
     // Delete invoice items first
     await database.delete(invoiceItems).where(eq(invoiceItems.invoiceId, id));
@@ -3297,14 +4018,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // E-invoice connections methods
-  async getEInvoiceConnections(): Promise<any[]> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in getEInvoiceConnections`);
-      throw new Error(`Database connection is not available`);
-    }
+  async getEInvoiceConnections(tenantDb?: any): Promise<any[]> {
+    const database = tenantDb || this.getSafeDatabase("getEInvoiceConnections");
     try {
       const { eInvoiceConnections } = await import("@shared/schema");
-      return await this.db
+      return await database
         .select()
         .from(eInvoiceConnections)
         .orderBy(eInvoiceConnections.symbol);
@@ -3314,14 +4032,11 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getEInvoiceConnection(id: number): Promise<any> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in getEInvoiceConnection`);
-      throw new Error(`Database connection is not available`);
-    }
+  async getEInvoiceConnection(id: number, tenantDb?: any): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("getEInvoiceConnection");
     try {
       const { eInvoiceConnections } = await import("@shared/schema");
-      const [result] = await this.db
+      const [result] = await database
         .select()
         .from(eInvoiceConnections)
         .where(eq(eInvoiceConnections.id, id));
@@ -3332,19 +4047,17 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createEInvoiceConnection(data: any): Promise<any> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in createEInvoiceConnection`);
-      throw new Error(`Database connection is not available`);
-    }
+  async createEInvoiceConnection(data: any, tenantDb?: any): Promise<any> {
+    const database =
+      tenantDb || this.getSafeDatabase("createEInvoiceConnection");
     try {
       const { eInvoiceConnections } = await import("@shared/schema");
 
       // Generate next symbol number
-      const existingConnections = await this.getEInvoiceConnections();
+      const existingConnections = await this.getEInvoiceConnections(tenantDb);
       const nextSymbol = (existingConnections.length + 1).toString();
 
-      const [result] = await this.db
+      const [result] = await database
         .insert(eInvoiceConnections)
         .values({
           ...data,
@@ -3360,14 +4073,16 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async updateEInvoiceConnection(id: number, data: any): Promise<any> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in updateEInvoiceConnection`);
-      throw new Error(`Database connection is not available`);
-    }
+  async updateEInvoiceConnection(
+    id: number,
+    data: any,
+    tenantDb?: any,
+  ): Promise<any> {
+    const database =
+      tenantDb || this.getSafeDatabase("updateEInvoiceConnection");
     try {
       const { eInvoiceConnections } = await import("@shared/schema");
-      const [result] = await this.db
+      const [result] = await database
         .update(eInvoiceConnections)
         .set({ ...data, updatedAt: new Date() })
         .where(eq(eInvoiceConnections.id, id))
@@ -3379,14 +4094,12 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async deleteEInvoiceConnection(id: number): Promise<boolean> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in deleteEInvoiceConnection`);
-      throw new Error(`Database connection is not available`);
-    }
+  async deleteEInvoiceConnection(id: number, tenantDb?: any): Promise<boolean> {
+    const database =
+      tenantDb || this.getSafeDatabase("deleteEInvoiceConnection");
     try {
       const { eInvoiceConnections } = await import("@shared/schema");
-      const result = await this.db
+      const result = await database
         .delete(eInvoiceConnections)
         .where(eq(eInvoiceConnections.id, id))
         .returning();
@@ -3397,13 +4110,13 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getEmployeeByEmail(email: string): Promise<Employee | undefined> {
-    if (!this.db) {
-      console.error(`❌ Database is undefined in getEmployeeByEmail`);
-      throw new Error(`Database connection is not available`);
-    }
+  async getEmployeeByEmail(
+    email: string,
+    tenantDb?: any,
+  ): Promise<Employee | undefined> {
+    const database = tenantDb || this.getSafeDatabase("getEmployeeByEmail");
     if (email && email.trim() !== "") {
-      const [employee] = await this.db
+      const [employee] = await database
         .select()
         .from(employees)
         .where(eq(employees.email, email));
@@ -3414,12 +4127,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   // New function to get attendance records by date range
-  async getAttendanceRecordsByRange(startDate: string, endDate: string, tenantDb?: any): Promise<AttendanceRecord[]> {
-    const database = tenantDb || this.db;
+  async getAttendanceRecordsByRange(
+    startDate: string,
+    endDate: string,
+    tenantDb?: any,
+  ): Promise<AttendanceRecord[]> {
+    const database =
+      tenantDb || this.getSafeDatabase("getAttendanceRecordsByRange");
 
     try {
-      this.validateDatabase(database, 'getAttendanceRecordsByRange');
-      console.log(`🔍 Getting attendance records for date range: ${startDate} to ${endDate}`);
+      console.log(
+        `🔍 Getting attendance records for date range: ${startDate} to ${endDate}`,
+      );
 
       // Ensure dates are valid and set to start/end of day
       const startOfRange = new Date(startDate);
@@ -3434,22 +4153,25 @@ export class DatabaseStorage implements IStorage {
       }
       endOfRange.setHours(23, 59, 59, 999);
 
-      console.log(`🔍 Date range for query: ${startOfRange.toISOString()} to ${endOfRange.toISOString()}`);
+      console.log(`🔍 Date range for query: ${startOfRange} to ${endOfRange}`);
 
-      const records = await database.select()
+      const records = await database
+        .select()
         .from(attendanceRecords)
         .where(
           and(
             gte(attendanceRecords.clockIn, startOfRange),
-            lte(attendanceRecords.clockIn, endOfRange)
-          )
+            lte(attendanceRecords.clockIn, endOfRange),
+          ),
         )
         .orderBy(attendanceRecords.clockIn);
 
-      console.log(`✅ Found ${records.length} attendance records in date range`);
+      console.log(
+        `✅ Found ${records.length} attendance records in date range`,
+      );
       return records;
     } catch (error) {
-      console.error('Error fetching attendance records by range:', error);
+      console.error("Error fetching attendance records by range:", error);
       // Re-throw the error to be handled by the caller
       throw error;
     }
@@ -3457,11 +4179,16 @@ export class DatabaseStorage implements IStorage {
 
   // Printer configuration management
   async getPrinterConfigs(tenantDb?: any): Promise<PrinterConfig[]> {
-    const database = tenantDb || db;
-    console.log("🔍 Storage: Fetching all printer configs (active and inactive)");
+    const database = tenantDb || this.getSafeDatabase("getPrinterConfigs");
+    console.log(
+      "🔍 Storage: Fetching all printer configs (active and inactive)",
+    );
 
     try {
-      const configs = await database.select().from(printerConfigs).orderBy(printerConfigs.id);
+      const configs = await database
+        .select()
+        .from(printerConfigs)
+        .orderBy(printerConfigs.id);
       console.log(`✅ Storage: Found ${configs.length} printer configs`);
       return configs;
     } catch (error) {
@@ -3470,14 +4197,24 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async createPrinterConfig(configData: any, tenantDb?: any): Promise<PrinterConfig> {
-    const database = tenantDb || db;
-    const [config] = await database.insert(printerConfigs).values(configData).returning();
+  async createPrinterConfig(
+    configData: any,
+    tenantDb?: any,
+  ): Promise<PrinterConfig> {
+    const database = tenantDb || this.getSafeDatabase("createPrinterConfig");
+    const [config] = await database
+      .insert(printerConfigs)
+      .values(configData)
+      .returning();
     return config;
   }
 
-  async updatePrinterConfig(id: number, configData: any, tenantDb?: any): Promise<PrinterConfig | null> {
-    const database = tenantDb || db;
+  async updatePrinterConfig(
+    id: number,
+    configData: any,
+    tenantDb?: any,
+  ): Promise<PrinterConfig | null> {
+    const database = tenantDb || this.getSafeDatabase("updatePrinterConfig");
     const [config] = await database
       .update(printerConfigs)
       .set({ ...configData, updatedAt: new Date() })
@@ -3487,11 +4224,1331 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deletePrinterConfig(id: number, tenantDb?: any): Promise<boolean> {
-    const database = tenantDb || db;
+    const database = tenantDb || this.getSafeDatabase("deletePrinterConfig");
     const result = await database
       .delete(printerConfigs)
       .where(eq(printerConfigs.id, id));
     return result.rowCount > 0;
+  }
+
+  // Purchase Order Management Implementation
+  async getPurchaseOrders(tenantDb?: any): Promise<PurchaseReceipt[]> {
+    const database = tenantDb || this.getSafeDatabase("getPurchaseOrders");
+    try {
+      console.log(
+        "🔍 Starting getPurchaseOrders - using purchase_receipts table",
+      );
+
+      // Query purchase_receipts table directly
+      const result = await database.execute(sql`
+        SELECT 
+          pr.*,
+          s.name as supplierName
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.id
+        ORDER BY pr.created_at DESC
+      `);
+
+      console.log(
+        `✅ Query executed successfully, found ${result.rows?.length || 0} purchase receipts`,
+      );
+      return result.rows || [];
+    } catch (error) {
+      console.error(`❌ Error in getPurchaseOrders:`, error);
+      return [];
+    }
+  }
+
+  async getPurchaseOrder(
+    id: number,
+    tenantDb?: any,
+  ): Promise<PurchaseReceipt | null> {
+    const database = tenantDb || this.getSafeDatabase("getPurchaseOrder");
+    console.log(`🔍 Starting getPurchaseOrder for ID: ${id}`);
+
+    try {
+      // Simple query without complex joins to avoid SQL syntax errors
+      const [receipt] = await database
+        .select()
+        .from(purchaseReceipts)
+        .where(eq(purchaseReceipts.id, id))
+        .limit(1);
+
+      if (!receipt) {
+        console.log(`❌ Purchase receipt not found: ${id}`);
+        return null;
+      }
+
+      console.log(`✅ Purchase receipt found: ${receipt.id}`);
+      return receipt;
+    } catch (error) {
+      console.error(`❌ Error in getPurchaseOrder for ID ${id}:`, error);
+      throw error;
+    }
+  }
+
+  async getPurchaseOrdersBySupplier(
+    supplierId: number,
+    tenantDb?: any,
+  ): Promise<PurchaseReceipt[]> {
+    try {
+      const database =
+        tenantDb || this.getSafeDatabase("getPurchaseOrdersBySupplier");
+      const result = await database.query(
+        `
+        SELECT 
+          pr.*,
+          s.name as supplierName
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.id
+        WHERE pr.supplier_id = $1
+        ORDER BY pr.created_at DESC
+      `,
+        [supplierId],
+      );
+      return result.rows || [];
+    } catch (error) {
+      console.error(`❌ Error in getPurchaseOrdersBySupplier:`, error);
+      return [];
+    }
+  }
+
+  async getPurchaseOrdersByStatus(
+    status: string,
+    tenantDb?: any,
+  ): Promise<PurchaseReceipt[]> {
+    try {
+      const database =
+        tenantDb || this.getSafeDatabase("getPurchaseOrdersByStatus");
+      const result = await database.query(
+        `
+        SELECT 
+          pr.*,
+          s.name as supplierName
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.id
+        WHERE pr.status = $1
+        ORDER BY pr.created_at DESC
+      `,
+        [status],
+      );
+      return result.rows || [];
+    } catch (error) {
+      console.error(`❌ Error in getPurchaseOrdersByStatus:`, error);
+      return [];
+    }
+  }
+
+  async searchPurchaseOrders(
+    query: string,
+    tenantDb?: any,
+  ): Promise<PurchaseReceipt[]> {
+    try {
+      const database = tenantDb || this.getSafeDatabase("searchPurchaseOrders");
+      const result = await database.query(
+        `
+        SELECT 
+          pr.*,
+          s.name as supplierName
+        FROM purchase_receipts pr
+        LEFT JOIN suppliers s ON pr.supplier_id = s.id
+        WHERE pr.po_number ILIKE $1 OR s.name ILIKE $1 OR pr.notes ILIKE $1
+        ORDER BY pr.created_at DESC
+      `,
+        [`%${query}%`],
+      );
+      return result.rows || [];
+    } catch (error) {
+      console.error(`❌ Error in searchPurchaseOrders:`, error);
+      return [];
+    }
+  }
+
+  async createPurchaseOrder(
+    orderData: InsertPurchaseReceipt,
+    items: InsertPurchaseReceiptItem[],
+    tenantDb?: any,
+  ): Promise<PurchaseReceipt> {
+    const database = tenantDb || this.getSafeDatabase("createPurchaseOrder");
+    try {
+      console.log("🔍 Creating purchase order with data:", orderData);
+      console.log("🔍 Creating purchase order with items:", items);
+
+      // Insert into purchase_receipts table
+      const insertResult = await database.execute(sql`
+        INSERT INTO purchase_receipts (
+          receipt_number, supplier_id, employee_id, status, purchase_date,
+          subtotal, tax, total, notes, created_at, updated_at
+        ) VALUES (
+          ${orderData.poNumber}, ${orderData.supplierId}, ${orderData.employeeId || null}, 
+          ${orderData.status || "pending"}, ${orderData.purchaseDate || null},
+          ${orderData.subtotal}, ${orderData.tax}, ${orderData.total}, 
+          ${orderData.notes || null}, NOW(), NOW()
+        ) RETURNING *
+      `);
+
+      if (!insertResult.rows || insertResult.rows.length === 0) {
+        throw new Error("Failed to create purchase order");
+      }
+
+      const newOrder = insertResult.rows[0];
+      console.log("✅ Purchase order created:", newOrder);
+
+      // Insert items into purchase_receipt_items table
+      if (items && items.length > 0) {
+        for (const item of items) {
+          await database.execute(sql`
+            INSERT INTO purchase_receipt_items (
+              purchase_receipt_id, product_id, product_name, sku, quantity, received_quantity, unit_price, total
+            ) VALUES (
+              ${newOrder.id}, ${item.productId}, ${item.productName}, ${item.sku || ""},
+              ${item.quantity}, ${item.receivedQuantity || 0}, ${item.unitPrice}, ${item.total}
+            )
+          `);
+        }
+        console.log(`✅ Created ${items.length} purchase receipt items`);
+      }
+
+      return {
+        id: newOrder.id,
+        receiptNumber: newOrder.receipt_number,
+        supplierId: newOrder.supplier_id,
+        employeeId: newOrder.employee_id,
+        status: newOrder.status,
+        purchaseDate: newOrder.purchase_date,
+        actualDeliveryDate: newOrder.actual_delivery_date,
+        subtotal: newOrder.subtotal,
+        tax: newOrder.tax,
+        total: newOrder.total,
+        notes: newOrder.notes,
+        createdAt: newOrder.created_at,
+        updatedAt: newOrder.updated_at,
+      };
+    } catch (error) {
+      console.error("❌ Error creating purchase order:", error);
+      throw error;
+    }
+  }
+
+  async updatePurchaseOrder(
+    id: number,
+    updateData: Partial<InsertPurchaseReceipt>,
+    tenantDb?: any,
+  ): Promise<PurchaseReceipt | null> {
+    try {
+      const database = tenantDb || this.getSafeDatabase("updatePurchaseOrder");
+
+      // Start transaction
+      await database.query("BEGIN");
+
+      // Update main purchase receipt
+      await database.query(
+        `
+        UPDATE purchase_receipts SET 
+          supplier_id = $1, 
+          po_number = $2, 
+          purchase_date = $3, 
+          status = $4, 
+          subtotal = $5, 
+          tax = $6, 
+          discount = $7, 
+          total = $8, 
+          notes = $9, 
+          purchase_type = $10,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $11
+      `,
+        [
+          updateData.supplierId,
+          updateData.poNumber,
+          updateData.purchaseDate,
+          updateData.status || "pending",
+          updateData.subtotal,
+          updateData.tax,
+          updateData.discount || "0.00",
+          updateData.total,
+          updateData.notes,
+          updateData.purchaseType,
+          id,
+        ],
+      );
+
+      // Delete existing items
+      await database.query(
+        "DELETE FROM purchase_receipt_items WHERE purchase_receipt_id = $1",
+        [id],
+      );
+
+      // Insert updated items
+      if (updateData.items && updateData.items.length > 0) {
+        for (const item of updateData.items) {
+          await database.query(
+            `
+            INSERT INTO purchase_receipt_items (
+              purchase_receipt_id, product_id, product_name, sku, quantity, received_quantity, unit_price, total
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          `,
+            [
+              id,
+              item.productId,
+              item.productName,
+              item.sku,
+              item.quantity,
+              item.receivedQuantity || 0,
+              item.unitPrice,
+              item.total,
+            ],
+          );
+        }
+      }
+
+      await database.query("COMMIT");
+
+      return { id };
+    } catch (error) {
+      console.error("❌ Error in updatePurchaseOrder:", error);
+      await database.query("ROLLBACK");
+      throw error;
+    }
+  }
+
+  async deletePurchaseOrder(id: number, tenantDb?: any): Promise<boolean> {
+    const database = tenantDb || this.getSafeDatabase("deletePurchaseOrder");
+    try {
+      // First, delete all related items from purchase_receipt_items
+      const itemDeleteResult = await database.execute(sql`
+        DELETE FROM purchase_receipt_items 
+        WHERE purchase_receipt_id = ${id}
+      `);
+
+      console.log(`🗑️ Deleted purchase receipt items for order ${id}`);
+
+      // Then delete the purchase receipt using sql helper
+      const orderDeleteResult = await database.execute(sql`
+        DELETE FROM purchase_receipts 
+        WHERE id = ${id}
+      `);
+
+      console.log(`🗑️ Deleted purchase receipt with ID ${id}`);
+
+      return true;
+    } catch (error) {
+      console.error(`❌ Error in deletePurchaseOrder:`, error);
+      throw error;
+    }
+  }
+
+  async updatePurchaseOrderStatus(
+    id: number,
+    status: string,
+    tenantDb?: any,
+  ): Promise<PurchaseReceipt | null> {
+    try {
+      const database =
+        tenantDb || this.getSafeDatabase("updatePurchaseOrderStatus");
+      const [updatedOrder] = await database
+        .update(purchaseReceipts)
+        .set({
+          status,
+          updatedAt: new Date(),
+        })
+        .where(eq(purchaseReceipts.id, id))
+        .returning();
+      return updatedOrder || null;
+    } catch (error) {
+      console.error(`❌ Error in updatePurchaseOrderStatus:`, error);
+      throw error;
+    }
+  }
+
+  async getNextPONumber(tenantDb?: any): Promise<string> {
+    try {
+      const database = tenantDb || this.getSafeDatabase("getNextPONumber");
+      console.log("🔍 Generating next purchase receipt number...");
+
+      // Get current year (last 2 digits)
+      const currentYear = new Date().getFullYear().toString().slice(-2);
+
+      // Query for the last PO number of current year using LIKE pattern
+      const lastPOQuery = await database.execute(sql`
+        SELECT receipt_number 
+        FROM purchase_receipts 
+        WHERE receipt_number LIKE ${'PN%/' + currentYear}
+        ORDER BY receipt_number DESC 
+        LIMIT 1
+      `);
+
+      console.log("📋 Last PO number found for year", currentYear, ":", lastPOQuery.rows[0]?.receipt_number);
+
+      let nextSequence = 1;
+
+      if (lastPOQuery.rows && lastPOQuery.rows.length > 0) {
+        const lastPONumber = lastPOQuery.rows[0].receipt_number;
+        // Extract sequence number from format: PNxxxxxx/YY
+        const match = lastPONumber.match(/^PN(\d{6})\/\d{2}$/);
+        if (match) {
+          const lastSequence = parseInt(match[1], 10);
+          nextSequence = lastSequence + 1;
+        }
+      }
+
+      // Format: PNxxxxxx/YY (e.g., PN000001/25)
+      const formattedSequence = nextSequence.toString().padStart(6, "0");
+      const nextPONumber = `PN${formattedSequence}/${currentYear}`;
+
+      console.log("🆕 Generated next purchase receipt number:", nextPONumber);
+      return nextPONumber;
+    } catch (error) {
+      console.error("❌ Error generating purchase receipt number:", error);
+      // Fallback: generate a simple sequential number
+      const currentYear = new Date().getFullYear().toString().slice(-2);
+      const fallbackPO = `PN000001/${currentYear}`;
+      console.log("🔄 Using fallback PO number:", fallbackPO);
+      return fallbackPO;
+    }
+  }
+
+  // Purchase Order Items Management
+  async getPurchaseOrderItems(
+    purchaseOrderId: number,
+    tenantDb?: any,
+  ): Promise<PurchaseReceiptItem[]> {
+    const database = tenantDb || this.getSafeDatabase("getPurchaseOrderItems");
+
+    try {
+      // Try with new column name first
+      let items;
+      try {
+        items = await database
+          .select()
+          .from(purchaseReceiptItems)
+          .where(eq(purchaseReceiptItems.purchaseReceiptId, purchaseOrderId));
+      } catch (newColumnError) {
+        // If that fails, try with old column name
+        console.log("Trying with old column name...");
+        items = await database.execute(
+          sql`SELECT * FROM purchase_receipt_items WHERE purchase_order_id = ${purchaseOrderId}`,
+        );
+        items = items.rows || [];
+      }
+
+      return items || [];
+    } catch (error) {
+      console.error(
+        `❌ Error fetching purchase order items for order ${purchaseOrderId}:`,
+        error,
+      );
+      return [];
+    }
+  }
+
+  async addPurchaseOrderItems(
+    purchaseOrderId: number,
+    items: InsertPurchaseReceiptItem[],
+    tenantDb?: any,
+  ): Promise<PurchaseReceiptItem[]> {
+    try {
+      const database =
+        tenantDb || this.getSafeDatabase("addPurchaseOrderItems");
+      const itemsWithOrderId = items.map((item) => ({
+        ...item,
+        purchaseReceiptId: purchaseOrderId,
+        receivedQuantity: 0, // Initialize to 0
+      }));
+
+      const result = await database
+        .insert(purchaseReceiptItems)
+        .values(itemsWithOrderId)
+        .returning();
+      return result || [];
+    } catch (error) {
+      console.error(`❌ Error in addPurchaseOrderItems:`, error);
+      throw error;
+    }
+  }
+
+  async updatePurchaseOrderItem(
+    id: number,
+    updateData: Partial<InsertPurchaseReceiptItem>,
+    tenantDb?: any,
+  ): Promise<PurchaseReceiptItem | null> {
+    try {
+      const database =
+        tenantDb || this.getSafeDatabase("updatePurchaseOrderItem");
+      const [updatedItem] = await database
+        .update(purchaseReceiptItems)
+        .set(updateData)
+        .where(eq(purchaseReceiptItems.id, id))
+        .returning();
+      return updatedItem || null;
+    } catch (error) {
+      console.error(`❌ Error in updatePurchaseOrderItem:`, error);
+      throw error;
+    }
+  }
+
+  async deletePurchaseOrderItem(id: number, tenantDb?: any): Promise<boolean> {
+    const database =
+      tenantDb || this.getSafeDatabase("deletePurchaseOrderItem");
+    try {
+      const result = await database
+        .delete(purchaseReceiptItems)
+        .where(eq(purchaseReceiptItems.id, id));
+      return result.rowCount > 0;
+    } catch (error) {
+      console.error(`❌ Error in deletePurchaseOrderItem:`, error);
+      return false;
+    }
+  }
+
+  async receiveItems(
+    purchaseOrderId: number,
+    receivedItems: Array<{
+      id: number;
+      receivedQuantity: number;
+      productId?: number;
+    }>,
+    tenantDb?: any,
+  ): Promise<{ success: boolean; status: string }> {
+    const database = tenantDb || this.getSafeDatabase("receiveItems");
+
+    // Use transaction for atomicity and consistency
+    return await database.transaction(async (tx) => {
+      try {
+        // Validate and update received quantities for each item
+        for (const receivedItem of receivedItems) {
+          // Get the current purchase receipt item to validate constraints
+          // SECURITY: Ensure item belongs to the specified purchase order
+          const currentItemResult = await tx.execute(sql`
+            SELECT * FROM purchase_receipt_items 
+            WHERE id = ${receivedItem.id} AND purchase_receipt_id = ${purchaseOrderId}
+            LIMIT 1
+          `);
+
+          const currentItem = currentItemResult.rows[0];
+
+          if (!currentItem) {
+            throw new Error(
+              `Purchase order item with ID ${receivedItem.id} not found`,
+            );
+          }
+
+          // Validate received quantity constraints
+          if (receivedItem.receivedQuantity < 0) {
+            throw new Error(
+              `Received quantity cannot be negative for item ${receivedItem.id}`,
+            );
+          }
+
+          if (receivedItem.receivedQuantity > currentItem.quantity) {
+            throw new Error(
+              `Received quantity (${receivedItem.receivedQuantity}) cannot exceed ordered quantity (${currentItem.quantity}) for item ${receivedItem.id}`,
+            );
+          }
+
+          // Update received quantity in purchase_receipt_items
+          await tx.execute(sql`
+            UPDATE purchase_receipt_items 
+            SET received_quantity = ${receivedItem.receivedQuantity}
+            WHERE id = ${receivedItem.id}
+          `);
+
+          // Update inventory if product exists and inventory tracking is enabled
+          const increaseAmount =
+            receivedItem.receivedQuantity - (currentItem.receivedQuantity || 0);
+          if (currentItem.productId && increaseAmount > 0) {
+            const [product] = await tx
+              .select()
+              .from(products)
+              .where(eq(products.id, currentItem.productId))
+              .limit(1);
+
+            if (product && product.trackInventory) {
+              // Update product stock
+              await tx
+                .update(products)
+                .set({
+                  stock: sql`${products.stock} + ${increaseAmount}`,
+                })
+                .where(eq(products.id, currentItem.productId));
+
+              // Record inventory transaction for audit trail
+              await tx.insert(inventoryTransactions).values({
+                productId: currentItem.productId,
+                type: "purchase_receipt",
+                quantity: increaseAmount,
+                unitPrice: currentItem.unitPrice,
+                totalAmount: (
+                  Number(currentItem.unitPrice) * increaseAmount
+                ).toFixed(2),
+                referenceType: "purchase_order", // This should map to purchase_receipt
+                referenceId: purchaseOrderId.toString(),
+                employeeId: null, // Could be passed as parameter if needed
+                notes: `Received ${increaseAmount} units from PO ${purchaseOrderId}`, // This should reflect purchase receipt
+              });
+            }
+          }
+        }
+
+        // Recompute purchase order status based on all items from purchase_receipt_items
+        const allItemsResult = await tx.execute(sql`
+          SELECT * FROM purchase_receipt_items 
+          WHERE purchase_receipt_id = ${purchaseOrderId}
+        `);
+
+        const allItems = allItemsResult.rows || [];
+
+        const fullyReceived = allItems.every(
+          (item) => item.receivedQuantity >= item.quantity,
+        );
+        const partiallyReceived = allItems.some(
+          (item) => item.receivedQuantity > 0,
+        );
+
+        let newStatus = "pending";
+        if (fullyReceived) {
+          newStatus = "received";
+        } else if (partiallyReceived) {
+          newStatus = "partially_received";
+        }
+
+        // Update purchase order status
+        await tx
+          .update(purchaseReceipts)
+          .set({
+            status: newStatus,
+            updatedAt: new Date(),
+            actualDeliveryDate: fullyReceived ? new Date() : null,
+          })
+          .where(eq(purchaseReceipts.id, purchaseOrderId));
+
+        return { success: true, status: newStatus };
+      } catch (error) {
+        console.error(`❌ Error in receiveItems:`, error);
+        throw error;
+      }
+    });
+  }
+
+  // Purchase Receipts Management Implementation
+  async getPurchaseReceipts(
+    options: {
+      supplierId?: number;
+      status?: string;
+      search?: string;
+      startDate?: string;
+      endDate?: string;
+      page?: number;
+      limit?: number;
+    } = {},
+    tenantDb?: any,
+  ): Promise<PurchaseReceipt[]> {
+    const database = tenantDb || this.getSafeDatabase("getPurchaseReceipts");
+
+    try {
+      console.log(`🔍 Fetching purchase receipts with options:`, options);
+
+      // Build query conditions using Drizzle
+      const conditions = [];
+      const {
+        supplierId,
+        status,
+        search,
+        startDate,
+        endDate,
+        page = 1,
+        limit,
+      } = options;
+
+      if (supplierId) {
+        conditions.push(eq(purchaseReceipts.supplierId, supplierId));
+      }
+
+      if (status && status !== "all") {
+        conditions.push(eq(purchaseReceipts.status, status));
+      }
+
+      if (search) {
+        conditions.push(
+          or(
+            ilike(purchaseReceipts.receiptNumber, `%${search}%`),
+            ilike(purchaseReceipts.notes, `%${search}%`),
+          ),
+        );
+      }
+
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        conditions.push(
+          and(
+            gte(purchaseReceipts.purchaseDate, start),
+            lte(purchaseReceipts.purchaseDate, end),
+          ),
+        );
+      }
+
+      // Build the query using Drizzle
+      let query = database
+        .select({
+          id: purchaseReceipts.id,
+          receiptNumber: purchaseReceipts.receiptNumber,
+          supplierId: purchaseReceipts.supplierId,
+          employeeId: purchaseReceipts.employeeId,
+          status: purchaseReceipts.status,
+          purchaseDate: purchaseReceipts.purchaseDate,
+          actualDeliveryDate: purchaseReceipts.actualDeliveryDate,
+          subtotal: purchaseReceipts.subtotal,
+          tax: purchaseReceipts.tax,
+          total: purchaseReceipts.total,
+          notes: purchaseReceipts.notes,
+          createdAt: purchaseReceipts.createdAt,
+          updatedAt: purchaseReceipts.updatedAt,
+          supplierName: suppliers.name,
+          supplierCode: suppliers.code,
+          employeeName: employees.name,
+          employeeCode: employees.employeeId,
+        })
+        .from(purchaseReceipts)
+        .leftJoin(suppliers, eq(purchaseReceipts.supplierId, suppliers.id))
+        .leftJoin(employees, eq(purchaseReceipts.employeeId, employees.id));
+
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions));
+      }
+
+      query = query.orderBy(desc(purchaseReceipts.createdAt));
+
+      if (limit) {
+        const offset = (page - 1) * limit;
+        query = query.limit(limit).offset(offset);
+      }
+
+      console.log(`📋 Executing purchase receipts query with Drizzle`);
+
+      // Execute the query
+      const receipts = await query;
+
+      console.log(
+        `✅ Successfully fetched ${receipts.length} purchase receipts`,
+      );
+      return receipts as PurchaseReceipt[];
+    } catch (error) {
+      console.error(`❌ Error in getPurchaseReceipts:`, error);
+      return [];
+    }
+  }
+
+  async createPurchaseReceipt(
+    receiptData: InsertPurchaseReceipt,
+    items: InsertPurchaseReceiptItem[],
+    tenantDb?: any,
+  ): Promise<PurchaseReceipt> {
+    const database = tenantDb || this.getSafeDatabase("createPurchaseReceipt");
+
+    try {
+      console.log("🔍 Creating purchase receipt with data:", receiptData);
+      console.log("📦 Processing", items.length, "items");
+
+      // Create the main receipt record
+      const [receipt] = await database
+        .insert(purchaseReceipts)
+        .values(receiptData)
+        .returning();
+
+      console.log("✅ Purchase receipt created with ID:", receipt.id);
+
+      // Create receipt items if provided
+      if (items && items.length > 0) {
+        const itemsToInsert = items.map((item) => ({
+          ...item,
+          purchaseReceiptId: receipt.id,
+        }));
+
+        console.log("📝 Creating", itemsToInsert.length, "receipt items");
+        const insertedItems = await database
+          .insert(purchaseReceiptItems)
+          .values(itemsToInsert)
+          .returning();
+
+        console.log("✅", insertedItems.length, "receipt items created");
+      }
+
+      return receipt;
+    } catch (error) {
+      console.error("❌ Error creating purchase receipt:", error);
+      throw error;
+    }
+  }
+
+  async uploadPurchaseReceiptDocument(
+    documentData: InsertPurchaseReceiptDocument,
+    tenantDb?: any,
+  ): Promise<PurchaseReceiptDocument> {
+    try {
+      const database =
+        tenantDb || this.getSafeDatabase("uploadPurchaseReceiptDocument");
+      const [uploadedDoc] = await database
+        .insert(purchaseReceiptDocuments)
+        .values(documentData)
+        .returning();
+      return uploadedDoc;
+    } catch (error) {
+      console.error(`❌ Error in uploadPurchaseReceiptDocument:`, error);
+      throw error;
+    }
+  }
+
+  // Purchase Order Documents Management Implementation
+  async getPurchaseOrderDocuments(
+    purchaseOrderId: number,
+    tenantDb?: any,
+  ): Promise<PurchaseReceiptDocument[]> {
+    try {
+      const database =
+        tenantDb || this.getSafeDatabase("getPurchaseOrderDocuments");
+      const result = await database.query(
+        `
+        SELECT 
+          pod.*
+        FROM purchase_receipt_documents pod
+        WHERE pod.purchase_receipt_id = $1
+        ORDER BY pod.created_at DESC
+      `,
+        [purchaseOrderId],
+      );
+      return result.rows || [];
+    } catch (error) {
+      console.error(`❌ Error in getPurchaseOrderDocuments:`, error);
+      return [];
+    }
+  }
+
+  async uploadPurchaseOrderDocument(
+    documentData: InsertPurchaseReceiptDocument,
+    tenantDb?: any,
+  ): Promise<PurchaseReceiptDocument> {
+    try {
+      const database =
+        tenantDb || this.getSafeDatabase("uploadPurchaseOrderDocument");
+      const [uploadedDoc] = await database
+        .insert(purchaseReceiptDocuments)
+        .values({
+          ...documentData,
+          purchaseReceiptId: documentData.purchaseReceiptId,
+        })
+        .returning();
+      return uploadedDoc;
+    } catch (error) {
+      console.error(`❌ Error in uploadPurchaseOrderDocument:`, error);
+      throw error;
+    }
+  }
+
+  async deletePurchaseOrderDocument(
+    id: number,
+    tenantDb?: any,
+  ): Promise<boolean> {
+    const database =
+      tenantDb || this.getSafeDatabase("deletePurchaseOrderDocument");
+    try {
+      const result = await database
+        .delete(purchaseReceiptDocuments)
+        .where(eq(purchaseReceiptDocuments.id, id))
+        .returning();
+      return result.length > 0;
+    } catch (error) {
+      console.error("Error deleting purchase order document:", error);
+      throw error;
+    }
+  }
+
+  async getPurchaseOrdersWithDetails(
+    options?: any,
+    tenantDb?: any,
+  ): Promise<any> {
+    const database =
+      tenantDb || this.getSafeDatabase("getPurchaseOrdersWithDetails");
+    console.log(
+      "🔍 Storage: getPurchaseOrdersWithDetails called with options:",
+      options,
+    );
+
+    try {
+      // Build base query for purchase orders
+      let whereConditions = [];
+
+      if (options?.status && options.status !== "all") {
+        whereConditions.push(eq(purchaseReceipts.status, options.status));
+      }
+
+      if (options?.supplierId) {
+        whereConditions.push(
+          eq(purchaseReceipts.supplierId, options.supplierId),
+        );
+      }
+
+      if (options?.search) {
+        whereConditions.push(
+          or(
+            ilike(purchaseReceipts.receiptNumber, `%${options.search}%`),
+            ilike(purchaseReceipts.notes, `%${options.search}%`),
+          ),
+        );
+      }
+
+      if (options?.startDate && options?.endDate) {
+        const startDate = new Date(options.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(options.endDate);
+        endDate.setHours(23, 59, 59, 999);
+
+        console.log("🗓️ Date filtering (both dates):", {
+          startDate: startDate,
+          endDate: endDate,
+          originalStart: options.startDate,
+          originalEnd: options.endDate,
+        });
+
+        whereConditions.push(
+          and(
+            gte(purchaseReceipts.purchaseDate, startDate),
+            lte(purchaseReceipts.purchaseDate, endDate),
+          ),
+        );
+      } else if (options?.startDate) {
+        const startDate = new Date(options.startDate);
+        startDate.setHours(0, 0, 0, 0);
+
+        console.log("🗓️ Date filtering (start only):", {
+          startDate: startDate,
+          originalStart: options.startDate,
+        });
+
+        whereConditions.push(gte(purchaseReceipts.purchaseDate, startDate));
+      } else if (options?.endDate) {
+        const endDate = new Date(options.endDate);
+        endDate.setHours(23, 59, 59, 999);
+
+        console.log("🗓️ Date filtering (end only):", {
+          endDate: endDate,
+          originalEnd: options.endDate,
+        });
+
+        whereConditions.push(lte(purchaseReceipts.purchaseDate, endDate));
+      }
+
+      // Get purchase orders with supplier information
+      const ordersQuery = database
+        .select({
+          // Purchase order fields
+          id: purchaseReceipts.id,
+          receiptNumber: purchaseReceipts.receiptNumber,
+          supplierId: purchaseReceipts.supplierId,
+          employeeId: purchaseReceipts.employeeId,
+          status: purchaseReceipts.status,
+          purchaseDate: purchaseReceipts.purchaseDate,
+          actualDeliveryDate: purchaseReceipts.actualDeliveryDate,
+          subtotal: purchaseReceipts.subtotal,
+          tax: purchaseReceipts.tax,
+          total: purchaseReceipts.total,
+          notes: purchaseReceipts.notes,
+          createdAt: purchaseReceipts.createdAt,
+          updatedAt: purchaseReceipts.updatedAt,
+          supplierName: suppliers.name,
+          supplierCode: suppliers.code,
+          supplierPhone: suppliers.phone,
+          supplierEmail: suppliers.email,
+          // Employee information
+          employeeName: employees.name,
+          employeeCode: employees.employeeId,
+        })
+        .from(purchaseReceipts)
+        .leftJoin(suppliers, eq(purchaseReceipts.supplierId, suppliers.id))
+        .leftJoin(employees, eq(purchaseReceipts.employeeId, employees.id));
+
+      if (whereConditions.length > 0) {
+        ordersQuery.where(and(...whereConditions));
+      }
+
+      const orders = await ordersQuery.orderBy(
+        desc(purchaseReceipts.createdAt),
+      );
+
+      console.log(`✅ Storage: Found ${orders.length} purchase orders`);
+
+      // Get items for each purchase order
+      const ordersWithDetails = await Promise.all(
+        orders.map(async (order) => {
+          try {
+            // Get purchase receipt items with product information using sql query
+            const itemsResult = await database.execute(sql`
+              SELECT 
+                pri.id,
+                pri.purchase_receipt_id as purchaseOrderId,
+                pri.product_id as productId,
+                pri.product_name as productName,
+                pri.sku,
+                pri.quantity,
+                pri.received_quantity as receivedQuantity,
+                pri.unit_price as unitPrice,
+                pri.total,
+                p.stock as productStock,
+                c.name as productCategory
+              FROM purchase_receipt_items pri
+              LEFT JOIN products p ON pri.product_id = p.id
+              LEFT JOIN categories c ON p.category_id = c.id
+              WHERE pri.purchase_receipt_id = ${order.id}
+              ORDER BY pri.id
+            `);
+
+            const items = itemsResult.rows || [];
+
+            // Calculate summary statistics
+            const itemCount = items.length;
+            const totalQuantity = items.reduce(
+              (sum, item) => sum + (item.quantity || 0),
+              0,
+            );
+            const totalReceived = items.reduce(
+              (sum, item) => sum + (item.receivedQuantity || 0),
+              0,
+            );
+            const receivedPercentage =
+              totalQuantity > 0
+                ? Math.round((totalReceived / totalQuantity) * 100)
+                : 0;
+
+            return {
+              ...order,
+              items: items || [],
+              itemCount,
+              totalQuantity,
+              totalReceived,
+              receivedPercentage,
+              isFullyReceived:
+                totalReceived >= totalQuantity && totalQuantity > 0,
+              // Format dates for display
+              purchaseDateFormatted: order.purchaseDate
+                ? new Date(order.purchaseDate).toLocaleDateString("vi-VN")
+                : null,
+              actualDeliveryDateFormatted: order.actualDeliveryDate
+                ? new Date(order.actualDeliveryDate).toLocaleDateString("vi-VN")
+                : null,
+              createdAtFormatted: order.createdAt
+                ? new Date(order.createdAt).toLocaleString("vi-VN")
+                : null,
+            };
+          } catch (itemError) {
+            console.error(
+              `❌ Error fetching items for purchase order ${order.id}:`,
+              itemError,
+            );
+            return {
+              ...order,
+              items: [],
+              itemCount: 0,
+              totalQuantity: 0,
+              totalReceived: 0,
+              receivedPercentage: 0,
+              isFullyReceived: false,
+            };
+          }
+        }),
+      );
+
+      console.log(
+        `✅ Storage: Successfully fetched ${ordersWithDetails.length} purchase orders with complete details`,
+      );
+
+      // Apply pagination if specified
+      const page = options?.page || 1;
+      const limit = options?.limit;
+
+      if (limit) {
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const paginatedOrders = ordersWithDetails.slice(startIndex, endIndex);
+
+        return {
+          data: paginatedOrders,
+          pagination: {
+            currentPage: page,
+            totalItems: ordersWithDetails.length,
+            totalPages: Math.ceil(ordersWithDetails.length / limit),
+            limit: limit,
+            hasNext: endIndex < ordersWithDetails.length,
+            hasPrev: page > 1,
+          },
+        };
+      }
+
+      return {
+        data: ordersWithDetails,
+        pagination: {
+          currentPage: 1,
+          totalItems: ordersWithDetails.length,
+          totalPages: 1,
+          limit: ordersWithDetails.length,
+          hasNext: false,
+          hasPrev: false,
+        },
+      };
+    } catch (error) {
+      console.error(
+        "❌ Storage: Error in getPurchaseOrdersWithDetails:",
+        error,
+      );
+      return {
+        data: [],
+        pagination: {
+          currentPage: 1,
+          totalItems: 0,
+          totalPages: 0,
+          limit: 0,
+          hasNext: false,
+          hasPrev: false,
+        },
+      };
+    }
+  }
+
+  // Income Voucher Methods Implementation
+  async getIncomeVouchers(tenantDb?: any): Promise<any[]> {
+    try {
+      const database = tenantDb || this.getSafeDatabase("getIncomeVouchers");
+      const result = await database
+        .select()
+        .from(incomeVouchers)
+        .orderBy(desc(incomeVouchers.createdAt));
+      return result || [];
+    } catch (error) {
+      console.error("Error fetching income vouchers:", error);
+      return [];
+    }
+  }
+
+  async createIncomeVoucher(voucherData: any, tenantDb?: any): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("createIncomeVoucher");
+
+    const [voucher] = await database
+      .insert(incomeVouchers)
+      .values({
+        voucherNumber: voucherData.voucherNumber,
+        date: voucherData.date,
+        amount: voucherData.amount,
+        account: voucherData.account,
+        recipient: voucherData.recipient,
+        phone: voucherData.phone || null,
+        category: voucherData.category,
+        description: voucherData.description || null,
+      })
+      .returning();
+
+    return voucher;
+  }
+
+  async updateIncomeVoucher(
+    id: string,
+    voucherData: any,
+    tenantDb?: any,
+  ): Promise<any> {
+    try {
+      const database = tenantDb || this.getSafeDatabase("updateIncomeVoucher");
+
+      console.log("Updating income voucher:", { id, voucherData });
+
+      const [voucher] = await database
+        .update(incomeVouchers)
+        .set({
+          voucherNumber: voucherData.voucherNumber,
+          date: voucherData.date,
+          amount: voucherData.amount.toString(), // Ensure amount is string
+          account: voucherData.account,
+          recipient: voucherData.recipient,
+          phone: voucherData.phone || null,
+          category: voucherData.category,
+          description: voucherData.description || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(incomeVouchers.id, parseInt(id)))
+        .returning();
+
+      console.log("Income voucher updated successfully:", voucher);
+      return voucher;
+    } catch (error) {
+      console.error("Error updating income voucher:", error);
+      throw error;
+    }
+  }
+
+  async deleteIncomeVoucher(id: string, tenantDb?: any): Promise<void> {
+    const database = tenantDb || this.getSafeDatabase("deleteIncomeVoucher");
+
+    await database
+      .delete(incomeVouchers)
+      .where(eq(incomeVouchers.id, parseInt(id)));
+  }
+
+  // Expense Voucher methods implementation
+  async getExpenseVouchers(tenantDb?: any): Promise<any[]> {
+    try {
+      const database = tenantDb || this.getSafeDatabase("getExpenseVouchers");
+      const result = await database
+        .select()
+        .from(expenseVouchers)
+        .orderBy(desc(expenseVouchers.createdAt));
+      return result || [];
+    } catch (error) {
+      console.error("Error fetching expense vouchers:", error);
+      return [];
+    }
+  }
+
+  async createExpenseVoucher(voucherData: any, tenantDb?: any): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("createExpenseVoucher");
+    try {
+      const [voucher] = await database
+        .insert(expenseVouchers)
+        .values({
+          voucherNumber: voucherData.voucherNumber,
+          date: voucherData.date,
+          amount: voucherData.amount,
+          account: voucherData.account,
+          recipient: voucherData.recipient,
+          phone: voucherData.phone || null,
+          category: voucherData.category,
+          description: voucherData.description || null,
+        })
+        .returning();
+      return voucher;
+    } catch (error) {
+      console.error("Error creating expense voucher:", error);
+      throw error;
+    }
+  }
+
+  async updateExpenseVoucher(
+    id: string,
+    voucherData: any,
+    tenantDb?: any,
+  ): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("updateExpenseVoucher");
+
+    const [voucher] = await database
+      .update(expenseVouchers)
+      .set({
+        ...voucherData,
+        updatedAt: new Date(),
+      })
+      .where(eq(expenseVouchers.id, parseInt(id)))
+      .returning();
+
+    return voucher;
+  }
+
+  async deleteExpenseVoucher(id: string, tenantDb?: any): Promise<void> {
+    const database = tenantDb || this.getSafeDatabase("deleteExpenseVoucher");
+
+    await database
+      .delete(expenseVouchers)
+      .where(eq(expenseVouchers.id, parseInt(id)));
+  }
+
+  async getNextExpenseVoucherSequence(tenantDb?: any): Promise<number> {
+    const database = tenantDb || this.getSafeDatabase("getNextExpenseVoucherSequence");
+
+    try {
+      // Get the current year for filtering
+      const currentYear = new Date().getFullYear();
+      const yearSuffix = currentYear.toString().slice(-2);
+
+      console.log(`🔍 Getting next expense voucher sequence for year: ${currentYear} (suffix: ${yearSuffix})`);
+
+      // Find the highest sequence number for the current year using raw SQL
+      const result = await database.execute(sql`
+        SELECT voucher_number 
+        FROM expense_vouchers 
+        WHERE voucher_number LIKE ${'PC%/' + yearSuffix}
+        ORDER BY 
+          CAST(SUBSTRING(voucher_number FROM 3 FOR 6) AS INTEGER) DESC
+        LIMIT 1
+      `);
+
+      console.log(`📋 Query result:`, result.rows);
+
+      if (!result.rows || result.rows.length === 0) {
+        console.log(`✅ No vouchers found for year ${currentYear}, starting from 1`);
+        return 1;
+      }
+
+      // Extract sequence number from voucher number (PC######/YY)
+      const lastVoucherNumber = result.rows[0].voucher_number;
+      console.log(`🔍 Last voucher number found: ${lastVoucherNumber}`);
+
+      const match = lastVoucherNumber.match(/^PC(\d{6})\/\d{2}$/);
+
+      if (match) {
+        const lastSequence = parseInt(match[1], 10);
+        const nextSequence = lastSequence + 1;
+        console.log(`✅ Last sequence: ${lastSequence}, Next sequence: ${nextSequence}`);
+        return nextSequence;
+      } else {
+        console.log(`⚠️ Voucher number format doesn't match expected pattern, starting from 1`);
+        return 1;
+      }
+    } catch (error) {
+      console.error("❌ Error getting expense voucher sequence:", error);
+      // If error occurs, start from 1
+      return 1;
+    }
+  }
+
+  async createExpenseVoucher(voucherData: any, tenantDb?: any): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("createExpenseVoucher");
+
+    const [voucher] = await database
+      .insert(expenseVouchers)
+      .values({
+        voucherNumber: voucherData.voucherNumber,
+        date: voucherData.date,
+        amount: voucherData.amount,
+        account: voucherData.account,
+        recipient: voucherData.recipient,
+        phone: voucherData.phone || null,
+        category: voucherData.category,
+        description: voucherData.description || null,
+      })
+      .returning();
+
+    return voucher;
+  }
+
+  async updateExpenseVoucher(
+    id: string,
+    voucherData: any,
+    tenantDb?: any,
+  ): Promise<any> {
+    const database = tenantDb || this.getSafeDatabase("updateExpenseVoucher");
+
+    const [voucher] = await database
+      .update(expenseVouchers)
+      .set({
+        ...voucherData,
+        updatedAt: new Date(),
+      })
+      .where(eq(expenseVouchers.id, parseInt(id)))
+      .returning();
+
+    return voucher;
+  }
+
+  async deleteExpenseVoucher(id: string, tenantDb?: any): Promise<void> {
+    const database = tenantDb || this.getSafeDatabase("deleteExpenseVoucher");
+
+    await database
+      .delete(expenseVouchers)
+      .where(eq(expenseVouchers.id, parseInt(id)));
   }
 }
 
