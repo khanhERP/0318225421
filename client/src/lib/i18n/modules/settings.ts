@@ -262,6 +262,8 @@ export const settingsTranslations: { [key: string]: SettingsTranslations } = {
     trackInventory: "Track Inventory",
     enableInventoryTracking: "이 상품의 재고 추적을 활성화",
     yes: "네",
+    productUpdatedSuccess: "상품이 성공적으로 업데이트되었습니다",
+    
     // Product form dialog
     addProductTitle: "상품 추가",
     addProductDesc: "새 상품 정보를 입력하세요",
@@ -501,6 +503,8 @@ export const settingsTranslations: { [key: string]: SettingsTranslations } = {
     categoryDeleteSuccess: "Category has been deleted successfully",
     categoryDeleteError: "An error occurred while deleting category",
     categoryDeleteErrorWithProducts: "Cannot delete category because there are still products in this category. Please delete or move the products to other categories first.",
+    productUpdatedSuccess: "Product has been updated successfully",
+  
     // Product management
     productDeleteSuccess: "Product has been deleted successfully",
     productDeleteError: "An error occurred while deleting product",
@@ -946,6 +950,8 @@ export const settingsTranslations: { [key: string]: SettingsTranslations } = {
     yes: "Có",
     inStock: "Còn hàng",
     outOfStock: "Hết hàng",
+    productUpdatedSuccess: "Sản phẩm đã được cập nhật thành công",
+    
     // Product form dialog
     addProductTitle: "Thêm sản phẩm",
     addProductDesc: "Nhập thông tin sản phẩm mới",

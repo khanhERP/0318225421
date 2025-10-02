@@ -169,7 +169,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     if (!employeeToDelete) return;
 
     try {
-      const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees/${employeeToDelete.id}`, {
+      const response = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/employees/${employeeToDelete.id}`, {
         method: "DELETE",
       });
 
@@ -209,7 +209,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       }
 
       await queryClient.refetchQueries({
-        queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees"],
+        queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/employees"],
       });
 
       toast({
@@ -250,21 +250,21 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
 
   // Fetch store settings
   const { data: storeData, isLoading } = useQuery<StoreSettings>({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings"],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/store-settings"],
   });
 
   // Fetch customers
   const { data: customersData, isLoading: customersLoading } = useQuery<
     Customer[]
   >({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers"],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/customers"],
   });
 
   // Fetch employees
   const { data: employeesRawData, isLoading: employeesLoading } = useQuery<
     any[]
   >({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees"],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/employees"],
   });
 
   // Sort employees by ID descending (newest first)
@@ -288,14 +288,14 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
   const { data: categoriesData, isLoading: categoriesLoading } = useQuery<
     any[]
   >({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories"],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/categories"],
   });
 
   // Fetch products (include inactive products in settings)
   const { data: productsData, isLoading: productsLoading } = useQuery<any[]>({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products", { includeInactive: true }],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products", { includeInactive: true }],
     queryFn: async () => {
-      const response = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products?includeInactive=true");
+      const response = await fetch("https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products?includeInactive=true");
       if (!response.ok) throw new Error("Failed to fetch products");
       return response.json();
     },
@@ -359,11 +359,11 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
   // Mutation to update store settings
   const updateStoreSettingsMutation = useMutation({
     mutationFn: async (settings: Partial<InsertStoreSettings>) => {
-      const response = await apiRequest("PUT", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings", settings);
+      const response = await apiRequest("PUT", "https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/store-settings", settings);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/store-settings"] });
       toast({
         title: t("common.success"),
         description: t("settings.storeUpdated"),
@@ -549,7 +549,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     if (!customerToDelete) return;
 
     try {
-      const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/${customerToDelete.id}`, {
+      const response = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/customers/${customerToDelete.id}`, {
         method: "DELETE",
       });
 
@@ -557,7 +557,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      await queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers"] });
+      await queryClient.refetchQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/customers"] });
 
       toast({
         title: t("common.success"),
@@ -632,7 +632,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     }
 
     try {
-      const response = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories", {
+      const response = await fetch("https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/categories", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -647,8 +647,8 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       const result = await response.json();
 
       // Refetch data immediately
-      await queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories"] });
-      await queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
+      await queryClient.refetchQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/categories"] });
+      await queryClient.refetchQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"] });
 
       toast({
         title: t("common.success"),
@@ -686,7 +686,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     }
 
     try {
-      const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories/${editingCategory.id}`, {
+      const response = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/categories/${editingCategory.id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -705,8 +705,8 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       resetCategoryForm();
 
       // Refetch data immediately
-      await queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories"] });
-      await queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
+      await queryClient.refetchQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/categories"] });
+      await queryClient.refetchQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"] });
 
       toast({
         title: t("common.success"),
@@ -749,7 +749,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     if (!categoryToDelete) return;
 
     try {
-      const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories/${categoryToDelete.id}`, {
+      const response = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/categories/${categoryToDelete.id}`, {
         method: "DELETE",
       });
 
@@ -761,8 +761,8 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       }
 
       // Refetch data immediately
-      await queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories"] });
-      await queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
+      await queryClient.refetchQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/categories"] });
+      await queryClient.refetchQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"] });
 
       toast({
         title: t("common.success"),
@@ -797,15 +797,18 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
+      reader.onerror = (error) => reject(error);
     });
   };
 
   // Function to generate unique SKU
   const generateProductSKU = () => {
-    const randomChars = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const sku = `ITEM-${randomChars.padEnd(6, '0')}`;
-    setProductForm(prev => ({ ...prev, sku }));
+    const randomChars = Math.random()
+      .toString(36)
+      .substring(2, 8)
+      .toUpperCase();
+    const sku = `ITEM-${randomChars.padEnd(6, "0")}`;
+    setProductForm((prev) => ({ ...prev, sku }));
   };
 
   const handleCreateProduct = async () => {
@@ -816,13 +819,18 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
         price: productForm.price.toString(),
         stock: Number(productForm.stock),
         floor: productForm.floor, // Add floor
-        zone: productForm.zone,   // Add zone
+        zone: productForm.zone, // Add zone
       };
 
       // Handle file upload if file method is selected
-      if (productForm.imageInputMethod === "file" && productForm.selectedImageFile) {
+      if (
+        productForm.imageInputMethod === "file" &&
+        productForm.selectedImageFile
+      ) {
         try {
-          const base64Image = await convertFileToBase64(productForm.selectedImageFile);
+          const base64Image = await convertFileToBase64(
+            productForm.selectedImageFile,
+          );
           finalProductData.imageUrl = base64Image;
         } catch (error) {
           console.error("파일 변환 오류:", error);
@@ -838,19 +846,20 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
         finalProductData.imageUrl = productForm.imageUrl;
       }
 
-
-      const response = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products", {
+      const response = await fetch("https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(finalProductData),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: "Unknown error" }));
+        const errorData = await response
+          .json()
+          .catch(() => ({ message: "Unknown error" }));
         throw new Error(errorData.message || "Failed to create product");
       }
 
-      await queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
+      await queryClient.refetchQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"] });
       setShowProductForm(false);
       resetProductForm();
       toast({
@@ -861,7 +870,8 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       console.error("Product creation error:", error);
       toast({
         title: t("common.error"),
-        description: (error as Error).message || t("settings.productCreatedError"),
+        description:
+          (error as Error).message || t("settings.productCreatedError"),
         variant: "destructive",
       });
     }
@@ -877,13 +887,18 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
         price: productForm.price.toString(),
         stock: Number(productForm.stock),
         floor: productForm.floor, // Add floor
-        zone: productForm.zone,   // Add zone
+        zone: productForm.zone, // Add zone
       };
 
       // Handle file upload if file method is selected
-      if (productForm.imageInputMethod === "file" && productForm.selectedImageFile) {
+      if (
+        productForm.imageInputMethod === "file" &&
+        productForm.selectedImageFile
+      ) {
         try {
-          const base64Image = await convertFileToBase64(productForm.selectedImageFile);
+          const base64Image = await convertFileToBase64(
+            productForm.selectedImageFile,
+          );
           finalProductData.imageUrl = base64Image;
         } catch (error) {
           console.error("파일 변환 오류:", error);
@@ -899,19 +914,20 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
         finalProductData.imageUrl = productForm.imageUrl;
       }
 
-
-      const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/${editingProduct.id}`, {
+      const response = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products/${editingProduct.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(finalProductData),
       });
 
       if (!response.ok) {
-         const errorData = await response.json().catch(() => ({ message: "Unknown error" }));
+        const errorData = await response
+          .json()
+          .catch(() => ({ message: "Unknown error" }));
         throw new Error(errorData.message || "Failed to update product");
       }
 
-      await queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
+      await queryClient.refetchQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"] });
       setShowProductForm(false);
       setEditingProduct(null);
       resetProductForm();
@@ -923,7 +939,8 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       console.error("Product update error:", error);
       toast({
         title: t("common.error"),
-        description: (error as Error).message || t("settings.productUpdatedError"),
+        description:
+          (error as Error).message || t("settings.productUpdatedError"),
         variant: "destructive",
       });
     }
@@ -941,9 +958,9 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     if (!productToDelete) return;
 
     try {
-      await apiRequest("DELETE", `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/${productToDelete.id}`);
+      await apiRequest("DELETE", `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products/${productToDelete.id}`);
 
-      await queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
+      await queryClient.refetchQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"] });
 
       toast({
         title: t("common.success"),
@@ -982,7 +999,8 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       imageUrl: product.imageUrl || "",
       floor: product.floor || "1층",
       zone: product.zone || "A구역",
-      imageInputMethod: (product.imageUrl && product.imageUrl.trim() !== "") ? "url" : "url",
+      imageInputMethod:
+        product.imageUrl && product.imageUrl.trim() !== "" ? "url" : "url",
       selectedImageFile: null,
     });
     setShowProductForm(true);
@@ -1006,7 +1024,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
   // Fetch E-invoice connections
   const { data: eInvoiceConnections = [], isLoading: eInvoiceLoading } =
     useQuery<any[]>({
-      queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/einvoice-connections"],
+      queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/einvoice-connections"],
     });
 
   // E-invoice mutations
@@ -1014,14 +1032,14 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     mutationFn: async (data: any) => {
       const response = await apiRequest(
         "POST",
-        "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/einvoice-connections",
+        "https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/einvoice-connections",
         data,
       );
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/einvoice-connections"],
+        queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/einvoice-connections"],
       });
       toast({
         title: t("common.success"),
@@ -1043,14 +1061,14 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
       const response = await apiRequest(
         "PUT",
-        `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/einvoice-connections/${id}`,
+        `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/einvoice-connections/${id}`,
         data,
       );
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/einvoice-connections"],
+        queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/einvoice-connections"],
       });
       toast({
         title: t("common.success"),
@@ -1072,13 +1090,13 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     mutationFn: async (id: number) => {
       const response = await apiRequest(
         "DELETE",
-        `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/einvoice-connections/${id}`,
+        `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/einvoice-connections/${id}`,
       );
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/einvoice-connections"],
+        queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/einvoice-connections"],
       });
       toast({
         title: t("common.success"),
@@ -1259,17 +1277,17 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
   const { data: invoiceTemplates = [], isLoading: templatesLoading } = useQuery<
     any[]
   >({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoice-templates"],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/invoice-templates"],
   });
 
   // Invoice template mutations
   const createTemplateMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoice-templates", data);
+      const response = await apiRequest("POST", "https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/invoice-templates", data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoice-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/invoice-templates"] });
       toast({
         title: t("common.success"),
         description: t("settings.einvoiceTemplateCreateSuccess"),
@@ -1290,13 +1308,13 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
       const response = await apiRequest(
         "PUT",
-        `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoice-templates/${id}`,
+        `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/invoice-templates/${id}`,
         data,
       );
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoice-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/invoice-templates"] });
       toast({
         title: t("common.success"),
         description: t("settings.einvoiceTemplateUpdateSuccess"),
@@ -1317,12 +1335,12 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     mutationFn: async (id: number) => {
       const response = await apiRequest(
         "DELETE",
-        `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoice-templates/${id}`,
+        `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/invoice-templates/${id}`,
       );
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoice-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/invoice-templates"] });
       toast({
         title: t("common.success"),
         description: t("settings.einvoiceTemplateDeleteSuccess"),
@@ -1422,9 +1440,8 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
   };
 
   const refetchProducts = () => {
-    queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
+    queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"] });
   };
-
 
   return (
     <div className="min-h-screen bg-gray-50 pt-20 relative">
@@ -2322,14 +2339,26 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                             }
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder={t("settings.selectDefaultFloor")} />
+                              <SelectValue
+                                placeholder={t("settings.selectDefaultFloor")}
+                              />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="1">{t("settings.floor")} 1</SelectItem>
-                              <SelectItem value="2">{t("settings.floor")} 2</SelectItem>
-                              <SelectItem value="3">{t("settings.floor")} 3</SelectItem>
-                              <SelectItem value="4">{t("settings.floor")} 4</SelectItem>
-                              <SelectItem value="5">{t("settings.floor")} 5</SelectItem>
+                              <SelectItem value="1">
+                                {t("settings.floor")} 1
+                              </SelectItem>
+                              <SelectItem value="2">
+                                {t("settings.floor")} 2
+                              </SelectItem>
+                              <SelectItem value="3">
+                                {t("settings.floor")} 3
+                              </SelectItem>
+                              <SelectItem value="4">
+                                {t("settings.floor")} 4
+                              </SelectItem>
+                              <SelectItem value="5">
+                                {t("settings.floor")} 5
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -2344,14 +2373,26 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                             }
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder={t("settings.selectDefaultZone")} />
+                              <SelectValue
+                                placeholder={t("settings.selectDefaultZone")}
+                              />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="A">{t("settings.zoneA")}</SelectItem>
-                              <SelectItem value="B">{t("settings.zoneB")}</SelectItem>
-                              <SelectItem value="C">{t("settings.zoneC")}</SelectItem>
-                              <SelectItem value="D">{t("settings.zoneD")}</SelectItem>
-                              <SelectItem value="E">{t("settings.zoneE")}</SelectItem>
+                              <SelectItem value="A">
+                                {t("settings.zoneA")}
+                              </SelectItem>
+                              <SelectItem value="B">
+                                {t("settings.zoneB")}
+                              </SelectItem>
+                              <SelectItem value="C">
+                                {t("settings.zoneC")}
+                              </SelectItem>
+                              <SelectItem value="D">
+                                {t("settings.zoneD")}
+                              </SelectItem>
+                              <SelectItem value="E">
+                                {t("settings.zoneE")}
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -2862,25 +2903,34 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                     <AlertDialogHeader>
                                       <AlertDialogTitle className="flex items-center gap-2 text-red-600">
                                         <Trash2 className="w-5 h-5" />
-                                        {t("common.comboValues.confirmDeleteCategoryTitle")}
+                                        {t(
+                                          "common.comboValues.confirmDeleteCategoryTitle",
+                                        )}
                                       </AlertDialogTitle>
                                       <AlertDialogDescription className="text-left">
                                         <div className="space-y-3">
                                           <p>
-                                            {t("common.comboValues.confirmDeleteCategoryDesc", {
-                                              name: categoryToDelete?.name,
-                                            })}
+                                            {t(
+                                              "common.comboValues.confirmDeleteCategoryDesc",
+                                              {
+                                                name: categoryToDelete?.name,
+                                              },
+                                            )}
                                           </p>
                                           <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                                             <div className="flex items-start gap-2">
                                               <div className="w-2 h-2 bg-red-400 rounded-full mt-2 flex-shrink-0"></div>
                                               <p className="text-sm text-red-700">
-                                                {t("common.comboValues.deleteCategoryWarning")}
+                                                {t(
+                                                  "common.comboValues.deleteCategoryWarning",
+                                                )}
                                               </p>
                                             </div>
                                           </div>
                                           <p className="text-sm text-gray-600">
-                                            {t("common.comboValues.deleteCategoryDetails")}
+                                            {t(
+                                              "common.comboValues.deleteCategoryDetails",
+                                            )}
                                           </p>
                                         </div>
                                       </AlertDialogDescription>
@@ -2900,7 +2950,9 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                         className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
                                       >
                                         <Trash2 className="w-4 h-4 mr-2" />
-                                        {t("common.comboValues.deleteCategoryAction")}
+                                        {t(
+                                          "common.comboValues.deleteCategoryAction",
+                                        )}
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
@@ -3773,10 +3825,12 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="전체구역">
-                                {currentLanguage === "ko" ? "전체구역" : 
-                                 currentLanguage === "en" ? "All Zones" :
-                                 "Tất cả khu vực"}
-                              </SelectItem>
+                    {currentLanguage === "ko"
+                      ? "전체구역"
+                      : currentLanguage === "en"
+                        ? "All Zones"
+                        : "Tất cả khu vực"}
+                  </SelectItem>
                   <SelectItem value="A구역">A구역</SelectItem>
                   <SelectItem value="B구역">B구역</SelectItem>
                   <SelectItem value="C구역">C구역</SelectItem>
@@ -3798,9 +3852,19 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                 <div className="flex space-x-2">
                   <Button
                     type="button"
-                    variant={productForm.imageInputMethod === "url" ? "default" : "outline"}
+                    variant={
+                      productForm.imageInputMethod === "url"
+                        ? "default"
+                        : "outline"
+                    }
                     size="sm"
-                    onClick={() => setProductForm(prev => ({ ...prev, imageInputMethod: "url", selectedImageFile: null }))}
+                    onClick={() =>
+                      setProductForm((prev) => ({
+                        ...prev,
+                        imageInputMethod: "url",
+                        selectedImageFile: null,
+                      }))
+                    }
                     className="flex items-center gap-2"
                   >
                     <Link className="w-4 h-4" />
@@ -3808,9 +3872,19 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                   </Button>
                   <Button
                     type="button"
-                    variant={productForm.imageInputMethod === "file" ? "default" : "outline"}
+                    variant={
+                      productForm.imageInputMethod === "file"
+                        ? "default"
+                        : "outline"
+                    }
                     size="sm"
-                    onClick={() => setProductForm(prev => ({ ...prev, imageInputMethod: "file", imageUrl: "" }))}
+                    onClick={() =>
+                      setProductForm((prev) => ({
+                        ...prev,
+                        imageInputMethod: "file",
+                        imageUrl: "",
+                      }))
+                    }
                     className="flex items-center gap-2"
                   >
                     <FileImage className="w-4 h-4" />
@@ -3823,7 +3897,10 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                     placeholder={t("tables.imageUrl")}
                     value={productForm.imageUrl || ""}
                     onChange={(e) =>
-                      setProductForm((prev) => ({ ...prev, imageUrl: e.target.value }))
+                      setProductForm((prev) => ({
+                        ...prev,
+                        imageUrl: e.target.value,
+                      }))
                     }
                   />
                 ) : (
@@ -3838,16 +3915,23 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                 {productForm.selectedImageFile.name}
                               </p>
                               <p className="text-xs text-gray-500">
-                                {(productForm.selectedImageFile.size / 1024).toFixed(1)} KB
+                                {(
+                                  productForm.selectedImageFile.size / 1024
+                                ).toFixed(1)}{" "}
+                                KB
                               </p>
                             </>
                           ) : (
                             <>
                               <Upload className="w-8 h-8 mb-2 text-gray-400" />
                               <p className="mb-2 text-sm text-gray-500">
-                                <span className="font-semibold">이미지 파일을 선택하거나</span>
+                                <span className="font-semibold">
+                                  이미지 파일을 선택하거나
+                                </span>
                               </p>
-                              <p className="text-xs text-gray-500">드래그엤드롭으로 업로드</p>
+                              <p className="text-xs text-gray-500">
+                                드래그엤드롭으로 업로드
+                              </p>
                             </>
                           )}
                         </div>
@@ -3861,12 +3945,17 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                               if (file.size > 5 * 1024 * 1024) {
                                 toast({
                                   title: "오류",
-                                  description: "이미지 크기는 5MB를 초과할 수 없습니다.",
+                                  description:
+                                    "이미지 크기는 5MB를 초과할 수 없습니다.",
                                   variant: "destructive",
                                 });
                                 return;
                               }
-                              setProductForm(prev => ({ ...prev, selectedImageFile: file, imageUrl: "" }));
+                              setProductForm((prev) => ({
+                                ...prev,
+                                selectedImageFile: file,
+                                imageUrl: "",
+                              }));
                             }
                           }}
                         />
@@ -3877,7 +3966,12 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => setProductForm(prev => ({ ...prev, selectedImageFile: null }))}
+                        onClick={() =>
+                          setProductForm((prev) => ({
+                            ...prev,
+                            selectedImageFile: null,
+                          }))
+                        }
                         className="w-full"
                       >
                         <X className="w-4 h-4 mr-2" />
@@ -4131,7 +4225,10 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
             <AlertDialogDescription className="text-left">
               <div className="space-y-3">
                 <p>
-                  {t("settings.confirmDeleteConnectionDesc").replace("{{name}}", eInvoiceToDelete?.softwareName || "")}
+                  {t("settings.confirmDeleteConnectionDesc").replace(
+                    "{{name}}",
+                    eInvoiceToDelete?.softwareName || "",
+                  )}
                 </p>
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                   <div className="flex items-start gap-2">

@@ -20,21 +20,21 @@ export default function AttendanceQRPage() {
   const { t } = useTranslation();
 
   const { data: employees } = useQuery({
-    queryKey: ['https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees'],
+    queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/employees'],
   });
 
   const { data: todayAttendance, refetch: refetchTodayAttendance } = useQuery({
-    queryKey: ['https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance/today', selectedEmployeeId],
+    queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/attendance/today', selectedEmployeeId],
     enabled: !!selectedEmployeeId,
   });
 
   const clockInMutation = useMutation({
-    mutationFn: () => apiRequest('POST', 'https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance/clock-in', {
+    mutationFn: () => apiRequest('POST', '/api/attendance/clock-in', {
       employeeId: parseInt(selectedEmployeeId),
       notes
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/attendance'] });
       refetchTodayAttendance();
       setNotes("");
       toast({
@@ -52,9 +52,9 @@ export default function AttendanceQRPage() {
   });
 
   const clockOutMutation = useMutation({
-    mutationFn: () => apiRequest('POST', `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance/clock-out/${(todayAttendance as AttendanceRecord)?.id}`, {}),
+    mutationFn: () => apiRequest('POST', `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/attendance/clock-out/${(todayAttendance as AttendanceRecord)?.id}`, {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/attendance'] });
       refetchTodayAttendance();
       toast({
         title: "퇴근 기록 완료",
@@ -71,9 +71,9 @@ export default function AttendanceQRPage() {
   });
 
   const breakStartMutation = useMutation({
-    mutationFn: () => apiRequest('POST', `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance/break-start/${(todayAttendance as AttendanceRecord)?.id}`, {}),
+    mutationFn: () => apiRequest('POST', `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/attendance/break-start/${(todayAttendance as AttendanceRecord)?.id}`, {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/attendance'] });
       refetchTodayAttendance();
       toast({
         title: t('attendance.breakStartSuccess'),
@@ -90,9 +90,9 @@ export default function AttendanceQRPage() {
   });
 
   const breakEndMutation = useMutation({
-    mutationFn: () => apiRequest('POST', `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance/break-end/${(todayAttendance as AttendanceRecord)?.id}`, {}),
+    mutationFn: () => apiRequest('POST', `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/attendance/break-end/${(todayAttendance as AttendanceRecord)?.id}`, {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/attendance'] });
       refetchTodayAttendance();
       toast({
         title: "휴식 종료",

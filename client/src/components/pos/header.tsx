@@ -65,20 +65,20 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
 
   // Fetch store settings
   const { data: storeSettings } = useQuery<StoreSettings>({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings"],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/store-settings"],
   });
 
   // Fetch employees
   const { data: employees } = useQuery<Employee[]>({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees"],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/employees"],
   });
 
   // Fetch today's attendance records
   const todayDate = new Date().toISOString().split("T")[0];
   const { data: todayAttendance } = useQuery<AttendanceRecord[]>({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance", todayDate],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/attendance", todayDate],
     queryFn: async () => {
-      const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance?date=${todayDate}`);
+      const response = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/attendance?date=${todayDate}`);
       if (!response.ok) {
         throw new Error("Failed to fetch attendance records");
       }
@@ -207,7 +207,8 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
               {storeSettings?.storeName || "EDPOS 레스토랑"}
             </div>
             <div className="text-sm opacity-75 text-right font-extrabold text-[#22c55e]">
-              {t("pos.posLocation")}: {storeSettings?.defaultFloor || "1"}{t("pos.floor")}-{storeSettings?.defaultZone || "A"}
+              {t("pos.posLocation")}: {storeSettings?.defaultFloor || "1"}
+              {t("pos.floor")}-{storeSettings?.defaultZone || "A"}
             </div>
           </div>
         </div>
@@ -291,8 +292,6 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
                     </button>
                   </Link>
 
-
-
                   <Link href="/sales-orders">
                     <button
                       className={`w-full flex items-center px-4 py-2 text-left hover:bg-green-50 transition-colors ${
@@ -306,7 +305,6 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
                       {t("orders.orderList")}
                     </button>
                   </Link>
-
 
                   <div className="border-t border-gray-200 my-2"></div>
                   <Link href="/suppliers">
@@ -322,9 +320,7 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
                       {t("nav.suppliers")}
                     </button>
                   </Link>
-                  
 
-                  
                   <Link href="/purchases">
                     <button
                       className={`w-full flex items-center px-4 py-2 text-left hover:bg-green-50 transition-colors ${
@@ -541,16 +537,20 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
                       setPosMenuOpen(false);
 
                       // Detect if multiple screens are available
-                      if (screen.availWidth > window.screen.width || window.screen.availLeft !== 0) {
+                      if (
+                        screen.availWidth > window.screen.width ||
+                        window.screen.availLeft !== 0
+                      ) {
                         // Multiple screens detected - place on secondary screen
-                        const secondaryScreenLeft = screen.availLeft !== 0 ? 0 : screen.width;
+                        const secondaryScreenLeft =
+                          screen.availLeft !== 0 ? 0 : screen.width;
                         const width = Math.min(1024, screen.availWidth);
                         const height = Math.min(768, screen.availHeight);
 
                         const customerWindow = window.open(
-                          '/customer-display',
-                          'customerDisplay',
-                          `width=${width},height=${height},left=${secondaryScreenLeft},top=0,resizable=yes,scrollbars=yes,status=no,toolbar=no,menubar=no,location=no`
+                          "/customer-display",
+                          "customerDisplay",
+                          `width=${width},height=${height},left=${secondaryScreenLeft},top=0,resizable=yes,scrollbars=yes,status=no,toolbar=no,menubar=no,location=no`,
                         );
 
                         // Try to maximize on secondary screen after opening
@@ -558,9 +558,14 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
                           setTimeout(() => {
                             try {
                               customerWindow.moveTo(secondaryScreenLeft, 0);
-                              customerWindow.resizeTo(screen.availWidth, screen.availHeight);
+                              customerWindow.resizeTo(
+                                screen.availWidth,
+                                screen.availHeight,
+                              );
                             } catch (error) {
-                              console.log('Cannot auto-resize customer display window due to browser security restrictions');
+                              console.log(
+                                "Cannot auto-resize customer display window due to browser security restrictions",
+                              );
                             }
                           }, 500);
                         }
@@ -572,9 +577,9 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
                         const top = (screen.height - height) / 2;
 
                         window.open(
-                          '/customer-display',
-                          'customerDisplay',
-                          `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,toolbar=no,menubar=no,location=no`
+                          "/customer-display",
+                          "customerDisplay",
+                          `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,toolbar=no,menubar=no,location=no`,
                         );
                       }
                     }}
@@ -599,10 +604,7 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
               )}
             </div>
           </nav>
-          
-
-          </div>
-
+        </div>
       </div>
       {showProductManager && (
         <ProductManagerModal

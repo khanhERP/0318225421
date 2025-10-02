@@ -15,11 +15,11 @@ export function AttendanceStats() {
   );
 
   const { data: employees } = useQuery({
-    queryKey: ['https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees'],
+    queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/employees'],
   });
 
   const { data: attendanceRecords } = useQuery({
-    queryKey: ['https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance'],
+    queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/attendance'],
   });
 
   const getMonthlyStats = () => {

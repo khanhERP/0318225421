@@ -44,13 +44,13 @@ export function MembershipModal({ isOpen, onClose }: MembershipModalProps) {
 
   // Fetch customers
   const { data: customers, isLoading } = useQuery<Customer[]>({
-    queryKey: ['https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers'],
+    queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/customers'],
     enabled: isOpen,
   });
 
   // Fetch membership thresholds
   const { data: fetchedThresholds } = useQuery<{ GOLD: number; VIP: number }>({
-    queryKey: ['https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/membership-thresholds'],
+    queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/membership-thresholds'],
     enabled: isOpen,
   });
 
@@ -94,7 +94,7 @@ export function MembershipModal({ isOpen, onClose }: MembershipModalProps) {
   // Update customer membership
   const updateMembershipMutation = useMutation({
     mutationFn: async ({ customerId, membershipLevel }: { customerId: number; membershipLevel: string }) => {
-      const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/${customerId}`, {
+      const response = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/customers/${customerId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -104,7 +104,7 @@ export function MembershipModal({ isOpen, onClose }: MembershipModalProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers'] });
+      queryClient.invalidateQueries({ queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/customers'] });
       toast({
         title: t("common.success"),
         description: t("customers.customerUpdated"),
@@ -122,7 +122,7 @@ export function MembershipModal({ isOpen, onClose }: MembershipModalProps) {
   // Update membership thresholds
   const updateThresholdsMutation = useMutation({
     mutationFn: async (newThresholds: { GOLD: number; VIP: number }) => {
-      const response = await fetch('https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/membership-thresholds', {
+      const response = await fetch('/api/membership-thresholds', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -132,8 +132,8 @@ export function MembershipModal({ isOpen, onClose }: MembershipModalProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/membership-thresholds'] });
-      queryClient.invalidateQueries({ queryKey: ['https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers'] });
+      queryClient.invalidateQueries({ queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/membership-thresholds'] });
+      queryClient.invalidateQueries({ queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/customers'] });
       toast({
         title: t("common.success"),
         description: "Đã cập nhật mức chi tiêu nâng hạng",

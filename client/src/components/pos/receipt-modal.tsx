@@ -46,18 +46,11 @@ export function ReceiptModal({
   const [title, setTitle] = useState<string>("");
   const { t } = useTranslation();
 
-  useEffect(() => {
-    const nameTitle =
-      isTitle == true
-        ? `${t("common.paymentInvoice")}`
-        : `${t("common.provisionalVoucher")}`;
-    setTitle(nameTitle);
-  }, [isTitle]);
   // Query store settings
   const { data: storeSettings } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings"],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/store-settings"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings");
+      const response = await apiRequest("GET", "/api/store-settings");
       return response.json();
     },
     enabled: isOpen, // Only fetch when modal is open
@@ -102,17 +95,99 @@ export function ReceiptModal({
     }
   }, [isOpen, receipt, isPreview, cartItems, total, onConfirm]);
 
+  // Set title whenever modal opens or isTitle changes
+  useEffect(() => {
+    if (isOpen) {
+      const nameTitle2 =
+        isTitle === true
+          ? `${t("common.paymentInvoice")}`
+          : `${t("common.provisionalVoucher")}`;
+      console.log(
+        "📄 Receipt Modal: Setting title to",
+        nameTitle2,
+        "isTitle:",
+        isTitle,
+      );
+      const nameTitle = `${t("common.invoice")}`;
+      setTitle(nameTitle);
+    }
+  }, [isOpen, isTitle, t]);
+
+  // Additional effect to handle title changes when isTitle prop changes
+  useEffect(() => {
+    const nameTitle2 =
+      isTitle === true
+        ? `${t("common.paymentInvoice")}`
+        : `${t("common.provisionalVoucher")}`;
+    console.log(
+      "📄 Receipt Modal: Title update triggered - isTitle:",
+      isTitle,
+      "new title:",
+      nameTitle2,
+    );
+    const nameTitle = `${t("common.invoice")}`;
+    setTitle(nameTitle);
+  }, [isTitle, t]);
+
   // Don't return early here - let the Dialog component handle the open state
 
   useEffect(() => {
     async function fetchPrinterConfigs() {
-      const printerResponse = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs");
-      if (printerResponse.ok) {
+      try {
+        const printerResponse = await fetch("/api/printer-configs");
+        if (!printerResponse.ok) {
+          console.error("Failed to fetch printer configs");
+          return;
+        }
+
         const allConfigs = await printerResponse.json();
-        let activePrinterConfigs = allConfigs.filter(
-          (config) =>
-            config.isActive && (config.isEmployee || config.isKitchen),
+        console.log(`📋 Total printer configs found: ${allConfigs.length}`);
+
+        // Get table floor if receipt has tableId
+        let tableFloor = null;
+        if (receipt?.tableId) {
+          try {
+            const tableResponse = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables/${receipt.tableId}`);
+            if (tableResponse.ok) {
+              const tableData = await tableResponse.json();
+              tableFloor = tableData.floor;
+              console.log(
+                `📍 Table ${receipt.tableId} is on floor: ${tableFloor}`,
+              );
+            }
+          } catch (error) {
+            console.error("Error fetching table data:", error);
+          }
+        }
+
+        let activePrinterConfigs = [];
+
+        // For kitchen receipts, get kitchen printers matching the floor + one employee printer
+        let employeePrinter = allConfigs.filter(
+          (config) => config.isActive && config.isEmployee,
         );
+
+        let kitchenPrinters = allConfigs.filter(
+          (config) => config.isActive && config.isKitchen,
+        );
+
+        console.log(
+          `🍳 Kitchen receipt mode - Found ${kitchenPrinters.length} active kitchen printers`,
+        );
+
+        // Filter kitchen printers by floor if we have table floor info
+        if (tableFloor) {
+          kitchenPrinters = kitchenPrinters.filter(
+            (config) => config.floor === tableFloor,
+          );
+          console.log(
+            `🖨️ Filtered to ${kitchenPrinters.length} kitchen printers for floor ${tableFloor}`,
+          );
+        }
+
+        // Combine kitchen printers with one employee printer
+        activePrinterConfigs = [...kitchenPrinters, ...employeePrinter];
+
         if (activePrinterConfigs.length > 0) {
           const lstPrinters = activePrinterConfigs.map((printer) => {
             return {
@@ -124,12 +199,17 @@ export function ReceiptModal({
             };
           });
           setPrinters(lstPrinters);
+          console.log("Danh sachs máy in", lstPrinters);
+          console.log("✅ Final printer list to be used:");
+        } else {
+          console.log("⚠️ No matching printers found");
         }
-        console.log("✅ Found active printer:", activePrinterConfigs);
+      } catch (error) {
+        console.error("Error in fetchPrinterConfigs:", error);
       }
     }
     fetchPrinterConfigs();
-  }, []);
+  }, [receipt?.tableId, isTitle]);
 
   // Handle missing data cases
   const hasReceiptData = receipt && typeof receipt === "object";
@@ -155,7 +235,7 @@ export function ReceiptModal({
           <div className="p-4 text-center">
             <p>
               {isPreview
-                ? "Không có sản phẩm trong giỏ hàng để xem trước hóa đơn"
+                ? "Không có sản phẩm trong giỏ hàng để xem trư  �c hóa đơn"
                 : "Không có dữ liệu hóa đơn để hiển thị"}
             </p>
             <Button onClick={onClose} className="mt-4">
@@ -177,7 +257,43 @@ export function ReceiptModal({
     if (content) {
       content = generatePrintHTML(printContent, false);
     }
+
+    console.log("🖨️ ============ BẮT ĐẦU IN HÓA ĐƠN ============");
+    console.log(
+      `📝 Loại hóa đơn: ${isTitle ? "Hóa đơn nhân viên" : "Hóa đơn bếp"}`,
+    );
+    console.log(`📊 Số lượng máy in sẽ được sử dụng: ${printers.length}`);
+    console.log(
+      `🏢 Bàn: ${receipt?.tableId ? `Bàn ${receipt.tableId}` : "POS"}`,
+    );
+    console.log(`📍 Tầng: ${receipt?.tableId ? "Sẽ lọc theo tầng" : "N/A"}`);
+
+    if (printers.length > 0) {
+      console.log("📋 ==========================================");
+      console.log("📋 DANH SÁCH MÁY IN SẼ ĐƯỢC SỬ DỤNG:");
+      console.log("📋 ==========================================");
+      printers.forEach((printer, index) => {
+        console.log(`\n   🖨️  MÁY IN #${index + 1}:`);
+        console.log(`   ├─ Tên máy in: ${printer.name}`);
+        console.log(`   ├─ Loại máy in: ${printer.type}`);
+        console.log(
+          `   ├─ Kết nối: ${printer.ip ? `IP ${printer.ip}:${printer.port}` : "USB"}`,
+        );
+        console.log(`   └─ Số bản in: ${printer.copies} bản`);
+      });
+      console.log("\n📋 ==========================================\n");
+    } else {
+      console.log("⚠️ ==========================================");
+      console.log("⚠️ KHÔNG CÓ MÁY IN NÀO ĐƯỢC CÁU HÌNH!");
+      console.log("⚠️ ==========================================");
+    }
+
     try {
+      console.log("📤 Đang gửi lệnh in đến máy in...");
+      console.log(
+        `📦 Dữ liệu gửi đi: ${printers.length} máy in, ${content.length} ký tự nội dung`,
+      );
+
       const response = await fetch("http://localhost:5000/print", {
         method: "POST",
         headers: {
@@ -190,14 +306,39 @@ export function ReceiptModal({
       });
 
       const result = await response.text();
+      console.log("✅ ==========================================");
+      console.log("✅ KẾT QUẢ IN THÀNH CÔNG!");
+      console.log("✅ ==========================================");
+      console.log(`✅ Response: ${result}`);
+      console.log(`✅ Đã in trên ${printers.length} máy in`);
+      printers.forEach((printer, index) => {
+        console.log(
+          `   ✓ Máy in #${index + 1}: ${printer.name} - ${printer.copies} bản`,
+        );
+      });
+      console.log("🖨️ ============ KẾT THÚC IN HÓA ĐƠN ============\n");
       alert("Kết quả in: " + result);
 
       onClose();
     } catch (error) {
-      console.error("Lỗi khi in:", error);
+      console.error("❌ ==========================================");
+      console.error("❌ LỖI KHI IN HÓA ĐƠN!");
+      console.error("❌ ==========================================");
+      console.error("❌ Chi tiết lỗi:", error);
+      console.error("❌ Số máy in đã cấu hình:", printers.length);
+      if (printers.length > 0) {
+        console.error("❌ Danh sách máy in:");
+        printers.forEach((printer, index) => {
+          console.error(
+            `   ✗ Máy in #${index + 1}: ${printer.name} (${printer.ip || "USB"})`,
+          );
+        });
+      }
+      console.error("🖨️ ============ LỖI IN HÓA ĐƠN ============\n");
       alert(
         "Bạn chưa thiết lập cài đặt máy in. Vui lòng liên hệ với edpos để được hỗ trợ.",
       );
+      onClose();
     }
   };
 
@@ -239,7 +380,7 @@ export function ReceiptModal({
       let activePrinterConfigs = [];
       try {
         console.log("🖨️ Fetching active printer configurations...");
-        const printerResponse = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/printer-configs");
+        const printerResponse = await fetch("/api/printer-configs");
         if (printerResponse.ok) {
           const allConfigs = await printerResponse.json();
           activePrinterConfigs = allConfigs.filter(
@@ -278,7 +419,7 @@ export function ReceiptModal({
         console.log("🖨️ Trying configured POS printers for all platforms...");
 
         try {
-          const printResponse = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/pos/print-receipt", {
+          const printResponse = await fetch("/api/pos/print-receipt", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -348,6 +489,7 @@ export function ReceiptModal({
       if (printContent) {
         handleDesktopPrint(printContent);
       }
+      onClose();
     }
   };
 
@@ -934,6 +1076,9 @@ export function ReceiptModal({
         detail: { closeAllModals: true, refreshData: true },
       }),
     );
+
+    // Close the modal
+    onClose();
   };
 
   // Use stored values directly from receipt data
@@ -959,7 +1104,7 @@ export function ReceiptModal({
           </DialogTitle>
         </DialogHeader>
 
-        {hasReceiptData ? (
+        {hasValidData ? (
           <div
             id="receipt-content"
             className="receipt-print bg-white"
@@ -1508,7 +1653,6 @@ export function ReceiptModal({
               return [];
             }
           })()}
-          orderId={receipt?.id}
         />
       )}
     </Dialog>

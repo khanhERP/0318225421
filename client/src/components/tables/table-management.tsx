@@ -94,7 +94,7 @@ export function TableManagement() {
   const [previewReceipt, setPreviewReceipt] = useState<any>(null);
 
   const { data: tables, isLoading } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables"],
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
     refetchOnWindowFocus: false,
@@ -109,17 +109,17 @@ export function TableManagement() {
       tableNumber: "",
       capacity: 1,
       status: "available",
-      floor: "1층",
-      zone: "A구역",
+      floor: "1",
+      zone: "A",
       qrCode: "",
     },
   });
 
   const createTableMutation = useMutation({
     mutationFn: (data: TableFormData) =>
-      apiRequest("POST", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables", data),
+      apiRequest("POST", "/api/tables", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
+      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables"] });
       toast({
         title: t("common.success"),
         description: t("tables.tableCreateSuccess"),
@@ -137,9 +137,9 @@ export function TableManagement() {
 
   const updateTableMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: TableFormData }) =>
-      apiRequest("PUT", `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables/${id}`, data),
+      apiRequest("PUT", `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
+      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables"] });
       toast({
         title: t("common.success"),
         description: t("tables.tableUpdateSuccess"),
@@ -156,9 +156,9 @@ export function TableManagement() {
   });
 
   const deleteTableMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables/${id}`, {}),
+    mutationFn: (id: number) => apiRequest("DELETE", `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables/${id}`, {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
+      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables"] });
       toast({
         title: t("common.success"),
         description: t("tables.tableDeleteSuccess"),
@@ -184,8 +184,8 @@ export function TableManagement() {
           | "occupied"
           | "reserved"
           | "maintenance",
-        floor: table.floor || "1층",
-        zone: (table as any).zone || "A구역",
+        floor: table.floor || "1",
+        zone: (table as any).zone || "A",
         qrCode: table.qrCode || "",
       });
     } else {
@@ -194,8 +194,8 @@ export function TableManagement() {
         tableNumber: "",
         capacity: 1,
         status: "available",
-        floor: "1층",
-        zone: "A구역",
+        floor: "1",
+        zone: "A",
         qrCode: "",
       });
     }

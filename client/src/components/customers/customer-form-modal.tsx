@@ -46,7 +46,7 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
   // Generate customer ID for new customers
   const generateCustomerId = async () => {
     try {
-      const response = await apiRequest("GET", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/next-id");
+      const response = await apiRequest("GET", "/api/customers/next-id");
       const data = await response.json();
       return data.nextId;
     } catch (error) {
@@ -105,11 +105,11 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
 
   const createMutation = useMutation({
     mutationFn: async (data: CustomerFormData) => {
-      const response = await apiRequest("POST", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers", data);
+      const response = await apiRequest("POST", "/api/customers", data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/customers"] });
       toast({
         title: t('common.success'),
         description: customer ? "고객 정보가 업데이트되었습니다." : "새 고객이 추가되었습니다.",
@@ -128,11 +128,11 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
 
   const updateMutation = useMutation({
     mutationFn: async (data: CustomerFormData) => {
-      const response = await apiRequest("PUT", `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/${customer!.id}`, data);
+      const response = await apiRequest("PUT", `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/customers/${customer!.id}`, data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/customers"] });
       toast({
         title: t('common.success'),
         description: "고객 정보가 업데이트되었습니다.",

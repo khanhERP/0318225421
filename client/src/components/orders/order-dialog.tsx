@@ -63,26 +63,26 @@ export function OrderDialog({
   const queryClient = useQueryClient();
 
   const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"],
   });
 
   const { data: categories, isLoading: categoriesLoading } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories"],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/categories"],
   });
 
   const { data: storeSettings } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings"],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/store-settings"],
   });
 
   const { data: existingOrderItems, refetch: refetchExistingItems } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", existingOrder?.id],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/order-items", existingOrder?.id],
     enabled: !!(existingOrder?.id && mode === "edit" && open),
     staleTime: 0,
     queryFn: async () => {
       console.log("Fetching existing order items for order:", existingOrder.id);
       const response = await apiRequest(
         "GET",
-        `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${existingOrder.id}`,
+        `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/order-items/${existingOrder.id}`,
       );
       const data = await response.json();
       console.log("Existing order items response:", data);
@@ -123,7 +123,7 @@ export function OrderDialog({
             );
             const addItemsResponse = await apiRequest(
               "POST",
-              `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${existingOrder.id}/items`,
+              `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders/${existingOrder.id}/items`,
               {
                 items: orderData.items,
               },
@@ -151,7 +151,7 @@ export function OrderDialog({
             try {
               const recalcResponse = await apiRequest(
                 "POST",
-                `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${existingOrder.id}/recalculate`,
+                `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders/${existingOrder.id}/recalculate`,
               );
               const recalcResult = await recalcResponse.json();
               console.log("✅ Order totals recalculated:", recalcResult);
@@ -209,7 +209,7 @@ export function OrderDialog({
               try {
                 const updateResponse = await apiRequest(
                   "PUT",
-                  `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${item.id}`,
+                  `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/order-items/${item.id}`,
                   {
                     discount: itemDiscount.toFixed(2),
                   },
@@ -262,7 +262,7 @@ export function OrderDialog({
 
           const updateResponse = await apiRequest(
             "PUT",
-            `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${existingOrder.id}`,
+            `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders/${existingOrder.id}`,
             {
               customerName: orderData.order.customerName,
               customerCount: orderData.order.customerCount,
@@ -283,7 +283,7 @@ export function OrderDialog({
           return updateResult;
         } else {
           console.log("📝 Creating new order...");
-          const response = await apiRequest("POST", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders", orderData);
+          const response = await apiRequest("POST", "/api/orders", orderData);
 
           if (!response.ok) {
             const errorData = await response.text();
@@ -323,16 +323,16 @@ export function OrderDialog({
         try {
           // Clear existing cache for this specific order items
           queryClient.removeQueries({
-            queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", existingOrder.id],
+            queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/order-items", existingOrder.id],
           });
 
           // Force fresh fetch of order items
           const freshOrderItems = await queryClient.fetchQuery({
-            queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", existingOrder.id],
+            queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/order-items", existingOrder.id],
             queryFn: async () => {
               const response = await apiRequest(
                 "GET",
-                `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${existingOrder.id}`,
+                `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/order-items/${existingOrder.id}`,
               );
               const data = await response.json();
               console.log("🔄 Fresh order items fetched:", data);
@@ -356,11 +356,11 @@ export function OrderDialog({
 
       // Invalidate and refetch all related queries
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items"] }),
-        queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
-        queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/order-items"] }),
+        queryClient.refetchQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders"] }),
+        queryClient.refetchQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables"] }),
       ]);
 
       // Reset form state
@@ -1490,7 +1490,7 @@ export function OrderDialog({
                                       // Call API to delete the order item
                                       apiRequest(
                                         "DELETE",
-                                        `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${item.id}`,
+                                        `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/order-items/${item.id}`,
                                       )
                                         .then(async () => {
                                           console.log(
@@ -1514,7 +1514,7 @@ export function OrderDialog({
                                               // Fetch current order items after deletion
                                               const response = await apiRequest(
                                                 "GET",
-                                                `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${existingOrder.id}`,
+                                                `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/order-items/${existingOrder.id}`,
                                               );
                                               const remainingItems =
                                                 await response.json();
@@ -1601,7 +1601,7 @@ export function OrderDialog({
                                               // Update order with new totals
                                               apiRequest(
                                                 "PUT",
-                                                `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${existingOrder.id}`,
+                                                `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders/${existingOrder.id}`,
                                                 {
                                                   subtotal:
                                                     newSubtotal.toString(),
@@ -1617,25 +1617,25 @@ export function OrderDialog({
                                                 Promise.all([
                                                   queryClient.invalidateQueries(
                                                     {
-                                                      queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"],
+                                                      queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders"],
                                                     },
                                                   ),
                                                   queryClient.invalidateQueries(
                                                     {
-                                                      queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"],
+                                                      queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables"],
                                                     },
                                                   ),
                                                   queryClient.invalidateQueries(
                                                     {
                                                       queryKey: [
-                                                        "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items",
+                                                        "/api/order-items",
                                                       ],
                                                     },
                                                   ),
                                                   queryClient.invalidateQueries(
                                                     {
                                                       queryKey: [
-                                                        "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items",
+                                                        "/api/order-items",
                                                         existingOrder.id,
                                                       ],
                                                     },
@@ -1644,10 +1644,10 @@ export function OrderDialog({
                                                   // Force immediate refetch to update table grid display
                                                   return Promise.all([
                                                     queryClient.refetchQueries({
-                                                      queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"],
+                                                      queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders"],
                                                     }),
                                                     queryClient.refetchQueries({
-                                                      queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"],
+                                                      queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables"],
                                                     }),
                                                   ]);
                                                 });
@@ -1672,10 +1672,10 @@ export function OrderDialog({
 
                                           // Invalidate queries to refresh data
                                           queryClient.invalidateQueries({
-                                            queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items"],
+                                            queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/order-items"],
                                           });
                                           queryClient.invalidateQueries({
-                                            queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"],
+                                            queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders"],
                                           });
                                         })
                                         .catch((error) => {
