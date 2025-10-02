@@ -1453,7 +1453,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
               <p className="text-gray-600">{t("settings.description")}</p>
             </div>
             <Button
-              onClick={() => (window.location.href = "/tables")}
+              onClick={() => (window.location.href = "/")}
               variant="outline"
               className="bg-white hover:bg-green-50 border-green-200 text-green-700 hover:text-green-800"
             >

@@ -35,7 +35,7 @@ function Router({ onLogout }: { onLogout: () => void }) {
 
   return (
     <Switch>
-      <Route path="/" component={RedirectToSales} />
+      <Route path="/" component={<TablesPage onLogout={onLogout} />} />
       <Route path="/pos" component={() => <POSPage onLogout={onLogout} />} />
       <Route
         path="/tables"
