@@ -14,7 +14,7 @@ export async function apiRequest(
   options: RequestInit = {},
 ) {
   // Log payment method tracking for order status updates
-  if (url.includes("https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders/") && url.includes("/status") && method === "PUT") {
+  if (url.includes("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/") && url.includes("/status") && method === "PUT") {
     console.log("🔍 apiRequest: Payment method tracking for order status update:", {
       method,
       url,
@@ -43,7 +43,7 @@ export async function apiRequest(
     config.body = JSON.stringify(data);
 
     // Additional logging for payment method requests
-    if (url.includes("https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders/") && url.includes("/status") && method === "PUT") {
+    if (url.includes("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/") && url.includes("/status") && method === "PUT") {
       console.log("🔍 apiRequest: Final request body for payment:", {
         url,
         requestBodyString: JSON.stringify(data),

@@ -159,7 +159,7 @@ export function EInvoiceModal({
         orderId,
       );
       // Pass the paymentMethod to the PUT request for status update
-      return apiRequest("PUT", `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders/${orderId}/status`, {
+      return apiRequest("PUT", `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${orderId}/status`, {
         status: "paid",
         paymentMethod, // Ensure paymentMethod is passed here
       });
@@ -169,8 +169,8 @@ export function EInvoiceModal({
         "🎯 E-invoice modal completed payment successfully for order:",
         variables.orderId,
       );
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables"] });
+      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
 
       toast({
         title: `${t("common.success")}`,
@@ -202,22 +202,22 @@ export function EInvoiceModal({
 
   // Fetch E-invoice connections
   const { data: eInvoiceConnections = [] } = useQuery<any[]>({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/einvoice-connections"],
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/einvoice-connections"],
     enabled: isOpen,
   });
 
   // Fetch active invoice templates for dropdown
   const { data: allInvoiceTemplates = [] } = useQuery<any[]>({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/invoice-templates/active"],
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoice-templates/active"],
     enabled: isOpen,
   });
 
   // Query all products to get tax rates
   const { data: products = [] } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"],
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"],
     queryFn: async () => {
       try {
-        const response = await apiRequest("GET", "https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products");
+        const response = await apiRequest("GET", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -233,11 +233,11 @@ export function EInvoiceModal({
 
   // Query order data to get priceIncludeTax setting
   const { data: orderData } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders", orderId],
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders", orderId],
     queryFn: async () => {
       if (!orderId) return null;
       try {
-        const response = await apiRequest("GET", `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders/${orderId}`);
+        const response = await apiRequest("GET", `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${orderId}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -385,7 +385,7 @@ export function EInvoiceModal({
     setIsTaxCodeLoading(true);
     try {
       // Use a proxy endpoint through our server to avoid CORS issues
-      const response = await fetch("https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tax-code-lookup", {
+      const response = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tax-code-lookup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -823,7 +823,7 @@ export function EInvoiceModal({
       );
 
       // Lưu hóa đơn vào bảng invoices và invoice_items
-      const invoiceResponse = await fetch("https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/invoices", {
+      const invoiceResponse = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -946,7 +946,7 @@ export function EInvoiceModal({
             paidAt: new Date().toISOString(),
           };
 
-          const updateResponse = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders/${orderId}`, {
+          const updateResponse = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${orderId}`, {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
@@ -1438,7 +1438,7 @@ export function EInvoiceModal({
     );
 
     // Call the proxy API
-    const response = await fetch("https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/einvoice/publish", {
+    const response = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/einvoice/publish", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1580,7 +1580,7 @@ export function EInvoiceModal({
 
         console.log("💾 Saving published invoice to database:", invoicePayload);
 
-        const invoiceResponse = await fetch("https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/invoices", {
+        const invoiceResponse = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -1621,7 +1621,7 @@ export function EInvoiceModal({
             paidAt: new Date().toISOString(),
           };
 
-          const updateResponse = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders/${orderId}`, {
+          const updateResponse = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${orderId}`, {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
@@ -1681,7 +1681,7 @@ export function EInvoiceModal({
 
           console.log("💾 Saving published order to database:", orderData);
 
-          const saveResponse = await fetch("https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders", {
+          const saveResponse = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -1850,7 +1850,7 @@ export function EInvoiceModal({
       };
 
       try {
-        const transactionResponse = await fetch("https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/transactions", {
+        const transactionResponse = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/transactions", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
