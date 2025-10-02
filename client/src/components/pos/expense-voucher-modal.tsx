@@ -82,7 +82,7 @@ export default function ExpenseVoucherModal({
 
   // Fetch customers
   const { data: customers = [] } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/customers"],
+    queryKey: ["/api/customers"],
     queryFn: async () => {
       try {
         const response = await fetch("/api/customers");
@@ -98,7 +98,7 @@ export default function ExpenseVoucherModal({
 
   // Fetch employees
   const { data: employees = [] } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/employees"],
+    queryKey: ["/api/employees"],
     queryFn: async () => {
       try {
         const response = await fetch("/api/employees");
@@ -114,7 +114,7 @@ export default function ExpenseVoucherModal({
 
   // Fetch suppliers
   const { data: suppliers = [] } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/suppliers"],
+    queryKey: ["/api/suppliers"],
     queryFn: async () => {
       try {
         const response = await fetch("/api/suppliers");
@@ -177,8 +177,8 @@ export default function ExpenseVoucherModal({
         title: "Thành công",
         description: `Đã tạo phiếu chi ${formData.voucherNumber} thành công`,
       });
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/expense-vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expense-vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       onClose();
     },
     onError: (error) => {
@@ -195,7 +195,7 @@ export default function ExpenseVoucherModal({
   const updateVoucherMutation = useMutation({
     mutationFn: async (data: ExpenseVoucher) => {
       console.log("Updating expense voucher with data:", data);
-      const response = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/expense-vouchers/${data.id}`, {
+      const response = await fetch(`/api/expense-vouchers/${data.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -215,8 +215,8 @@ export default function ExpenseVoucherModal({
         title: "Thành công", 
         description: `Đã cập nhật phiếu chi ${formData.voucherNumber} thành công`,
       });
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/expense-vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expense-vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       setIsEditing(false);
     },
     onError: (error) => {
@@ -232,7 +232,7 @@ export default function ExpenseVoucherModal({
 
   const deleteVoucherMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/expense-vouchers/${id}`, {
+      const response = await fetch(`/api/expense-vouchers/${id}`, {
         method: "DELETE",
       });
       if (!response.ok) throw new Error("Failed to delete expense voucher");
@@ -243,8 +243,8 @@ export default function ExpenseVoucherModal({
         title: "Thành công",
         description: "Đã xóa phiếu chi",
       });
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/expense-vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expense-vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
       setShowDeleteDialog(false);
       onClose();
     },

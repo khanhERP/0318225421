@@ -101,7 +101,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
         params.append("search", productFilter);
       }
 
-      const url = `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/purchase-receipts${params.toString() ? `?${params.toString()}` : ""}`;
+      const url = `/api/purchase-receipts${params.toString() ? `?${params.toString()}` : ""}`;
       console.log("🔍 Fetching purchase receipts with filters:", url);
 
       const response = await fetch(url);
@@ -133,7 +133,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
 
   // Fetch suppliers for filtering
   const { data: suppliers = [] } = useQuery<Supplier[]>({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/suppliers"],
+    queryKey: ["/api/suppliers"],
   });
 
   // Calculate dashboard statistics
@@ -260,7 +260,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
       setSelectedOrders(new Set());
 
       // Refetch purchase receipts
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/purchase-receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-receipts"] });
 
       // Close dialog
       setShowDeleteDialog(false);

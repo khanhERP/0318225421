@@ -29,20 +29,20 @@ export default function SuppliersPage({ onLogout }: SuppliersPageProps) {
   const queryClient = useQueryClient();
 
   const { data: suppliers, isLoading } = useQuery({
-    queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/suppliers', { status: selectedStatus, search: searchQuery }],
+    queryKey: ['/api/suppliers', { status: selectedStatus, search: searchQuery }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedStatus !== 'all') params.append('status', selectedStatus);
       if (searchQuery) params.append('search', searchQuery);
       
-      const response = await apiRequest('GET', `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/suppliers?${params}`);
+      const response = await apiRequest('GET', `/api/suppliers?${params}`);
       return response.json();
     },
   });
 
   // Fetch purchase order statistics for suppliers
   const { data: supplierStats } = useQuery({
-    queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/purchase-orders/supplier-stats'],
+    queryKey: ['/api/purchase-orders/supplier-stats'],
     queryFn: async () => {
       const response = await apiRequest('GET', '/api/purchase-orders/supplier-stats');
       return response.json();
@@ -51,11 +51,11 @@ export default function SuppliersPage({ onLogout }: SuppliersPageProps) {
 
   const deleteSupplierMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest('DELETE', `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/suppliers/${id}`);
+      const response = await apiRequest('DELETE', `/api/suppliers/${id}`);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/suppliers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/suppliers'] });
       toast({
         title: t('suppliers.deleteSuccess'),
         description: t('suppliers.deleteSuccessDesc'),

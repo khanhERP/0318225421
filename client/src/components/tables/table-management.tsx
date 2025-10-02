@@ -94,7 +94,7 @@ export function TableManagement() {
   const [previewReceipt, setPreviewReceipt] = useState<any>(null);
 
   const { data: tables, isLoading } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables"],
+    queryKey: ["/api/tables"],
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
     refetchOnWindowFocus: false,
@@ -119,7 +119,7 @@ export function TableManagement() {
     mutationFn: (data: TableFormData) =>
       apiRequest("POST", "/api/tables", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tables"] });
       toast({
         title: t("common.success"),
         description: t("tables.tableCreateSuccess"),
@@ -137,9 +137,9 @@ export function TableManagement() {
 
   const updateTableMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: TableFormData }) =>
-      apiRequest("PUT", `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables/${id}`, data),
+      apiRequest("PUT", `/api/tables/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tables"] });
       toast({
         title: t("common.success"),
         description: t("tables.tableUpdateSuccess"),
@@ -156,9 +156,9 @@ export function TableManagement() {
   });
 
   const deleteTableMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables/${id}`, {}),
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/tables/${id}`, {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tables"] });
       toast({
         title: t("common.success"),
         description: t("tables.tableDeleteSuccess"),

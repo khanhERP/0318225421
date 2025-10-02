@@ -47,7 +47,7 @@ export function TableReport() {
 
   // Fetch data using EXACT same pattern as other reports
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders"],
+    queryKey: ["/api/orders"],
     queryFn: async () => {
       try {
         const response = await fetch("/api/orders");
@@ -67,7 +67,7 @@ export function TableReport() {
   });
 
   const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/invoices"],
+    queryKey: ["/api/invoices"],
     queryFn: async () => {
       try {
         const response = await fetch("/api/invoices");
@@ -87,7 +87,7 @@ export function TableReport() {
   });
 
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/transactions"],
+    queryKey: ["/api/transactions"],
     queryFn: async () => {
       try {
         const response = await fetch("/api/transactions");
@@ -107,7 +107,7 @@ export function TableReport() {
   });
 
   const { data: tables = [], isLoading: tablesLoading } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/tables"],
+    queryKey: ["/api/tables"],
     queryFn: async () => {
       try {
         const response = await fetch("/api/tables");
@@ -128,7 +128,7 @@ export function TableReport() {
 
   // Fetch order items and transaction items for detailed analysis
   const { data: orderItems = [], isLoading: orderItemsLoading } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/order-items"],
+    queryKey: ["/api/order-items"],
     queryFn: async () => {
       try {
         const response = await fetch("/api/order-items");
@@ -149,7 +149,7 @@ export function TableReport() {
 
   const { data: transactionItems = [], isLoading: transactionItemsLoading } =
     useQuery({
-      queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/transaction-items"],
+      queryKey: ["/api/transaction-items"],
       queryFn: async () => {
         try {
           const response = await fetch("/api/transaction-items");

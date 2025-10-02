@@ -61,12 +61,12 @@ export function SalesChannelReport() {
   const [selectedCategory, setSelectedCategory] = useState("all");
 
   const { data: employees } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/employees"],
+    queryKey: ["/api/employees"],
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: categories } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/categories"],
+    queryKey: ["/api/categories"],
     staleTime: 5 * 60 * 1000,
   });
 
@@ -88,7 +88,7 @@ export function SalesChannelReport() {
           salesChannel: selectedSalesChannel,
         }),
       });
-      const response = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/sales-channel-sales?${params}`);
+      const response = await fetch(`/api/sales-channel-sales?${params}`);
       if (!response.ok) {
         throw new Error("Failed to fetch sales channel sales data");
       }
@@ -115,7 +115,7 @@ export function SalesChannelReport() {
           salesChannel: selectedSalesChannel,
         }),
       });
-      const response = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/sales-channel-profit?${params}`);
+      const response = await fetch(`/api/sales-channel-profit?${params}`);
       if (!response.ok) {
         throw new Error("Failed to fetch sales channel profit data");
       }
@@ -149,7 +149,7 @@ export function SalesChannelReport() {
           ...(productType !== "all" && { productType }),
           ...(selectedCategory !== "all" && { categoryId: selectedCategory }),
         });
-        const response = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/sales-channel-products?${params}`);
+        const response = await fetch(`/api/sales-channel-products?${params}`);
         if (!response.ok) {
           throw new Error("Failed to fetch sales channel products data");
         }

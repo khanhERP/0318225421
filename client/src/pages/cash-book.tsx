@@ -81,7 +81,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
   // Query orders (thu - income from sales)
   const { data: orders = [] } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/orders"],
+    queryKey: ["/api/orders"],
     queryFn: async () => {
       try {
         const response = await fetch("/api/orders");
@@ -97,7 +97,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
   // Query purchase receipts (chi - expenses from purchases)
   const { data: purchaseReceipts = [] } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/purchase-receipts"],
+    queryKey: ["/api/purchase-receipts"],
     queryFn: async () => {
       try {
         const response = await fetch("/api/purchase-receipts");
@@ -113,7 +113,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
   // Query income vouchers (thu - manual income entries)
   const { data: incomeVouchers = [] } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/income-vouchers"],
+    queryKey: ["/api/income-vouchers"],
     queryFn: async () => {
       try {
         const response = await fetch("/api/income-vouchers");
@@ -129,7 +129,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
   // Query expense vouchers (chi - manual expense entries)
   const { data: expenseVouchers = [] } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/expense-vouchers"],
+    queryKey: ["/api/expense-vouchers"],
     queryFn: async () => {
       try {
         const response = await fetch("/api/expense-vouchers");
@@ -145,7 +145,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
   // Query suppliers for name mapping
   const { data: suppliers = [] } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/suppliers"],
+    queryKey: ["/api/suppliers"],
     queryFn: async () => {
       try {
         const response = await fetch("/api/suppliers");
@@ -161,7 +161,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
   // Query payment methods
   const { data: paymentMethods = [] } = useQuery({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/payment-methods"],
+    queryKey: ["/api/payment-methods"],
     queryFn: async () => {
       try {
         const response = await fetch("/api/payment-methods");

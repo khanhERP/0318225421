@@ -90,11 +90,11 @@ export default function InventoryPage({ onLogout }: InventoryPageProps) {
   const { data: products = [], isLoading: productsLoading } = useQuery<
     Product[]
   >({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"],
+    queryKey: ["/api/products"],
   });
 
   const { data: categories = [] } = useQuery<Category[]>({
-    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/categories"],
+    queryKey: ["/api/categories"],
   });
 
   const stockUpdateForm = useForm<StockUpdateForm>({
@@ -122,8 +122,8 @@ export default function InventoryPage({ onLogout }: InventoryPageProps) {
     },
     onSuccess: () => {
       // Force refresh products data
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"] });
-      queryClient.refetchQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      queryClient.refetchQueries({ queryKey: ["/api/products"] });
       setShowStockDialog(false);
       stockUpdateForm.reset();
       toast({
@@ -153,7 +153,7 @@ export default function InventoryPage({ onLogout }: InventoryPageProps) {
       id: number;
       trackInventory: boolean;
     }) => {
-      const response = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products/${id}/track-inventory`, {
+      const response = await fetch(`/api/products/${id}/track-inventory`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -166,7 +166,7 @@ export default function InventoryPage({ onLogout }: InventoryPageProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       toast({
         title: "Thành công",
         description: "Trạng thái theo dõi tồn kho đã được cập nhật",
@@ -197,7 +197,7 @@ export default function InventoryPage({ onLogout }: InventoryPageProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       setShowStockDialog(false);
       stockUpdateForm.reset();
       toast({
@@ -236,7 +236,7 @@ export default function InventoryPage({ onLogout }: InventoryPageProps) {
 
   const deleteProductMutation = useMutation({
     mutationFn: async (productId: number) => {
-      const response = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products/${productId}`, {
+      const response = await fetch(`/api/products/${productId}`, {
         method: "DELETE",
       });
       if (!response.ok) {
@@ -246,7 +246,7 @@ export default function InventoryPage({ onLogout }: InventoryPageProps) {
       return response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       toast({
         title: "",
         description: t("inventory.deleteSuccess") || "Xóa sản phẩm thành công",
@@ -291,7 +291,7 @@ export default function InventoryPage({ onLogout }: InventoryPageProps) {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       toast({
         title: "Dọn dẹp thành công",
         description: `Đã xóa ${data.deletedCount} sản phẩm vô hiệu khỏi cơ sở dữ liệu`,

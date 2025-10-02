@@ -109,7 +109,7 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
       toast({
         title: t('common.success'),
         description: customer ? "고객 정보가 업데이트되었습니다." : "새 고객이 추가되었습니다.",
@@ -128,11 +128,11 @@ export function CustomerFormModal({ isOpen, onClose, customer }: CustomerFormMod
 
   const updateMutation = useMutation({
     mutationFn: async (data: CustomerFormData) => {
-      const response = await apiRequest("PUT", `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/customers/${customer!.id}`, data);
+      const response = await apiRequest("PUT", `/api/customers/${customer!.id}`, data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
       toast({
         title: t('common.success'),
         description: "고객 정보가 업데이트되었습니다.",
