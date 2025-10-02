@@ -75,7 +75,7 @@ export function PointsManagementModal({ isOpen, onClose }: PointsManagementModal
       type: string; 
       description: string 
     }) => {
-      const response = await apiRequest('POST', 'https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/adjust-points', {
+      const response = await apiRequest('POST', '/api/customers/adjust-points', {
         customerId,
         points,
         type,
@@ -107,7 +107,7 @@ export function PointsManagementModal({ isOpen, onClose }: PointsManagementModal
   // Point payment mutation
   const processPaymentMutation = useMutation({
     mutationFn: async ({ customerId, points }: { customerId: number; points: number }) => {
-      const response = await apiRequest('POST', 'https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers/redeem-points', {
+      const response = await apiRequest('POST', '/api/customers/redeem-points', {
         customerId,
         points
       });

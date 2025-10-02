@@ -122,7 +122,7 @@ export function MembershipModal({ isOpen, onClose }: MembershipModalProps) {
   // Update membership thresholds
   const updateThresholdsMutation = useMutation({
     mutationFn: async (newThresholds: { GOLD: number; VIP: number }) => {
-      const response = await fetch('https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/membership-thresholds', {
+      const response = await fetch('/api/membership-thresholds', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

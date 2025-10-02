@@ -72,7 +72,7 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormMod
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertSupplier) => {
-      const response = await apiRequest('POST', 'https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/suppliers', data);
+      const response = await apiRequest('POST', '/api/suppliers', data);
       return response.json();
     },
     onSuccess: () => {

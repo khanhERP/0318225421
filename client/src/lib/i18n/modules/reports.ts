@@ -23,7 +23,7 @@ export const reportsTranslations: { [key: string]: ReportsTranslations } = {
     custom: "Tùy chỉnh",
 
     // Dashboard metrics
-    totalRevenue: "Doanh thu từ bán hàng",
+    totalRevenue: "Tổng thu từ bán hàng",
     salesReportTotalRevenue: "Tổng doanh thu",
     totalOrders: "Tổng đơn hàng",
     totalQuantitySold: "Tổng số lượng đã bán",
@@ -581,7 +581,7 @@ export const reportsTranslations: { [key: string]: ReportsTranslations } = {
     custom: "사용자 정의",
 
     // Dashboard metrics
-    totalRevenue: "총 매출",
+    totalRevenue: "판매로 인한 총 수익",
     salesReportTotalRevenue: "총 수익",
     totalOrders: "총 주문",
     totalQuantitySold: "총 판매량",
@@ -643,7 +643,7 @@ export const reportsTranslations: { [key: string]: ReportsTranslations } = {
     salesMethod: "판매 방법",
     salesChannel: "판매 채널",
     productFilter: "상품",
-    productFilterPlaceholder: "코드, 이름으로 검색",
+    productFilterPlaceholder: "코드, 이름으��� 검색",
     customerFilter: "고객",
     customerFilterPlaceholder: "이름, 전화번호 또는 코드로 검색",
     customerCodePlaceholder: "고객 코드로 검색",
@@ -1106,7 +1106,7 @@ export const reportsTranslations: { [key: string]: ReportsTranslations } = {
     custom: "Custom",
 
     // Dashboard metrics
-    totalRevenue: "Total Sales Revenue",
+    totalRevenue: "Total revenue from sales",
     salesReportTotalRevenue: "Total Sales Revenue",
     totalOrders: "Total Orders",
     totalQuantitySold: "Total Quantity Sold",

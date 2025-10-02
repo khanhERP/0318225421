@@ -657,6 +657,8 @@ export const printerConfigs = pgTable("printer_configs", {
   isKitchen: boolean("is_kitchen").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   copies: integer("copies").notNull().default(0),
+  floor: varchar("floor", { length: 50 }).default("1"),
+  zone: varchar("zone", { length: 50 }).default("A"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

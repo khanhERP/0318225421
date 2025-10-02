@@ -197,44 +197,62 @@ export function SalesReport() {
         [method: string]: { count: number; revenue: number };
       } = {};
 
-      uniqueCombinedData.forEach((item: any) => {
+      // Process paid orders for payment methods
+      paidOrders.forEach((order: any) => {
         try {
-          // Payment method is likely on the order itself
-          let method = item.paymentMethod || "cash";
-          if (typeof method === "number") {
-            method = method.toString();
+          const paymentMethodStr = order.paymentMethod || "cash";
+          const orderSubtotal = Number(order.subtotal || 0);
+          const orderDiscount = Number(order.discount || 0);
+          const orderTax = Number(order.tax || 0);
+          const orderTotal = Number(order.total || 0);
+
+          // Calculate revenue for this order
+          const orderPriceIncludeTax = order.priceIncludeTax === true;
+          let orderRevenue;
+          if (orderPriceIncludeTax) {
+            orderRevenue = orderSubtotal; // Revenue = subtotal (already net of discount)
+          } else {
+            orderRevenue = Math.max(0, orderSubtotal - orderDiscount);
           }
 
-          if (!paymentMethods[method]) {
-            paymentMethods[method] = { count: 0, revenue: 0 };
+          // Try to parse as JSON for multi-payment
+          try {
+            const parsed = JSON.parse(paymentMethodStr);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              // Multi-payment: distribute revenue proportionally by payment amounts
+              const totalPaymentAmount = parsed.reduce((sum: number, pm: any) => sum + Number(pm.amount || 0), 0);
+
+              parsed.forEach((pm: any) => {
+                const method = pm.method || "cash";
+                const paymentAmount = Number(pm.amount || 0);
+
+                if (!paymentMethods[method]) {
+                  paymentMethods[method] = { count: 0, revenue: 0 };
+                }
+
+                // Distribute revenue proportionally
+                const revenueShare = totalPaymentAmount > 0 ? (paymentAmount / totalPaymentAmount) * orderRevenue : 0;
+                paymentMethods[method].revenue += revenueShare;
+                paymentMethods[method].count += 1;
+              });
+            } else {
+              // Not a valid JSON array, treat as single payment
+              if (!paymentMethods[paymentMethodStr]) {
+                paymentMethods[paymentMethodStr] = { count: 0, revenue: 0 };
+              }
+              paymentMethods[paymentMethodStr].count += 1;
+              paymentMethods[paymentMethodStr].revenue += orderRevenue;
+            }
+          } catch (e) {
+            // Not JSON, single payment method
+            if (!paymentMethods[paymentMethodStr]) {
+              paymentMethods[paymentMethodStr] = { count: 0, revenue: 0 };
+            }
+            paymentMethods[paymentMethodStr].count += 1;
+            paymentMethods[paymentMethodStr].revenue += orderRevenue;
           }
-
-          // For order items, we associate the payment method of the parent order
-          const correspondingOrder = paidOrders.find(
-            (order: any) => order.id === item.orderId,
-          );
-          const orderPaymentMethod =
-            correspondingOrder?.paymentMethod || method;
-
-          if (!paymentMethods[orderPaymentMethod]) {
-            paymentMethods[orderPaymentMethod] = { count: 0, revenue: 0 };
-          }
-
-          paymentMethods[orderPaymentMethod].count += 1;
-
-          const itemPrice = Number(item.price || item.total || 0);
-          const itemQuantity = Number(item.quantity || 1);
-          const revenue = itemPrice * itemQuantity;
-
-          // Get discount from database, default to 0 if no data
-          const discountAmount =
-            item.discount !== undefined && item.discount !== null
-              ? Number(item.discount)
-              : 0;
-
-          paymentMethods[orderPaymentMethod].revenue += revenue;
         } catch (error) {
-          console.warn("Error processing item for payment methods:", error);
+          console.warn("Error processing order for payment methods:", error);
         }
       });
 
@@ -423,7 +441,7 @@ export function SalesReport() {
   };
 
   const formatCurrency = (amount: number) => {
-    return `${amount.toLocaleString()} ₫`;
+    return `${Math.ceil(amount).toLocaleString()} ₫`;
   };
 
   const formatDate = (dateStr: string) => {

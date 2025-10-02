@@ -412,7 +412,9 @@ export function SalesChartReport() {
   };
 
   // Function to format payment methods, handling JSON strings for multiple methods
-  const formatPaymentMethodDisplay = (paymentMethod: string | undefined | null) => {
+  const formatPaymentMethodDisplay = (
+    paymentMethod: string | undefined | null,
+  ) => {
     if (!paymentMethod) return "-";
 
     try {
@@ -990,18 +992,40 @@ export function SalesChartReport() {
                       <TableHead
                         className="text-center border-r bg-blue-50 min-w-[200px] font-bold"
                         colSpan={(() => {
-                          // Get all unique payment methods from completed orders
+                          // Get all unique payment methods from completed orders (including from JSON)
                           const allPaymentMethods = new Set();
                           if (
                             filteredCompletedOrders &&
                             Array.isArray(filteredCompletedOrders)
                           ) {
                             filteredCompletedOrders.forEach((order: any) => {
-                              const method = order.paymentMethod || "cash";
-                              allPaymentMethods.add(method);
+                              const paymentMethod =
+                                order.paymentMethod || "cash";
+
+                              // Try to parse as JSON for multi-payment
+                              try {
+                                const parsed = JSON.parse(paymentMethod);
+                                if (
+                                  Array.isArray(parsed) &&
+                                  parsed.length > 0
+                                ) {
+                                  // Multi-payment: add all methods from JSON
+                                  parsed.forEach((pm: any) => {
+                                    if (pm.method) {
+                                      allPaymentMethods.add(pm.method);
+                                    }
+                                  });
+                                } else {
+                                  // Single payment method
+                                  allPaymentMethods.add(paymentMethod);
+                                }
+                              } catch (e) {
+                                // Not JSON, treat as single payment method
+                                allPaymentMethods.add(paymentMethod);
+                              }
                             });
                           }
-                          return allPaymentMethods.size + 1; // +1 for total column
+                          return allPaymentMethods.size;
                         })()}
                       >
                         {t("reports.totalCustomerPayment")}
@@ -1017,7 +1041,7 @@ export function SalesChartReport() {
                         ) {
                           filteredCompletedOrders.forEach((order: any) => {
                             const paymentMethod = order.paymentMethod || "cash";
-                            
+
                             // Try to parse as JSON for multi-payment
                             try {
                               const parsed = JSON.parse(paymentMethod);
@@ -1110,9 +1134,7 @@ export function SalesChartReport() {
                             const transactionDiscount = Number(
                               transaction.discount || 0,
                             );
-                            const transactionTax = Number(
-                              transaction.tax || 0,
-                            );
+                            const transactionTax = Number(transaction.tax || 0);
                             const transactionTotal = Number(
                               transaction.total || 0,
                             );
@@ -1289,68 +1311,121 @@ export function SalesChartReport() {
                                     [method: string]: number;
                                   } = {};
 
-                                  dateTransactions.forEach((transaction: any) => {
-                                    const paymentMethodStr = transaction.paymentMethod || "cash";
-                                    
-                                    // Parse payment method - check if it's multi-payment (JSON array)
-                                    try {
-                                      const parsed = JSON.parse(paymentMethodStr);
-                                      if (Array.isArray(parsed) && parsed.length > 0) {
-                                        // Multi-payment: use amounts directly from JSON
-                                        parsed.forEach((pm: any) => {
-                                          const method = pm.method || "cash";
-                                          const amount = Number(pm.amount || 0);
-                                          paymentMethodsForDate[method] = (paymentMethodsForDate[method] || 0) + amount;
-                                        });
-                                      } else {
-                                        // Not a valid JSON array, treat as single payment method
-                                        const transSubtotal = Number(transaction.subtotal || 0);
-                                        const transDiscount = Number(transaction.discount || 0);
-                                        const transTax = Number(transaction.tax || 0);
-                                        const transTotal = Number(transaction.total || 0);
+                                  dateTransactions.forEach(
+                                    (transaction: any) => {
+                                      const paymentMethodStr =
+                                        transaction.paymentMethod || "cash";
 
-                                        const transCustomerPayment = transaction.priceIncludeTax === true
-                                          ? transTotal
-                                          : transSubtotal - transDiscount + transTax;
-                                        
-                                        paymentMethodsForDate[paymentMethodStr] = (paymentMethodsForDate[paymentMethodStr] || 0) + transCustomerPayment;
+                                      // Parse payment method - check if it's multi-payment (JSON array)
+                                      try {
+                                        const parsed =
+                                          JSON.parse(paymentMethodStr);
+                                        if (
+                                          Array.isArray(parsed) &&
+                                          parsed.length > 0
+                                        ) {
+                                          // Multi-payment: use amounts directly from JSON
+                                          parsed.forEach((pm: any) => {
+                                            const method = pm.method || "cash";
+                                            const amount = Number(
+                                              pm.amount || 0,
+                                            );
+                                            paymentMethodsForDate[method] =
+                                              (paymentMethodsForDate[method] ||
+                                                0) + amount;
+                                          });
+                                        } else {
+                                          // Not a valid JSON array, treat as single payment method
+                                          const transSubtotal = Number(
+                                            transaction.subtotal || 0,
+                                          );
+                                          const transDiscount = Number(
+                                            transaction.discount || 0,
+                                          );
+                                          const transTax = Number(
+                                            transaction.tax || 0,
+                                          );
+                                          const transTotal = Number(
+                                            transaction.total || 0,
+                                          );
+
+                                          const transCustomerPayment =
+                                            transaction.priceIncludeTax === true
+                                              ? transTotal
+                                              : transSubtotal -
+                                                transDiscount +
+                                                transTax;
+
+                                          paymentMethodsForDate[
+                                            paymentMethodStr
+                                          ] =
+                                            (paymentMethodsForDate[
+                                              paymentMethodStr
+                                            ] || 0) + transCustomerPayment;
+                                        }
+                                      } catch (e) {
+                                        // Not JSON, single payment method
+                                        const transSubtotal = Number(
+                                          transaction.subtotal || 0,
+                                        );
+                                        const transDiscount = Number(
+                                          transaction.discount || 0,
+                                        );
+                                        const transTax = Number(
+                                          transaction.tax || 0,
+                                        );
+                                        const transTotal = Number(
+                                          transaction.total || 0,
+                                        );
+
+                                        const transCustomerPayment =
+                                          transaction.priceIncludeTax === true
+                                            ? transTotal
+                                            : transSubtotal -
+                                              transDiscount +
+                                              transTax;
+
+                                        paymentMethodsForDate[
+                                          paymentMethodStr
+                                        ] =
+                                          (paymentMethodsForDate[
+                                            paymentMethodStr
+                                          ] || 0) + transCustomerPayment;
                                       }
-                                    } catch (e) {
-                                      // Not JSON, single payment method
-                                      const transSubtotal = Number(transaction.subtotal || 0);
-                                      const transDiscount = Number(transaction.discount || 0);
-                                      const transTax = Number(transaction.tax || 0);
-                                      const transTotal = Number(transaction.total || 0);
-
-                                      const transCustomerPayment = transaction.priceIncludeTax === true
-                                        ? transTotal
-                                        : transSubtotal - transDiscount + transTax;
-                                      
-                                      paymentMethodsForDate[paymentMethodStr] = (paymentMethodsForDate[paymentMethodStr] || 0) + transCustomerPayment;
-                                    }
-                                  });
+                                    },
+                                  );
 
                                   // Get all unique payment methods from all transactions
                                   const allPaymentMethods = new Set<string>();
-                                  filteredTransactions.forEach((transaction: any) => {
-                                    const paymentMethodStr = transaction.paymentMethod || "cash";
-                                    try {
-                                      const parsed = JSON.parse(paymentMethodStr);
-                                      if (Array.isArray(parsed) && parsed.length > 0) {
-                                        parsed.forEach((pm: any) => {
-                                          if (pm.method) {
-                                            allPaymentMethods.add(pm.method);
-                                          }
-                                        });
-                                      } else {
+                                  filteredTransactions.forEach(
+                                    (transaction: any) => {
+                                      const paymentMethodStr =
+                                        transaction.paymentMethod || "cash";
+                                      try {
+                                        const parsed =
+                                          JSON.parse(paymentMethodStr);
+                                        if (
+                                          Array.isArray(parsed) &&
+                                          parsed.length > 0
+                                        ) {
+                                          parsed.forEach((pm: any) => {
+                                            if (pm.method) {
+                                              allPaymentMethods.add(pm.method);
+                                            }
+                                          });
+                                        } else {
+                                          allPaymentMethods.add(
+                                            paymentMethodStr,
+                                          );
+                                        }
+                                      } catch (e) {
                                         allPaymentMethods.add(paymentMethodStr);
                                       }
-                                    } catch (e) {
-                                      allPaymentMethods.add(paymentMethodStr);
-                                    }
-                                  });
+                                    },
+                                  );
 
-                                  const paymentMethodsArray = Array.from(allPaymentMethods).sort();
+                                  const paymentMethodsArray =
+                                    Array.from(allPaymentMethods).sort();
 
                                   return (
                                     <>
@@ -1550,7 +1625,9 @@ export function SalesChartReport() {
                                                   parsed.length > 0
                                                 ) {
                                                   parsed.forEach((pm: any) =>
-                                                    allPaymentMethods.add(pm.method),
+                                                    allPaymentMethods.add(
+                                                      pm.method,
+                                                    ),
                                                   );
                                                 } else {
                                                   allPaymentMethods.add(
@@ -1560,8 +1637,7 @@ export function SalesChartReport() {
                                                 }
                                               } catch (e) {
                                                 allPaymentMethods.add(
-                                                  trans.paymentMethod ||
-                                                    "cash",
+                                                  trans.paymentMethod || "cash",
                                                 );
                                               }
                                             },
@@ -1570,47 +1646,100 @@ export function SalesChartReport() {
 
                                         const paymentMethodsArray =
                                           Array.from(allPaymentMethods).sort();
-
                                         return (
                                           <>
                                             {paymentMethodsArray.map(
                                               (method: any) => {
                                                 // Parse this transaction's payment method
-                                                const transPaymentMethod = transaction.paymentMethod || "cash";
+                                                const transPaymentMethod =
+                                                  transaction.paymentMethod ||
+                                                  "cash";
                                                 let transactionAmount = 0;
 
                                                 try {
-                                                  const parsed = JSON.parse(transPaymentMethod);
-                                                  if (Array.isArray(parsed) && parsed.length > 0) {
+                                                  const parsed =
+                                                    JSON.parse(
+                                                      transPaymentMethod,
+                                                    );
+                                                  if (
+                                                    Array.isArray(parsed) &&
+                                                    parsed.length > 0
+                                                  ) {
                                                     // Multi-payment: find amount for this method from JSON
-                                                    const paymentItem = parsed.find((pm: any) => pm.method === method);
+                                                    const paymentItem =
+                                                      parsed.find(
+                                                        (pm: any) =>
+                                                          pm.method === method,
+                                                      );
                                                     if (paymentItem) {
-                                                      transactionAmount = Number(paymentItem.amount || 0);
+                                                      transactionAmount =
+                                                        Number(
+                                                          paymentItem.amount ||
+                                                            0,
+                                                        );
                                                     }
                                                   } else {
                                                     // Not a valid array, treat as single payment
-                                                    if (transPaymentMethod === method) {
-                                                      const transSubtotal = Number(transaction.subtotal || 0);
-                                                      const transDiscount = Number(transaction.discount || 0);
-                                                      const transTax = Number(transaction.tax || 0);
-                                                      const transTotal = Number(transaction.total || 0);
+                                                    if (
+                                                      transPaymentMethod ===
+                                                      method
+                                                    ) {
+                                                      const transSubtotal =
+                                                        Number(
+                                                          transaction.subtotal ||
+                                                            0,
+                                                        );
+                                                      const transDiscount =
+                                                        Number(
+                                                          transaction.discount ||
+                                                            0,
+                                                        );
+                                                      const transTax = Number(
+                                                        transaction.tax || 0,
+                                                      );
+                                                      const transTotal = Number(
+                                                        transaction.total || 0,
+                                                      );
 
-                                                      transactionAmount = transaction.priceIncludeTax === true
-                                                        ? transTotal
-                                                        : transSubtotal - transDiscount + transTax;
+                                                      transactionAmount =
+                                                        transaction.priceIncludeTax ===
+                                                        true
+                                                          ? transTotal
+                                                          : transSubtotal -
+                                                            transDiscount +
+                                                            transTax;
                                                     }
                                                   }
                                                 } catch (e) {
                                                   // Not JSON, single payment method
-                                                  if (transPaymentMethod === method) {
-                                                    const transSubtotal = Number(transaction.subtotal || 0);
-                                                    const transDiscount = Number(transaction.discount || 0);
-                                                    const transTax = Number(transaction.tax || 0);
-                                                    const transTotal = Number(transaction.total || 0);
+                                                  if (
+                                                    transPaymentMethod ===
+                                                    method
+                                                  ) {
+                                                    const transSubtotal =
+                                                      Number(
+                                                        transaction.subtotal ||
+                                                          0,
+                                                      );
+                                                    const transDiscount =
+                                                      Number(
+                                                        transaction.discount ||
+                                                          0,
+                                                      );
+                                                    const transTax = Number(
+                                                      transaction.tax || 0,
+                                                    );
+                                                    const transTotal = Number(
+                                                      transaction.total || 0,
+                                                    );
 
-                                                    transactionAmount = transaction.priceIncludeTax === true
-                                                      ? transTotal
-                                                      : transSubtotal - transDiscount + transTax;
+                                                    transactionAmount =
+                                                      transaction.priceIncludeTax ===
+                                                      true
+                                                        ? transTotal
+                                                        : transSubtotal -
+                                                          transDiscount +
+                                                          transTax;
                                                   }
                                                 }
 
@@ -1701,7 +1830,7 @@ export function SalesChartReport() {
                             )}
                           </TableCell>
                         )}
-                        <TableCell className="text-right border-r min-w-[140px] px-4">
+                        <TableCell className="text-right border-r text-green-600 min-w-[120px] px-4">
                           {(() => {
                             // Calculate total revenue based on each order's priceIncludeTax setting
                             let totalRevenue = 0;
@@ -1740,7 +1869,7 @@ export function SalesChartReport() {
                             ),
                           )}
                         </TableCell>
-                        <TableCell className="text-right border-r text-blue-600 min-w-[140px] px-4">
+                        <TableCell className="text-right border-r text-blue-600 font-bold min-w-[140px] px-4">
                           {(() => {
                             // Calculate total customer payment from all transactions
                             let totalCustomerPayment = 0;
@@ -1778,13 +1907,14 @@ export function SalesChartReport() {
                           })()}
                         </TableCell>
                         {(() => {
-                          // Calculate total payment methods across all dates
+                          // Calculate total payment methods across all dates with proper multi-payment handling
                           const totalPaymentMethods: {
                             [method: string]: number;
                           } = {};
+                          
                           filteredTransactions.forEach((transaction: any) => {
-                            const method = transaction.paymentMethod || "cash";
-
+                            const paymentMethodStr = transaction.paymentMethod || "cash";
+                            
                             const transactionSubtotal = Number(
                               transaction.subtotal || 0,
                             );
@@ -1805,9 +1935,29 @@ export function SalesChartReport() {
                                   transactionDiscount +
                                   transactionTax;
 
-                            totalPaymentMethods[method] =
-                              (totalPaymentMethods[method] || 0) +
-                              customerPayment;
+                            // Try to parse as JSON for multi-payment
+                            try {
+                              const parsed = JSON.parse(paymentMethodStr);
+                              if (Array.isArray(parsed) && parsed.length > 0) {
+                                // Multi-payment: use amounts directly from JSON
+                                parsed.forEach((pm: any) => {
+                                  const method = pm.method || "cash";
+                                  const amount = Number(pm.amount || 0);
+                                  totalPaymentMethods[method] =
+                                    (totalPaymentMethods[method] || 0) + amount;
+                                });
+                              } else {
+                                // Not a valid JSON array, treat as single payment
+                                totalPaymentMethods[paymentMethodStr] =
+                                  (totalPaymentMethods[paymentMethodStr] || 0) +
+                                  customerPayment;
+                              }
+                            } catch (e) {
+                              // Not JSON, single payment method
+                              totalPaymentMethods[paymentMethodStr] =
+                                (totalPaymentMethods[paymentMethodStr] || 0) +
+                                customerPayment;
+                            }
                           });
 
                           // Get all unique payment methods from all completed orders
@@ -1817,19 +1967,28 @@ export function SalesChartReport() {
                             Array.isArray(filteredCompletedOrders)
                           ) {
                             filteredCompletedOrders.forEach((order: any) => {
-                              const method = order.paymentMethod || "cash";
-                              allPaymentMethods.add(method);
+                              const paymentMethodStr = order.paymentMethod || "cash";
+                              
+                              // Parse to find all methods including multi-payment
+                              try {
+                                const parsed = JSON.parse(paymentMethodStr);
+                                if (Array.isArray(parsed) && parsed.length > 0) {
+                                  parsed.forEach((pm: any) => {
+                                    if (pm.method) {
+                                      allPaymentMethods.add(pm.method);
+                                    }
+                                  });
+                                } else {
+                                  allPaymentMethods.add(paymentMethodStr);
+                                }
+                              } catch (e) {
+                                allPaymentMethods.add(paymentMethodStr);
+                              }
                             });
                           }
 
                           const paymentMethodsArray =
                             Array.from(allPaymentMethods).sort();
-                          const grandTotal = Object.values(
-                            totalPaymentMethods,
-                          ).reduce(
-                            (sum: number, amount: number) => sum + amount,
-                            0,
-                          );
 
                           return (
                             <>
@@ -2404,7 +2563,7 @@ export function SalesChartReport() {
                       Mã hàng
                     </TableHead>
                     <TableHead className="text-center bg-blue-50 min-w-[200px] font-bold">
-                      Tên hàng
+                      Tên h ng
                     </TableHead>
                     <TableHead className="text-center bg-blue-50 min-w-[60px] font-bold">
                       ĐVT
@@ -2834,9 +2993,7 @@ export function SalesChartReport() {
                   </button>
                   <button
                     onClick={() =>
-                      setCurrentPage((prev) =>
-                        Math.min(prev + 1, totalPages),
-                      )
+                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                     }
                     disabled={currentPage === totalPages}
                     className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
@@ -3148,7 +3305,7 @@ export function SalesChartReport() {
                     <TableHead
                       className="text-center border-r bg-blue-50 min-w-[200px] font-bold"
                       colSpan={(() => {
-                        // Get all unique payment methods from completed orders
+                        // Get all unique payment methods from completed orders (including from JSON)
                         const allPaymentMethods = new Set();
                         if (data && Array.isArray(data)) {
                           data.forEach((employee: any) => {
@@ -3157,8 +3314,26 @@ export function SalesChartReport() {
                               Array.isArray(employee.orders)
                             ) {
                               employee.orders.forEach((order: any) => {
-                                const method = order.paymentMethod || "cash";
-                                allPaymentMethods.add(method);
+                                const paymentMethodStr = order.paymentMethod || "cash";
+                                
+                                // Try to parse as JSON for multi-payment
+                                try {
+                                  const parsed = JSON.parse(paymentMethodStr);
+                                  if (Array.isArray(parsed) && parsed.length > 0) {
+                                    // Multi-payment: add all methods from JSON
+                                    parsed.forEach((pm: any) => {
+                                      if (pm.method) {
+                                        allPaymentMethods.add(pm.method);
+                                      }
+                                    });
+                                  } else {
+                                    // Single payment method
+                                    allPaymentMethods.add(paymentMethodStr);
+                                  }
+                                } catch (e) {
+                                  // Not JSON, treat as single payment method
+                                  allPaymentMethods.add(paymentMethodStr);
+                                }
                               });
                             }
                           });
@@ -3171,7 +3346,7 @@ export function SalesChartReport() {
                   </TableRow>
                   <TableRow>
                     {(() => {
-                      // Get all unique payment methods from employee orders
+                      // Get all unique payment methods from employee orders (including from JSON)
                       const allPaymentMethods = new Set();
                       if (data && Array.isArray(data)) {
                         data.forEach((employee: any) => {
@@ -3180,8 +3355,26 @@ export function SalesChartReport() {
                             Array.isArray(employee.orders)
                           ) {
                             employee.orders.forEach((order: any) => {
-                              const method = order.paymentMethod || "cash";
-                              allPaymentMethods.add(method);
+                              const paymentMethodStr = order.paymentMethod || "cash";
+                              
+                              // Try to parse as JSON for multi-payment
+                              try {
+                                const parsed = JSON.parse(paymentMethodStr);
+                                if (Array.isArray(parsed) && parsed.length > 0) {
+                                  // Multi-payment: add all methods from JSON
+                                  parsed.forEach((pm: any) => {
+                                    if (pm.method) {
+                                      allPaymentMethods.add(pm.method);
+                                    }
+                                  });
+                                } else {
+                                  // Single payment method
+                                  allPaymentMethods.add(paymentMethodStr);
+                                }
+                              } catch (e) {
+                                // Not JSON, treat as single payment method
+                                allPaymentMethods.add(paymentMethodStr);
+                              }
                             });
                           }
                         });
@@ -3258,7 +3451,7 @@ export function SalesChartReport() {
                               {formatCurrency(item.totalMoney)}
                             </TableCell>
                             {(() => {
-                              // Get all unique payment methods from all employee data
+                              // Get all unique payment methods from all employee data (including from JSON)
                               const allPaymentMethods = new Set();
                               if (data && Array.isArray(data)) {
                                 data.forEach((employee: any) => {
@@ -3267,9 +3460,26 @@ export function SalesChartReport() {
                                     Array.isArray(employee.orders)
                                   ) {
                                     employee.orders.forEach((order: any) => {
-                                      const method =
-                                        order.paymentMethod || "cash";
-                                      allPaymentMethods.add(method);
+                                      const paymentMethodStr = order.paymentMethod || "cash";
+                                      
+                                      // Try to parse as JSON for multi-payment
+                                      try {
+                                        const parsed = JSON.parse(paymentMethodStr);
+                                        if (Array.isArray(parsed) && parsed.length > 0) {
+                                          // Multi-payment: add all methods from JSON
+                                          parsed.forEach((pm: any) => {
+                                            if (pm.method) {
+                                              allPaymentMethods.add(pm.method);
+                                            }
+                                          });
+                                        } else {
+                                          // Single payment method
+                                          allPaymentMethods.add(paymentMethodStr);
+                                        }
+                                      } catch (e) {
+                                        // Not JSON, treat as single payment method
+                                        allPaymentMethods.add(paymentMethodStr);
+                                      }
                                     });
                                   }
                                 });
@@ -3281,26 +3491,43 @@ export function SalesChartReport() {
                               return (
                                 <>
                                   {paymentMethodsArray.map((method: any) => {
-                                    // Calculate customer payment = revenue + tax for this payment method
+                                    // Calculate customer payment for this payment method
                                     let customerPaymentForMethod = 0;
                                     if (
                                       item.orders &&
                                       Array.isArray(item.orders)
                                     ) {
                                       item.orders.forEach((order: any) => {
-                                        if (
-                                          (order.paymentMethod || "cash") ===
-                                          method
-                                        ) {
-                                          const orderRevenue = Math.max(
-                                            0,
-                                            Number(order.subtotal || 0),
-                                          );
-                                          const orderTax = Number(
-                                            order.tax || 0,
-                                          );
-                                          customerPaymentForMethod +=
-                                            orderRevenue + orderTax;
+                                        const paymentMethodStr = order.paymentMethod || "cash";
+                                        const orderSubtotal = Number(order.subtotal || 0);
+                                        const orderDiscount = Number(order.discount || 0);
+                                        const orderTax = Number(order.tax || 0);
+                                        const orderTotal = Number(order.total || 0);
+
+                                        const customerPayment = order.priceIncludeTax === true
+                                          ? orderTotal
+                                          : orderSubtotal - orderDiscount + orderTax;
+
+                                        // Try to parse as JSON for multi-payment
+                                        try {
+                                          const parsed = JSON.parse(paymentMethodStr);
+                                          if (Array.isArray(parsed) && parsed.length > 0) {
+                                            // Multi-payment: find amount for this method from JSON
+                                            const paymentItem = parsed.find((pm: any) => pm.method === method);
+                                            if (paymentItem) {
+                                              customerPaymentForMethod += Number(paymentItem.amount || 0);
+                                            }
+                                          } else {
+                                            // Not a valid array, treat as single payment
+                                            if (paymentMethodStr === method) {
+                                              customerPaymentForMethod += customerPayment;
+                                            }
+                                          }
+                                        } catch (e) {
+                                          // Not JSON, single payment method
+                                          if (paymentMethodStr === method) {
+                                            customerPaymentForMethod += customerPayment;
+                                          }
                                         }
                                       });
                                     }
@@ -3437,7 +3664,7 @@ export function SalesChartReport() {
                                     })()}
                                   </TableCell>
                                   {(() => {
-                                    // Get all unique payment methods from all employee data
+                                    // Get all unique payment methods from all employee data (including from JSON)
                                     const allPaymentMethods = new Set();
                                     if (data && Array.isArray(data)) {
                                       data.forEach((employee: any) => {
@@ -3447,9 +3674,26 @@ export function SalesChartReport() {
                                         ) {
                                           employee.orders.forEach(
                                             (order: any) => {
-                                              const method =
-                                                order.paymentMethod || "cash";
-                                              allPaymentMethods.add(method);
+                                              const paymentMethodStr = order.paymentMethod || "cash";
+                                              
+                                              // Try to parse as JSON for multi-payment
+                                              try {
+                                                const parsed = JSON.parse(paymentMethodStr);
+                                                if (Array.isArray(parsed) && parsed.length > 0) {
+                                                  // Multi-payment: add all methods from JSON
+                                                  parsed.forEach((pm: any) => {
+                                                    if (pm.method) {
+                                                      allPaymentMethods.add(pm.method);
+                                                    }
+                                                  });
+                                                } else {
+                                                  // Single payment method
+                                                  allPaymentMethods.add(paymentMethodStr);
+                                                }
+                                              } catch (e) {
+                                                // Not JSON, treat as single payment method
+                                                allPaymentMethods.add(paymentMethodStr);
+                                              }
                                             },
                                           );
                                         }
@@ -3458,33 +3702,56 @@ export function SalesChartReport() {
 
                                     const paymentMethodsArray =
                                       Array.from(allPaymentMethods).sort();
-                                    const orderPaymentMethod =
-                                      order.paymentMethod || "cash";
-
-                                    // Calculate customer payment = revenue + tax for this order
-                                    const orderRevenue = Math.max(
-                                      0,
-                                      Number(order.subtotal || 0),
-                                    );
-                                    const orderTax = Number(order.tax || 0);
-                                    const customerPayment =
-                                      orderRevenue + orderTax;
 
                                     return (
                                       <>
                                         {paymentMethodsArray.map(
-                                          (method: any) => (
-                                            <TableCell
-                                              key={method}
-                                              className="text-right border-r text-sm min-w-[130px] px-4"
-                                            >
-                                              {orderPaymentMethod === method
-                                                ? formatCurrency(
-                                                    customerPayment,
-                                                  )
-                                                : "-"}
-                                            </TableCell>
-                                          ),
+                                          (method: any) => {
+                                            const orderPaymentMethodStr = order.paymentMethod || "cash";
+                                            let orderPaymentForMethod = 0;
+
+                                            const orderSubtotal = Number(order.subtotal || 0);
+                                            const orderDiscount = Number(order.discount || 0);
+                                            const orderTax = Number(order.tax || 0);
+                                            const orderTotal = Number(order.total || 0);
+
+                                            const customerPayment = order.priceIncludeTax === true
+                                              ? orderTotal
+                                              : orderSubtotal - orderDiscount + orderTax;
+
+                                            // Try to parse as JSON for multi-payment
+                                            try {
+                                              const parsed = JSON.parse(orderPaymentMethodStr);
+                                              if (Array.isArray(parsed) && parsed.length > 0) {
+                                                // Multi-payment: find amount for this method from JSON
+                                                const paymentItem = parsed.find((pm: any) => pm.method === method);
+                                                if (paymentItem) {
+                                                  orderPaymentForMethod = Number(paymentItem.amount || 0);
+                                                }
+                                              } else {
+                                                // Not a valid array, treat as single payment
+                                                if (orderPaymentMethodStr === method) {
+                                                  orderPaymentForMethod = customerPayment;
+                                                }
+                                              }
+                                            } catch (e) {
+                                              // Not JSON, single payment method
+                                              if (orderPaymentMethodStr === method) {
+                                                orderPaymentForMethod = customerPayment;
+                                              }
+                                            }
+
+                                            return (
+                                              <TableCell
+                                                key={method}
+                                                className="text-right border-r text-sm min-w-[130px] px-4"
+                                              >
+                                                {orderPaymentForMethod > 0
+                                                  ? formatCurrency(orderPaymentForMethod)
+                                                  : "-"}
+                                              </TableCell>
+                                            );
+                                          },
                                         )}
                                       </>
                                     );
@@ -3521,12 +3788,15 @@ export function SalesChartReport() {
                           .reduce((sum, item) => sum + item.totalOrders, 0)
                           .toLocaleString()}
                       </TableCell>
-                      <TableCell className="text-center border-r min-w-[130px]">
-                        {data
-                          .reduce((sum, item) => sum + item.totalSubtotal, 0)
-                          .toLocaleString()}
-                      </TableCell>
                       <TableCell className="text-right border-r min-w-[140px] px-4">
+                        {formatCurrency(
+                          data.reduce(
+                            (sum, item) => sum + item.totalSubtotal,
+                            0,
+                          ),
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right border-r text-red-600 min-w-[120px] px-4">
                         {formatCurrency(
                           data.reduce(
                             (sum, item) => sum + item.totalDiscount,
@@ -3534,20 +3804,10 @@ export function SalesChartReport() {
                           ),
                         )}
                       </TableCell>
-                      {analysisType !== "employee" && (
-                        <TableCell className="text-right border-r text-red-600 min-w-[120px] px-4">
-                          {formatCurrency(
-                            data.reduce(
-                              (sum, customer) => sum + customer.discount,
-                              0,
-                            ),
-                          )}
-                        </TableCell>
-                      )}
-                      <TableCell className="text-right border-r min-w-[120px] px-4">
+                      <TableCell className="text-right border-r text-green-600 min-w-[120px] px-4">
                         {formatCurrency(
                           data.reduce(
-                            (sum, customer) => sum + customer.totalRevenue,
+                            (sum, item) => sum + item.totalRevenue,
                             0,
                           ),
                         )}
@@ -3555,27 +3815,28 @@ export function SalesChartReport() {
                       <TableCell className="text-right border-r min-w-[120px] px-4">
                         {formatCurrency(
                           data.reduce(
-                            (sum, customer) => sum + customer.totalTax,
+                            (sum, item) => sum + item.totalTax,
                             0,
                           ),
                         )}
                       </TableCell>
-                      <TableCell className="text-right border-r min-w-[120px] px-4">
+                      <TableCell className="text-right border-r text-blue-600 font-bold min-w-[140px] px-4">
                         {formatCurrency(
                           data.reduce(
-                            (sum, customer) => sum + customer.totalMoney,
+                            (sum, item) => sum + item.totalMoney,
                             0,
                           ),
                         )}
                       </TableCell>
                       {(() => {
-                        // Calculate total payment methods across all dates
+                        // Calculate total payment methods across all dates with proper multi-payment handling
                         const totalPaymentMethods: {
                           [method: string]: number;
                         } = {};
+                        
                         filteredCompletedOrders.forEach((transaction: any) => {
-                          const method = transaction.paymentMethod || "cash";
-
+                          const paymentMethodStr = transaction.paymentMethod || "cash";
+                          
                           const transactionSubtotal = Number(
                             transaction.subtotal || 0,
                           );
@@ -3596,31 +3857,63 @@ export function SalesChartReport() {
                                 transactionDiscount +
                                 transactionTax;
 
-                          totalPaymentMethods[method] =
-                            (totalPaymentMethods[method] || 0) +
-                            customerPayment;
+                          // Try to parse as JSON for multi-payment
+                          try {
+                            const parsed = JSON.parse(paymentMethodStr);
+                            if (Array.isArray(parsed) && parsed.length > 0) {
+                              // Multi-payment: use amounts directly from JSON
+                              parsed.forEach((pm: any) => {
+                                const method = pm.method || "cash";
+                                const amount = Number(pm.amount || 0);
+                                totalPaymentMethods[method] =
+                                  (totalPaymentMethods[method] || 0) + amount;
+                              });
+                            } else {
+                              // Not a valid JSON array, treat as single payment
+                              totalPaymentMethods[paymentMethodStr] =
+                                (totalPaymentMethods[paymentMethodStr] || 0) +
+                                customerPayment;
+                            }
+                          } catch (e) {
+                            // Not JSON, single payment method
+                            totalPaymentMethods[paymentMethodStr] =
+                              (totalPaymentMethods[paymentMethodStr] || 0) +
+                              customerPayment;
+                          }
                         });
 
-                        // Get all unique payment methods from all completed orders
+                        // Get all unique payment methods from all completed orders (including from JSON)
                         const allPaymentMethods = new Set();
                         if (
                           filteredCompletedOrders &&
                           Array.isArray(filteredCompletedOrders)
                         ) {
                           filteredCompletedOrders.forEach((order: any) => {
-                            const method = order.paymentMethod || "cash";
-                            allPaymentMethods.add(method);
+                            const paymentMethodStr = order.paymentMethod || "cash";
+                            
+                            // Try to parse as JSON for multi-payment
+                            try {
+                              const parsed = JSON.parse(paymentMethodStr);
+                              if (Array.isArray(parsed) && parsed.length > 0) {
+                                // Multi-payment: add all methods from JSON
+                                parsed.forEach((pm: any) => {
+                                  if (pm.method) {
+                                    allPaymentMethods.add(pm.method);
+                                  }
+                                });
+                              } else {
+                                // Single payment method
+                                allPaymentMethods.add(paymentMethodStr);
+                              }
+                            } catch (e) {
+                              // Not JSON, treat as single payment method
+                              allPaymentMethods.add(paymentMethodStr);
+                            }
                           });
                         }
 
                         const paymentMethodsArray =
                           Array.from(allPaymentMethods).sort();
-                        const grandTotal = Object.values(
-                          totalPaymentMethods,
-                        ).reduce(
-                          (sum: number, amount: number) => sum + amount,
-                          0,
-                        );
 
                         return (
                           <>
@@ -3916,7 +4209,7 @@ export function SalesChartReport() {
             </span>
             <Button
               onClick={() => {
-                const exportData = [];
+                let exportData = [];
 
                 // Export customer summaries with their detailed orders
                 data.forEach((customer) => {
@@ -5365,7 +5658,7 @@ export function SalesChartReport() {
     const {
       productStats,
       totalRevenue,
-      totalQuantity,
+            totalQuantity,
       totalDiscount,
       totalProducts,
     } = productAnalysisData;
@@ -5637,7 +5930,7 @@ export function SalesChartReport() {
                       )
                     }
                     disabled={productCurrentPage === totalPages}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
                   >
                     {">"}
                   </button>

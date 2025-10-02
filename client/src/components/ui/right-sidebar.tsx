@@ -81,7 +81,7 @@ export function RightSidebar() {
     // Add Cash Book menu item
     {
       icon: BookOpen,
-      label: "Sổ quỹ",
+      label: t("nav.cashBook"),
       href: "/cash-book",
     },
     {

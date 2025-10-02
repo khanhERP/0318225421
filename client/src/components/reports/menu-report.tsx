@@ -355,7 +355,10 @@ function MenuReport() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
-                  placeholder={t("reports.productFilterPlaceholder") || "Tìm theo tên hoặc mã"}
+                  placeholder={
+                    t("reports.productFilterPlaceholder") ||
+                    "Tìm theo tên hoặc mã"
+                  }
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
                   className="pl-10"
@@ -373,7 +376,7 @@ function MenuReport() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">
-                  {t("reports.revenueTotal")}
+                  {t("reports.totalRevenue")}
                 </p>
                 <p className="text-2xl font-bold text-green-600">
                   {formatCurrency(menuAnalysis?.totalRevenue || 0)} ₫
@@ -743,21 +746,22 @@ function MenuReport() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>
-              {t("reports.menuAnalysis") ||
-                "Phân tích theo menu"}
-            </span>
+            <span>{t("reports.menuAnalysis") || "Phân tích theo menu"}</span>
             <Button
               onClick={() => {
                 refetch();
-                queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/menu-analysis"] });
+                queryClient.invalidateQueries({
+                  queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/menu-analysis"],
+                });
               }}
               variant="outline"
               size="sm"
               className="flex items-center gap-2"
               disabled={analysisLoading}
             >
-              <RefreshCw className={`w-4 h-4 ${analysisLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw
+                className={`w-4 h-4 ${analysisLoading ? "animate-spin" : ""}`}
+              />
               {t("common.refresh") || "Tải lại"}
             </Button>
           </CardTitle>
@@ -781,8 +785,6 @@ function MenuReport() {
             </div>
           ) : (
             <>
-              
-              
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[800px]">
                   <thead>
@@ -799,15 +801,21 @@ function MenuReport() {
                       <th className="text-right py-2 px-4">
                         {t("reports.averagePrice") || "Giá trung bình"}
                       </th>
-                      <td className="py-2 px-4 text-right">{t("reports.contribution")}</td>
+                      <td className="py-2 px-4 text-right">
+                        {t("reports.contribution")}
+                      </td>
                     </tr>
                   </thead>
                   <tbody>
                     {(() => {
                       // Filter products based on search term
-                      const filteredStats = menuAnalysis.productStats.filter(product =>
-                        !productSearch || 
-                        (product.productName && product.productName.toLowerCase().includes(productSearch.toLowerCase()))
+                      const filteredStats = menuAnalysis.productStats.filter(
+                        (product) =>
+                          !productSearch ||
+                          (product.productName &&
+                            product.productName
+                              .toLowerCase()
+                              .includes(productSearch.toLowerCase())),
                       );
 
                       const sortedProducts = filteredStats.sort(
@@ -855,10 +863,12 @@ function MenuReport() {
                             </td>
                             <td className="py-2 px-4 text-right">
                               {formatCurrency(
-                                product.totalQuantity > 0 
-                                  ? (product.totalRevenue || 0) / (product.totalQuantity || 1)
-                                  : 0
-                              )} ₫
+                                product.totalQuantity > 0
+                                  ? (product.totalRevenue || 0) /
+                                      (product.totalQuantity || 1)
+                                  : 0,
+                              )}{" "}
+                              ₫
                             </td>
                             <td className="py-2 px-4 text-right">
                               <div className="flex items-center justify-end gap-2">
@@ -886,11 +896,15 @@ function MenuReport() {
               {/* Pagination Controls */}
               {(() => {
                 // Use same filtering logic as table
-                const filteredStats = menuAnalysis.productStats.filter(product =>
-                  !productSearch || 
-                  (product.productName && product.productName.toLowerCase().includes(productSearch.toLowerCase()))
+                const filteredStats = menuAnalysis.productStats.filter(
+                  (product) =>
+                    !productSearch ||
+                    (product.productName &&
+                      product.productName
+                        .toLowerCase()
+                        .includes(productSearch.toLowerCase())),
                 );
-                
+
                 const sortedProducts = filteredStats.sort(
                   (a, b) => (b.totalRevenue || 0) - (a.totalRevenue || 0),
                 );
