@@ -35,13 +35,13 @@ export function CategorySidebar({
   const { t } = useTranslation();
 
   const { data: categories = [] } = useQuery<Category[]>({
-    queryKey: ["/api/categories"],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/categories"],
   });
 
   const { data: products = [] } = useQuery<Product[]>({
-    queryKey: ["/api/products"],
+    queryKey: ["https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products"],
     queryFn: async () => {
-      const response = await fetch(`/api/products`);
+      const response = await fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products`);
       if (!response.ok) throw new Error('Failed to fetch products');
       const allProducts = await response.json();
 
@@ -71,7 +71,7 @@ export function CategorySidebar({
     const sampleSkus = ["BEV001", "BEV002", "SNK001", "ELC001"];
     const randomSku = sampleSkus[Math.floor(Math.random() * sampleSkus.length)];
     
-    fetch(`/api/products/barcode/${randomSku}`)
+    fetch(`https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/products/barcode/${randomSku}`)
       .then(res => res.json())
       .then(product => {
         if (product.id) {

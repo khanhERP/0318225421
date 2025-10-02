@@ -35,7 +35,7 @@ export default function SuppliersPage({ onLogout }: SuppliersPageProps) {
       if (selectedStatus !== 'all') params.append('status', selectedStatus);
       if (searchQuery) params.append('search', searchQuery);
       
-      const response = await apiRequest('GET', `/api/suppliers?${params}`);
+      const response = await apiRequest('GET', `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/suppliers?${params}`);
       return response.json();
     },
   });
@@ -51,7 +51,7 @@ export default function SuppliersPage({ onLogout }: SuppliersPageProps) {
 
   const deleteSupplierMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest('DELETE', `/api/suppliers/${id}`);
+      const response = await apiRequest('DELETE', `https://64071157-147f-4160-96cd-6dc099d777d2-00-1d0mzv8b48h7n.pike.replit.dev/api/suppliers/${id}`);
       return response.json();
     },
     onSuccess: () => {
