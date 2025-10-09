@@ -22,13 +22,4 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist"), // Vercel nhận dist/
     emptyOutDir: true
   },
-  server: {
-  proxy: {
-    "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api": {
-      target: "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev",
-      changeOrigin: true,
-      rewrite: (path) => path.replace(/^\/api/, ""),
-    },
-  },
-},
 })
