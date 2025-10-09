@@ -811,16 +811,22 @@ export function ShoppingCart({
 
       let totalAfterDiscount;
       let originalTotal;
+      let itemPriceBeforeTax = 0;
+      let itemTax = 0;
 
-      if (priceIncludesTax) {
+      if (priceIncludesTax && taxRate > 0) {
         originalTotal = unitPrice * quantity;
         const adjustedPrice = Math.max(0, unitPrice - discountPerUnit);
         const giaGomThue = adjustedPrice * quantity;
-        totalAfterDiscount = Math.round(giaGomThue / (1 + taxRate));
+        itemPriceBeforeTax = Math.round(giaGomThue / (1 + taxRate));
+        itemTax = giaGomThue - itemPriceBeforeTax;
+        totalAfterDiscount = itemPriceBeforeTax;
       } else {
         originalTotal = unitPrice * quantity;
         const adjustedPrice = Math.max(0, unitPrice - discountPerUnit);
-        totalAfterDiscount = adjustedPrice * quantity;
+        itemPriceBeforeTax = Math.round(adjustedPrice * quantity);
+        itemTax = taxRate > 0 ? Math.round(itemPriceBeforeTax * taxRate) : 0;
+        totalAfterDiscount = itemPriceBeforeTax;
       }
 
       return {
@@ -831,12 +837,14 @@ export function ShoppingCart({
         sku: item.sku || `FOOD${String(item.id).padStart(5, "0")}`,
         taxRate: item.taxRate || "0",
         afterTaxPrice: item.afterTaxPrice,
-        discount: itemDiscountAmount.toString(), // Placeholder, actual discount applied per item for E-invoice needs careful calculation
-        discountAmount: itemDiscountAmount.toString(), // This is the calculated discount for this item
+        discount: itemDiscountAmount.toString(),
+        discountAmount: itemDiscountAmount.toString(),
         discountPerUnit: discountPerUnit.toString(),
         originalPrice: item.originalPrice || unitPrice.toString(),
         totalAfterDiscount: totalAfterDiscount.toString(),
         originalTotal: originalTotal.toString(),
+        tax: itemTax.toString(),
+        priceBeforeTax: itemPriceBeforeTax.toString(),
       };
     });
 
@@ -882,8 +890,9 @@ export function ShoppingCart({
         discountAmount: item.discountAmount,
         discountPerUnit: item.discountPerUnit.toString(),
         originalPrice: item.originalPrice,
-        // Add original total before discount for reference
         originalTotal: (item.price * item.quantity).toString(),
+        tax: item.tax,
+        priceBeforeTax: item.priceBeforeTax,
       })),
       subtotal: Math.floor(calculatedSubtotal).toString(),
       tax: calculatedTax.toString(),
@@ -969,8 +978,9 @@ export function ShoppingCart({
         discountAmount: item.discountAmount,
         discountPerUnit: item.discountPerUnit.toString(),
         originalPrice: item.originalPrice,
-        // Add original total before discount for reference
         originalTotal: (item.price * item.quantity).toString(),
+        tax: item.tax,
+        priceBeforeTax: item.priceBeforeTax,
       })),
       subtotal: Math.floor(calculatedSubtotal),
       tax: calculatedTax,
@@ -1610,14 +1620,14 @@ export function ShoppingCart({
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="pos-text-secondary">
-                {t("tables.subtotal")}:
+                {t("pos.totalAmount")}
               </span>
               <span className="font-medium">
                 {Math.round(subtotal).toLocaleString("vi-VN")} ₫
               </span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="pos-text-secondary">{t("pos.tax")}:</span>
+              <span className="pos-text-secondary">{t("pos.tax")}</span>
               <span className="font-medium">
                 {Math.round(tax).toLocaleString("vi-VN")} ₫
               </span>

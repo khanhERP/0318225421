@@ -2310,10 +2310,13 @@ export function OrderManagement() {
                         </div>
 
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Tạm tính:</span>
+                          <span className="text-gray-600">
+                            {t("pos.totalAmount")}
+                          </span>
                           <span className="font-medium">
                             {Math.floor(
-                              Number(order.subtotal || 0),
+                              Number(order.subtotal || 0) +
+                                Number(order.discount || 0),
                             ).toLocaleString("vi-VN")}{" "}
                             ₫
                           </span>
@@ -2321,7 +2324,7 @@ export function OrderManagement() {
 
                         {order.discount && Number(order.discount) > 0 && (
                           <div className="flex justify-between text-red-600">
-                            <span>Giảm giá:</span>
+                            <span>{t("reports.discount")}:</span>
                             <span>
                               -
                               {Math.floor(
@@ -2334,7 +2337,7 @@ export function OrderManagement() {
 
                         <div className="flex justify-between border-t pt-1">
                           <span className="text-gray-900 font-semibold">
-                            Tổng tiền:
+                            {t("reports.totalMoney")}:
                           </span>
                           <span className="text-lg font-bold text-blue-600">
                             {Math.floor(
@@ -2715,10 +2718,11 @@ export function OrderManagement() {
               {/* Order Summary */}
               <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Tạm tính:</span>
+                  <span className="text-gray-600">{t("pos.totalAmount")}</span>
                   <span className="font-medium">
                     {Math.floor(
-                      Number(selectedOrder?.subtotal || 0),
+                      Number(selectedOrder?.subtotal || 0) +
+                        Number(selectedOrder?.discount || 0),
                     ).toLocaleString("vi-VN")}{" "}
                     ₫
                   </span>
@@ -2750,7 +2754,7 @@ export function OrderManagement() {
                 <Separator />
                 <div className="flex justify-between">
                   <span className="text-lg font-bold text-gray-900">
-                    Tổng tiền:
+                    {t("reports.totalMoney")}:
                   </span>
                   <span className="text-lg font-bold text-blue-600">
                     {Math.floor(
@@ -3176,7 +3180,7 @@ export function OrderManagement() {
                 </p>
                 {mixedPaymentData && (
                   <p className="text-sm text-blue-600">
-                    Đã sử dụng {mixedPaymentData.pointsToUse.toLocaleString()}P
+                    Đã sử d  �ng {mixedPaymentData.pointsToUse.toLocaleString()}P
                     ( -
                     {(mixedPaymentData.pointsToUse * 1000).toLocaleString(
                       "vi-VN",
@@ -3556,7 +3560,6 @@ export function OrderManagement() {
                 )
               : 0
           }
-          isTitle={showReceiptPreview}
         />
       )}
 
@@ -3695,7 +3698,6 @@ export function OrderManagement() {
           isOpen={showEInvoiceModal}
           onClose={() => {
             setShowEInvoiceModal(false);
-            setIsShowTitle(true);
             setOrderForPayment(null);
           }}
           onConfirm={handleEInvoiceConfirm}
@@ -3717,99 +3719,100 @@ export function OrderManagement() {
       )}
 
       {/* Receipt Modal - Final receipt after payment */}
-      {!showReceiptPreview && (
-        <ReceiptModal
-          isOpen={showReceiptModal}
-          onClose={async () => {
-            console.log(
-              "🔴 Order Management: Closing final receipt modal safely",
-            );
+      {showReceiptModal ||
+        (selectedReceipt && (
+          <ReceiptModal
+            isOpen={showReceiptModal}
+            onClose={async () => {
+              console.log(
+                "🔴 Order Management: Closing final receipt modal safely",
+              );
 
-            try {
-              // Step 1: Close modal immediately
-              setShowReceiptModal(false);
-              setSelectedReceipt(null);
+              try {
+                // Step 1: Close modal immediately
+                setShowReceiptModal(false);
+                setSelectedReceipt(null);
 
-              // Step 2: Force data refresh before clearing states
-              await Promise.all([
-                queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
-                queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] }),
-                queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
-                queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] }),
-              ]);
+                // Step 2: Force data refresh before clearing states
+                await Promise.all([
+                  queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
+                  queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] }),
+                  queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
+                  queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] }),
+                ]);
 
-              // Step 3: Clear modal states gradually to prevent white screen
-              setTimeout(() => {
+                // Step 3: Clear modal states gradually to prevent white screen
+                setTimeout(() => {
+                  setOrderForPayment(null);
+                  setShowPaymentMethodModal(false);
+                  setShowEInvoiceModal(false);
+                }, 50);
+
+                setTimeout(() => {
+                  setShowReceiptPreview(false);
+                  setPreviewReceipt(null);
+                  setOrderDetailsOpen(false);
+                }, 100);
+
+                setTimeout(() => {
+                  setSelectedOrder(null);
+                  setPaymentMethodsOpen(false);
+                  setShowQRPayment(false);
+                  setPointsPaymentOpen(false);
+                  setMixedPaymentOpen(false);
+                }, 150);
+
+                // Step 4: Send global refresh signal
+                if (typeof window !== "undefined") {
+                  window.dispatchEvent(
+                    new CustomEvent("orderManagementRefresh", {
+                      detail: {
+                        source: "receipt_modal_close",
+                        timestamp: new Date().toISOString(),
+                      },
+                    }),
+                  );
+                }
+
+                console.log(
+                  "✅ Order Management: Receipt modal closed safely with gradual state clearing",
+                );
+              } catch (error) {
+                console.error("❌ Error during receipt modal close:", error);
+                // Fallback: just clear states without refresh
                 setOrderForPayment(null);
                 setShowPaymentMethodModal(false);
                 setShowEInvoiceModal(false);
-              }, 50);
-
-              setTimeout(() => {
                 setShowReceiptPreview(false);
                 setPreviewReceipt(null);
                 setOrderDetailsOpen(false);
-              }, 100);
-
-              setTimeout(() => {
                 setSelectedOrder(null);
                 setPaymentMethodsOpen(false);
                 setShowQRPayment(false);
                 setPointsPaymentOpen(false);
                 setMixedPaymentOpen(false);
-              }, 150);
-
-              // Step 4: Send global refresh signal
-              if (typeof window !== "undefined") {
-                window.dispatchEvent(
-                  new CustomEvent("orderManagementRefresh", {
-                    detail: {
-                      source: "receipt_modal_close",
-                      timestamp: new Date().toISOString(),
-                    },
-                  }),
-                );
               }
-
-              console.log(
-                "✅ Order Management: Receipt modal closed safely with gradual state clearing",
-              );
-            } catch (error) {
-              console.error("❌ Error during receipt modal close:", error);
-              // Fallback: just clear states without refresh
-              setOrderForPayment(null);
-              setShowPaymentMethodModal(false);
-              setShowEInvoiceModal(false);
-              setShowReceiptPreview(false);
-              setPreviewReceipt(null);
-              setOrderDetailsOpen(false);
-              setSelectedOrder(null);
-              setPaymentMethodsOpen(false);
-              setShowQRPayment(false);
-              setPointsPaymentOpen(false);
-              setMixedPaymentOpen(false);
+            }}
+            receipt={selectedReceipt}
+            cartItems={
+              selectedReceipt?.items?.map((item: any) => ({
+                id: item.productId || item.id,
+                name: item.productName || item.name,
+                price: parseFloat(item.price || item.unitPrice || "0"),
+                quantity: item.quantity,
+                sku: item.sku || `SP${item.productId}`,
+                taxRate: (() => {
+                  const product = Array.isArray(products)
+                    ? products.find((p: any) => p.id === item.productId)
+                    : null;
+                  return product?.taxRate ? parseFloat(product.taxRate) : 10;
+                })(),
+                discount: item.discount || "0",
+              })) || []
             }
-          }}
-          receipt={selectedReceipt}
-          cartItems={
-            selectedReceipt?.items?.map((item: any) => ({
-              id: item.productId || item.id,
-              name: item.productName || item.name,
-              price: parseFloat(item.price || item.unitPrice || "0"),
-              quantity: item.quantity,
-              sku: item.sku || `SP${item.productId}`,
-              taxRate: (() => {
-                const product = Array.isArray(products)
-                  ? products.find((p: any) => p.id === item.productId)
-                  : null;
-                return product?.taxRate ? parseFloat(product.taxRate) : 10;
-              })(),
-              discount: item.discount || "0",
-            })) || []
-          }
-          autoClose={true}
-        />
-      )}
+            autoClose={true}
+          />
+        ))}
     </div>
   );
 }

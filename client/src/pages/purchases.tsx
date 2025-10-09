@@ -66,6 +66,8 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [productFilter, setProductFilter] = useState("");
+  const [supplierFilter, setSupplierFilter] = useState("");
+  const [poNumberFilter, setPoNumberFilter] = useState("");
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -83,7 +85,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
   } = useQuery<{ data: PurchaseOrder[]; success: boolean; message: string }>({
     queryKey: [
       "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts",
-      { startDate, endDate, productFilter, searchTerm },
+      { startDate, endDate, productFilter, searchTerm, supplierFilter, poNumberFilter },
     ],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -94,11 +96,17 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
       if (endDate) {
         params.append("endDate", endDate);
       }
-      if (searchTerm) {
-        params.append("search", searchTerm);
+      
+      // Add supplier filter as separate parameter (priority over search)
+      if (supplierFilter && supplierFilter.trim() !== "") {
+        params.append("supplierName", supplierFilter.trim());
+        console.log("🔍 Adding supplier filter:", supplierFilter.trim());
       }
-      if (productFilter) {
-        params.append("search", productFilter);
+      
+      // Add PO number filter as search parameter
+      if (poNumberFilter && poNumberFilter.trim() !== "") {
+        params.append("search", poNumberFilter.trim());
+        console.log("🔍 Adding PO number search:", poNumberFilter.trim());
       }
 
       const url = `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts${params.toString() ? `?${params.toString()}` : ""}`;
@@ -192,18 +200,8 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
         vi: "vi-VN",
       }[currentLanguage] || "en-US";
 
-    // Use appropriate currency based on locale
-    const currency =
-      {
-        ko: "KRW",
-        en: "USD",
-        vi: "VND",
-      }[currentLanguage] || "USD";
-
-    return new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency: currency,
-    }).format(parseFloat(amount || "0"));
+    // Format as decimal number without currency symbol
+    return new Intl.NumberFormat(locale).format(parseFloat(amount || "0"));
   };
 
   const getSupplierName = (supplierId: number) => {
@@ -348,33 +346,33 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
                     />
                   </div>
 
-                  {/* Product Filter */}
+                  {/* Supplier Filter */}
                   <div className="flex flex-col">
                     <label className="text-xs text-gray-600 mb-1 font-bold">
-                      {t("purchases.productLabel")}
+                      {t("purchases.supplier")}
                     </label>
                     <Input
-                      placeholder={t("purchases.searchProducts")}
-                      value={productFilter}
-                      onChange={(e) => setProductFilter(e.target.value)}
+                      placeholder="Nhập tên nhà cung cấp..."
+                      value={supplierFilter}
+                      onChange={(e) => setSupplierFilter(e.target.value)}
                       className="w-full text-sm"
-                      data-testid="input-search-products"
+                      data-testid="input-search-supplier"
                     />
                   </div>
 
-                  {/* Search */}
+                  {/* PO Number Filter */}
                   <div className="flex flex-col">
                     <label className="text-xs text-gray-600 mb-1 font-bold">
-                      {t("purchases.generalSearchLabel")}
+                      {t("purchases.receiptNumber")}
                     </label>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                       <Input
-                        placeholder={t("purchases.searchPlaceholder")}
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Nhập số phiếu nhập..."
+                        value={poNumberFilter}
+                        onChange={(e) => setPoNumberFilter(e.target.value)}
                         className="pl-10 w-full text-sm"
-                        data-testid="input-search-purchase-orders"
+                        data-testid="input-search-po-number"
                       />
                     </div>
                   </div>
@@ -494,7 +492,32 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredOrders.map((order) => (
+                      {filteredOrders.map((order) => {
+                        // Calculate values from items if available
+                        let calculatedSubtotal = 0;
+                        let calculatedDiscount = 0;
+                        
+                        if (order.items && order.items.length > 0) {
+                          order.items.forEach(item => {
+                            const quantity = parseFloat(item.quantity || '0');
+                            const unitPrice = parseFloat(item.unitPrice || '0');
+                            const itemSubtotal = quantity * unitPrice;
+                            
+                            calculatedSubtotal += itemSubtotal;
+                            
+                            // Get discount from item
+                            const discount = item.discount || item.discountAmount || item.discount_amount || 0;
+                            const discountValue = typeof discount === 'string' ? parseFloat(discount) : discount;
+                            calculatedDiscount += (isNaN(discountValue) ? 0 : discountValue);
+                          });
+                        }
+                        
+                        // Use calculated values if items exist, otherwise use order totals
+                        const displaySubtotal = calculatedSubtotal > 0 ? calculatedSubtotal : parseFloat(order.subtotal || order.total || "0");
+                        const displayDiscount = calculatedDiscount;
+                        const displayTotal = displaySubtotal - displayDiscount;
+
+                        return (
                         <TableRow
                           key={order.id}
                           data-testid={`row-purchase-order-${order.id}`}
@@ -508,12 +531,6 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
                               target.closest("button")
                             )
                               return;
-                            console.log(
-                              "Clicked row for order:",
-                              order.id,
-                              "Order data:",
-                              order,
-                            );
                             navigate(`/purchases/view/${order.id}`);
                           }}
                         >
@@ -582,40 +599,30 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
                               <User className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 flex-shrink-0" />
                               <span
                                 className="max-w-[120px] truncate"
-                                title={getSupplierName(order.supplierId)}
+                                title={order.supplier?.name || getSupplierName(order.supplierId)}
                               >
-                                {getSupplierName(order.supplierId)}
+                                {order.supplier?.name || getSupplierName(order.supplierId)}
                               </span>
                             </div>
                           </TableCell>
                           <TableCell className="text-right text-xs sm:text-sm">
-                            <div className="flex items-center justify-end gap-1">
-                              <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 hidden sm:block" />
-                              <span className="font-medium">
-                                {formatCurrency(
-                                  order.subtotal || order.total || "0",
-                                )}
-                              </span>
-                            </div>
+                            <span className="font-medium">
+                              {formatCurrency(displaySubtotal.toString())}
+                            </span>
                           </TableCell>
                           <TableCell className="text-right text-xs sm:text-sm">
-                            <div className="flex items-center justify-end gap-1 text-red-600">
-                              <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 text-red-500 hidden sm:block" />
-                              <span className="font-medium">
-                                {formatCurrency(order.discount || "0")}
-                              </span>
-                            </div>
+                            <span className="font-medium text-red-600">
+                              {formatCurrency(Math.round(displayDiscount).toString())}
+                            </span>
                           </TableCell>
                           <TableCell className="text-right text-xs sm:text-sm">
-                            <div className="flex items-center justify-end gap-1">
-                              <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 hidden sm:block" />
-                              <span className="font-bold text-green-600">
-                                {formatCurrency(order.total || "0")}
-                              </span>
-                            </div>
+                            <span className="font-bold text-green-600">
+                              {formatCurrency(Math.round(displayTotal).toString())}
+                            </span>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

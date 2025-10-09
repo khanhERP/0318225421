@@ -27,7 +27,7 @@ export const navigationTranslations: { [key: string]: NavigationTranslations } =
     orderReport: '주문 보고서',
     customerDisplay: "고객 화면",
     logout: '로그아웃',
-    cashBook: "현금 장부",
+    cashBook: "현금 관리",
   },
   en: {
     pos: 'POS',
@@ -55,7 +55,7 @@ export const navigationTranslations: { [key: string]: NavigationTranslations } =
     orderReport: 'Order Report',
     customerDisplay: "Customer Display",
     logout: 'Logout',
-    cashBook: "Cash Book",
+    cashBook: "Cash Management",
   },
   vi: {
     pos: 'Bán hàng',
@@ -83,6 +83,6 @@ export const navigationTranslations: { [key: string]: NavigationTranslations } =
     orderReport: 'Báo cáo đơn hàng',
     customerDisplay: "Màn hình khách hàng",
     logout: 'Đăng xuất',
-    cashBook: "Sổ quỹ",
+    cashBook: "Quản lý quỹ",
   },
 };

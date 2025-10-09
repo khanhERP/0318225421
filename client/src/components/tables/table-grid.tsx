@@ -9,7 +9,15 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,7 +42,21 @@ import { createQRPosAsync, type CreateQRPosRequest } from "@/lib/api";
 import { PaymentMethodModal } from "@/components/pos/payment-method-modal";
 import { EInvoiceModal } from "@/components/pos/einvoice-modal";
 import { ReceiptModal } from "@/components/pos/receipt-modal";
+import { SplitOrderModal } from "./split-order-modal";
 import type { Table, Order } from "@shared/schema";
+
+// Helper function to format currency, assuming it's available in the scope or imported
+// For demonstration purposes, defining a placeholder if not globally available.
+const formatCurrency = (amount: string | number): string => {
+  const numericAmount = parseFloat(String(amount));
+  if (isNaN(numericAmount)) {
+    return "0 ₫";
+  }
+  return numericAmount.toLocaleString("vi-VN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+};
 
 interface TableGridProps {
   onTableSelect?: (tableId: number | null) => void;
@@ -75,7 +97,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
   const [previewReceipt, setPreviewReceipt] = useState<any>(null);
   const [orderForPayment, setOrderForPayment] = useState<any>(null);
   const [activeFloor, setActiveFloor] = useState("1");
-  const [isShowTitle, setIsShowTitle] = useState(false);
+  const [splitOrderOpen, setSplitOrderOpen] = useState(false); // State for split order modal
 
   // Listen for print completion event
   useEffect(() => {
@@ -298,6 +320,232 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
       );
     };
   }, [queryClient]);
+
+  // Broadcast cart updates to customer display - only for selected table
+  let broadcastCartUpdate = useCallback(
+    async (specificTableId?: number) => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        let cartItems: any[] = [];
+        let orderSubtotal = 0;
+        let orderTax = 0;
+        let orderTotal = 0;
+
+        // If specific table ID is provided, get detailed order items for that table
+        if (specificTableId) {
+          const tableOrders = activeOrders.filter(
+            (order) => order.tableId === specificTableId,
+          );
+
+          // If table has orders, get detailed items
+          if (tableOrders.length > 0) {
+            console.log(
+              "📡 Table Grid: Getting detailed items for table",
+              specificTableId,
+              "with",
+              tableOrders.length,
+              "orders",
+            );
+
+            try {
+              // Get detailed order items for all orders of this table
+              for (const order of tableOrders) {
+                console.log(
+                  "📡 Table Grid: Fetching items for order",
+                  order.id,
+                );
+
+                // Fetch order items for this order
+                const response = await apiRequest(
+                  "GET",
+                  `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${order.id}`,
+                );
+                const orderItemsData = await response.json();
+
+                if (
+                  Array.isArray(orderItemsData) &&
+                  orderItemsData.length > 0
+                ) {
+                  console.log(
+                    "📡 Table Grid: Found",
+                    orderItemsData.length,
+                    "items for order",
+                    order.id,
+                  );
+
+                  // Convert order items to cart format with full product details
+                  const orderCartItems = orderItemsData.map((item: any) => {
+                    const basePrice = Number(item.unitPrice || 0);
+                    const quantity = Number(item.quantity || 0);
+                    const product = Array.isArray(products)
+                      ? products.find((p: any) => p.id === item.productId)
+                      : null;
+
+                    // Calculate subtotal for this item
+                    const itemSubtotal = basePrice * quantity;
+                    orderSubtotal += itemSubtotal;
+
+                    // Calculate tax for this item using same logic as order details
+                    let itemTax = 0;
+                    if (
+                      product?.afterTaxPrice &&
+                      product.afterTaxPrice !== null &&
+                      product.afterTaxPrice !== ""
+                    ) {
+                      const afterTaxPrice = parseFloat(product.afterTaxPrice);
+                      const taxPerUnit = Math.max(0, afterTaxPrice - basePrice);
+                      itemTax = Math.floor(taxPerUnit * quantity);
+                      orderTax += itemTax;
+                    }
+
+                    const itemTotal = itemSubtotal + itemTax;
+                    orderTotal += itemTotal;
+
+                    return {
+                      id: item.id,
+                      productId: item.productId,
+                      name: item.productName || getProductName(item.productId),
+                      productName:
+                        item.productName || getProductName(item.productId),
+                      price: basePrice.toString(),
+                      quantity: quantity,
+                      total: itemTotal.toString(),
+                      taxRate: product?.taxRate || "0",
+                      afterTaxPrice: product?.afterTaxPrice || null,
+                      unitPrice: item.unitPrice,
+                      notes: item.notes,
+                      orderNumber: order.orderNumber,
+                      product: {
+                        id: item.productId,
+                        name:
+                          item.productName || getProductName(item.productId),
+                        price: basePrice.toString(),
+                        afterTaxPrice: product?.afterTaxPrice || null,
+                        taxRate: product?.taxRate || "0",
+                      },
+                    };
+                  });
+
+                  cartItems.push(...orderCartItems);
+                }
+              }
+
+              console.log(
+                "📡 Table Grid: Total cart items for table",
+                specificTableId,
+                ":",
+                cartItems.length,
+              );
+              console.log("📡 Table Grid: Calculated totals:", {
+                subtotal: orderSubtotal,
+                tax: orderTax,
+                total: orderTotal,
+              });
+            } catch (error) {
+              console.error(
+                "📡 Table Grid: Error fetching detailed order items:",
+                error,
+              );
+
+              // Fallback to basic order data if detailed fetch fails
+              cartItems = tableOrders.map((order) => ({
+                id: order.id,
+                productId: order.productId || order.id,
+                name: order.name || `uơn hàng ${order.orderNumber}`,
+                productName: order.name || `Đơn hàng ${order.orderNumber}`,
+                price: order.price || "0",
+                quantity: order.quantity || 1,
+                total: order.total || "0",
+                taxRate: order.taxRate || "0",
+                afterTaxPrice: order.afterTaxPrice,
+                orderNumber: order.orderNumber,
+                product: {
+                  id: order.productId || order.id,
+                  name: order.name || `Đơn hàng ${order.orderNumber}`,
+                  price: order.price || "0",
+                  afterTaxPrice: order.afterTaxPrice,
+                  taxRate: order.taxRate || "0",
+                },
+              }));
+
+              // Use stored totals as fallback
+              tableOrders.forEach((order) => {
+                orderSubtotal += parseFloat(order.subtotal || "0");
+                orderTax += parseFloat(order.tax || "0");
+                orderTotal += parseFloat(order.total || "0");
+              });
+            }
+          }
+        } else {
+          // If no specific table, clear the display
+          cartItems = [];
+          orderSubtotal = 0;
+          orderTax = 0;
+          orderTotal = 0;
+        }
+
+        const cartData = {
+          type: "cart_update",
+          cart: cartItems,
+          subtotal: Math.floor(orderSubtotal),
+          tax: Math.floor(orderTax),
+          total: Math.floor(orderTotal),
+          tableId: specificTableId || null,
+          orderNumber: cartItems.length > 0 ? cartItems[0]?.orderNumber : null,
+          timestamp: new Date().toISOString(),
+        };
+
+        console.log(
+          "📡 Table Grid: Broadcasting detailed cart update for table:",
+          {
+            tableId: specificTableId,
+            cartItemsCount: cartItems.length,
+            subtotal: Math.floor(orderSubtotal),
+            tax: Math.floor(orderTax),
+            total: Math.floor(orderTotal),
+            orderNumber: cartData.orderNumber,
+            sampleItems: cartItems.slice(0, 3).map((item) => ({
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price,
+              total: item.total,
+            })),
+          },
+        );
+
+        try {
+          wsRef.current.send(JSON.stringify(cartData));
+        } catch (error) {
+          console.error(
+            "📡 Table Grid: Error broadcasting cart update:",
+            error,
+          );
+        }
+      } else {
+        console.log("📡 Table Grid: WebSocket not available for broadcasting");
+      }
+    },
+    [activeOrders, products, getProductName, queryClient],
+  );
+
+  // Auto-close dialog when no active orders remain on the selected table
+  useEffect(() => {
+    if (orderDetailsOpen && selectedTable) {
+      const tableActiveOrders = activeOrders.filter(
+        (order) => order.tableId === selectedTable.id,
+      );
+
+      if (tableActiveOrders.length === 0) {
+        console.log(
+          "🔴 Auto-closing order details dialog - no active orders on table",
+          selectedTable.tableNumber,
+        );
+        setOrderDetailsOpen(false);
+        setSelectedOrder(null);
+        setSelectedTable(null);
+        broadcastCartUpdate(null);
+      }
+    }
+  }, [orderDetailsOpen, selectedTable, activeOrders, broadcastCartUpdate]);
 
   // Enhanced WebSocket connection for AGGRESSIVE real-time updates
   useEffect(() => {
@@ -588,212 +836,6 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
       setActiveFloor(sortedFloors[0]);
     }
   }, [tables, activeFloor]);
-
-  // Broadcast cart updates to customer display - only for selected table
-  const broadcastCartUpdate = useCallback(
-    async (specificTableId?: number) => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        let cartItems: any[] = [];
-        let orderSubtotal = 0;
-        let orderTax = 0;
-        let orderTotal = 0;
-
-        // If specific table ID is provided, get detailed order items for that table
-        if (specificTableId) {
-          const tableOrders = activeOrders.filter(
-            (order) => order.tableId === specificTableId,
-          );
-
-          // If table has orders, get detailed items
-          if (tableOrders.length > 0) {
-            console.log(
-              "📡 Table Grid: Getting detailed items for table",
-              specificTableId,
-              "with",
-              tableOrders.length,
-              "orders",
-            );
-
-            try {
-              // Get detailed order items for all orders of this table
-              for (const order of tableOrders) {
-                console.log(
-                  "📡 Table Grid: Fetching items for order",
-                  order.id,
-                );
-
-                // Fetch order items for this order
-                const response = await apiRequest(
-                  "GET",
-                  `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${order.id}`,
-                );
-                const orderItemsData = await response.json();
-
-                if (
-                  Array.isArray(orderItemsData) &&
-                  orderItemsData.length > 0
-                ) {
-                  console.log(
-                    "📡 Table Grid: Found",
-                    orderItemsData.length,
-                    "items for order",
-                    order.id,
-                  );
-
-                  // Convert order items to cart format with full product details
-                  const orderCartItems = orderItemsData.map((item: any) => {
-                    const basePrice = Number(item.unitPrice || 0);
-                    const quantity = Number(item.quantity || 0);
-                    const product = Array.isArray(products)
-                      ? products.find((p: any) => p.id === item.productId)
-                      : null;
-
-                    // Calculate subtotal for this item
-                    const itemSubtotal = basePrice * quantity;
-                    orderSubtotal += itemSubtotal;
-
-                    // Calculate tax for this item using same logic as order details
-                    let itemTax = 0;
-                    if (
-                      product?.afterTaxPrice &&
-                      product.afterTaxPrice !== null &&
-                      product.afterTaxPrice !== ""
-                    ) {
-                      const afterTaxPrice = parseFloat(product.afterTaxPrice);
-                      const taxPerUnit = Math.max(0, afterTaxPrice - basePrice);
-                      itemTax = Math.floor(taxPerUnit * quantity);
-                      orderTax += itemTax;
-                    }
-
-                    const itemTotal = itemSubtotal + itemTax;
-                    orderTotal += itemTotal;
-
-                    return {
-                      id: item.id,
-                      productId: item.productId,
-                      name: item.productName || getProductName(item.productId),
-                      productName:
-                        item.productName || getProductName(item.productId),
-                      price: basePrice.toString(),
-                      quantity: quantity,
-                      total: itemTotal.toString(),
-                      taxRate: product?.taxRate || "0",
-                      afterTaxPrice: product?.afterTaxPrice || null,
-                      unitPrice: item.unitPrice,
-                      notes: item.notes,
-                      orderNumber: order.orderNumber,
-                      product: {
-                        id: item.productId,
-                        name:
-                          item.productName || getProductName(item.productId),
-                        price: basePrice.toString(),
-                        afterTaxPrice: product?.afterTaxPrice || null,
-                        taxRate: product?.taxRate || "0",
-                      },
-                    };
-                  });
-
-                  cartItems.push(...orderCartItems);
-                }
-              }
-
-              console.log(
-                "📡 Table Grid: Total cart items for table",
-                specificTableId,
-                ":",
-                cartItems.length,
-              );
-              console.log("📡 Table Grid: Calculated totals:", {
-                subtotal: orderSubtotal,
-                tax: orderTax,
-                total: orderTotal,
-              });
-            } catch (error) {
-              console.error(
-                "📡 Table Grid: Error fetching detailed order items:",
-                error,
-              );
-
-              // Fallback to basic order data if detailed fetch fails
-              cartItems = tableOrders.map((order) => ({
-                id: order.id,
-                productId: order.productId || order.id,
-                name: order.name || `Đơn hàng ${order.orderNumber}`,
-                productName: order.name || `Đơn hàng ${order.orderNumber}`,
-                price: order.price || "0",
-                quantity: order.quantity || 1,
-                total: order.total || "0",
-                taxRate: order.taxRate || "0",
-                afterTaxPrice: order.afterTaxPrice,
-                orderNumber: order.orderNumber,
-                product: {
-                  id: order.productId || order.id,
-                  name: order.name || `Đơn hàng ${order.orderNumber}`,
-                  price: order.price || "0",
-                  afterTaxPrice: order.afterTaxPrice,
-                  taxRate: order.taxRate || "0",
-                },
-              }));
-
-              // Use stored totals as fallback
-              tableOrders.forEach((order) => {
-                orderSubtotal += parseFloat(order.subtotal || "0");
-                orderTax += parseFloat(order.tax || "0");
-                orderTotal += parseFloat(order.total || "0");
-              });
-            }
-          }
-        } else {
-          // If no specific table, clear the display
-          cartItems = [];
-          orderSubtotal = 0;
-          orderTax = 0;
-          orderTotal = 0;
-        }
-
-        const cartData = {
-          type: "cart_update",
-          cart: cartItems,
-          subtotal: Math.floor(orderSubtotal),
-          tax: Math.floor(orderTax),
-          total: Math.floor(orderTotal),
-          tableId: specificTableId || null,
-          orderNumber: cartItems.length > 0 ? cartItems[0]?.orderNumber : null,
-          timestamp: new Date().toISOString(),
-        };
-
-        console.log(
-          "📡 Table Grid: Broadcasting detailed cart update for table:",
-          {
-            tableId: specificTableId,
-            cartItemsCount: cartItems.length,
-            subtotal: Math.floor(orderSubtotal),
-            tax: Math.floor(orderTax),
-            total: Math.floor(orderTotal),
-            orderNumber: cartData.orderNumber,
-            sampleItems: cartItems.slice(0, 3).map((item) => ({
-              name: item.name,
-              quantity: item.quantity,
-              price: item.price,
-              total: item.total,
-            })),
-          },
-        );
-
-        try {
-          wsRef.current.send(JSON.stringify(cartData));
-        } catch (error) {
-          console.error(
-            "📡 Table Grid: Error broadcasting cart update:",
-            error,
-          );
-        }
-      } else {
-        console.log("📡 Table Grid: WebSocket not available for broadcasting");
-      }
-    },
-    [activeOrders, products, getProductName, queryClient],
-  );
 
   // Clear customer display when no order details are open
   useEffect(() => {
@@ -1086,10 +1128,6 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
           setShowPaymentMethodModal(false);
           setShowEInvoiceModal(false);
           setOrderForPayment(null);
-
-          // Show receipt modal
-          setSelectedReceipt(receiptData);
-          setShowReceiptModal(true);
         }
       } catch (error) {
         console.error("Error fetching order details for receipt:", error);
@@ -1534,7 +1572,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
                 tableNumber:
                   getTableInfo(completedOrder.tableId)?.tableNumber || "N/A",
               });
-              setShowReceiptModal(true);
+              setShowReceiptModal(false);
             }
           }
         });
@@ -2183,8 +2221,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
         if (paymentData.receipt && paymentData.shouldShowReceipt !== false) {
           console.log("📄 Table Grid: Showing final receipt modal");
           setSelectedReceipt(paymentData.receipt);
-          setShowReceiptModal(true);
-          setIsShowTitle(true);
+          // setShowReceiptModal(true);
         }
 
         console.log(
@@ -2321,6 +2358,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
                 quantity: quantity,
                 price: item.unitPrice,
                 unitPrice: item.unitPrice,
+                discount: item.discount || "0",
                 total: item.total,
                 sku:
                   item.productSku ||
@@ -2380,8 +2418,8 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
       });
 
       setSelectedReceipt(receiptPreview);
-      setShowReceiptModal(true);
-      setIsShowTitle(true);
+      setShowReceiptPreview(false);
+      setShowReceiptModal(false);
 
       console.log("📄 Showing receipt preview for table payment confirmation");
     } catch (error) {
@@ -2594,7 +2632,6 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
       setOrderForPayment(null);
       setSelectedReceipt(receiptData);
       setShowReceiptModal(true);
-      setIsShowTitle(true);
     } catch (error) {
       console.error("❌ Error completing payment from table:", error);
       toast({
@@ -2716,7 +2753,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
         variant: "secondary" as const,
       },
       ready: { label: t("orders.status.ready"), variant: "outline" as const },
-      served: { label: t("orders.status.served"), variant: "outline" as const },
+      served: { label: t("common.serving"), variant: "outline" as const },
       delivering: {
         label: t("orders.status.delivering"),
         variant: "secondary" as const,
@@ -2763,6 +2800,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
           productName: item.productName || getProductName(item.productId),
           price: item.unitPrice,
           quantity: item.quantity,
+          discount: item.discount || "0",
           total: item.total,
           sku: item.productSku || `SP${item.productId}`,
           taxRate: (() => {
@@ -2835,7 +2873,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
         toast({
           title: "Không tìm thấy máy in",
           description:
-            "Không tìm thấy máy in hoặc không có cấu hình máy in. Sử dụng chức năng in thủ công.",
+            "Không tìm thấy máy in hom.c không có cấu hình máy in. Sử dụng chức năng in th. công.",
           variant: "destructive",
         });
       }
@@ -2870,6 +2908,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
             productName: item.productName || getProductName(item.productId),
             price: item.unitPrice,
             quantity: item.quantity,
+            discount: item.discount || "0",
             total: item.total,
             sku: item.productSku || `SP${item.productId}`,
             taxRate: (() => {
@@ -2895,6 +2934,155 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
       } catch (fallbackError) {
         console.error("Error preparing fallback receipt:", fallbackError);
       }
+    }
+  };
+
+  const splitOrderMutation = useMutation({
+    mutationFn: async (splitData: {
+      originalOrderId: number;
+      splitItems: any[];
+    }) => {
+      console.log("🔪 Split order mutation starting with data:", splitData);
+
+      // Call split order API
+      const response = await apiRequest("POST", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/split", {
+        originalOrderId: splitData.originalOrderId,
+        splitItems: splitData.splitItems,
+      });
+
+      const result = await response.json();
+      console.log("✅ Split order API response:", result);
+
+      // Force refresh all related data
+      await Promise.all([
+        refetchOrders(),
+        refetchTables(),
+        queryClient.invalidateQueries({
+          queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", splitData.originalOrderId],
+        }),
+      ]);
+
+      return result;
+    },
+    onSuccess: (data, variables) => {
+      console.log("Split order successful:", data);
+      toast({
+        title: "Tách đơn thành công",
+        description: `Đơn hàng ${
+          selectedOrder?.orderNumber
+        } đã được tách thành công.`,
+      });
+      setSplitOrderOpen(false);
+      setOrderDetailsOpen(false);
+      setSelectedOrder(null);
+      // Force a full data refresh after split
+      queryClient.clear();
+      queryClient.removeQueries();
+      Promise.all([refetchTables(), refetchOrders()]);
+    },
+    onError: (error) => {
+      console.error("Error splitting order:", error);
+      toast({
+        title: "Lỗi tách đơn",
+        description: "Không thể tách đơn hàng. Vui lòng thử lại.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSplitOrder = async (splitData: any) => {
+    try {
+      console.log("🔪 Split order data:", splitData);
+
+      const response = await apiRequest("POST", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/split", splitData);
+
+      if (!response.ok) {
+        throw new Error("Failed to split order");
+      }
+
+      const result = await response.json();
+      console.log("✅ Split order result:", result);
+
+      toast({
+        title: "Thành công",
+        description: `Đã tách thành ${result.orders.length} đơn mới`,
+      });
+
+      // IMMEDIATE: Clear all cache and force fresh data
+      console.log("🔄 Clearing cache and forcing fresh data after split");
+      queryClient.clear();
+      queryClient.removeQueries();
+
+      // Force immediate fresh fetch with no-cache
+      try {
+        const [freshTables, freshOrders] = await Promise.all([
+          fetch(
+            "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables?" +
+              new URLSearchParams({
+                _t: Date.now().toString(),
+                _force: "true",
+              }),
+            {
+              cache: "no-store",
+              headers: {
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                Pragma: "no-cache",
+                Expires: "0",
+              },
+            },
+          ).then((r) => r.json()),
+          fetch(
+            "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders?" +
+              new URLSearchParams({
+                _t: Date.now().toString(),
+                _force: "true",
+              }),
+            {
+              cache: "no-store",
+              headers: {
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                Pragma: "no-cache",
+                Expires: "0",
+              },
+            },
+          ).then((r) => r.json()),
+        ]);
+
+        // Set fresh data immediately
+        queryClient.setQueryData(["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"], freshTables);
+        queryClient.setQueryData(["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"], freshOrders);
+
+        console.log("✅ Fresh data loaded after split:", {
+          tables: freshTables?.length || 0,
+          orders: freshOrders?.length || 0,
+        });
+
+        // Force re-render with invalidation
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
+          queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
+        }, 50);
+      } catch (fetchError) {
+        console.error("❌ Error fetching fresh data:", fetchError);
+        // Fallback to normal refresh
+        await Promise.all([refetchTables(), refetchOrders()]);
+      }
+
+      // Close modals
+      setSplitOrderOpen(false);
+      setOrderDetailsOpen(false);
+      setSelectedOrder(null);
+      setSelectedTable(null);
+
+      // Clear customer display
+      broadcastCartUpdate(null);
+    } catch (error) {
+      console.error("❌ Error splitting order:", error);
+      toast({
+        title: "Lỗi",
+        description: "Không thể tách đơn hàng",
+        variant: "destructive",
+      });
     }
   };
 
@@ -2972,7 +3160,17 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
                       className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${
                         isSelected ? "ring-2 ring-blue-500" : ""
                       } ${table.status === "occupied" ? "bg-red-50" : "bg-white"}`}
-                      onClick={() => handleTableClick(table)}
+                      onClick={() => {
+                        if (table.status === "occupied") {
+                          const activeOrder = getActiveOrder(table.id);
+                          if (activeOrder) {
+                            setSelectedTable(table);
+                            handleViewOrderDetails(activeOrder);
+                          }
+                        } else {
+                          handleTableClick(table);
+                        }
+                      }}
                     >
                       <CardContent className="p-4">
                         <div className="flex flex-col items-center text-center space-y-3">
@@ -3076,55 +3274,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
                             </div>
                           )}
 
-                          {/* Quick Actions */}
-                          {table.status === "occupied" && (
-                            <div className="space-y-1 w-full">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="w-full text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (activeOrder) {
-                                    handleViewOrderDetails(activeOrder);
-                                  }
-                                }}
-                              >
-                                <Eye className="w-3 h-3 mr-1" />
-                                {t("orders.viewDetails")}
-                              </Button>
-
-                              <Button
-                                size="sm"
-                                variant="default"
-                                className="w-full text-xs bg-blue-600 hover:bg-blue-700"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (activeOrder) {
-                                    handleEditOrder(activeOrder, table);
-                                  }
-                                }}
-                              >
-                                <Plus className="w-3 h-3 mr-1" />
-                                {t("orders.addMore")}
-                              </Button>
-
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                className="w-full text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (activeOrder) {
-                                    handleDeleteOrder(activeOrder);
-                                  }
-                                }}
-                              >
-                                <X className="w-3 h-3 mr-1" />
-                                {t("tables.deleteOrder")}
-                              </Button>
-                            </div>
-                          )}
+                          {/* Bỏ nút Xem chi tiết - click vào card để xem */}
                         </div>
                       </CardContent>
                     </Card>
@@ -3145,7 +3295,44 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
         table={selectedTable}
       />
 
-      {/* Order Details Dialog */}
+      {/* Edit Order Dialog */}
+      <OrderDialog
+        open={editOrderOpen}
+        onOpenChange={(open) => {
+          console.log("🔄 Edit dialog onOpenChange:", {
+            open,
+            hasEditingOrder: !!editingOrder,
+          });
+
+          setEditOrderOpen(open);
+
+          // When đóng edit dialog, quay lại order details
+          if (!open && editingOrder) {
+            console.log("📋 Returning to order details list after edit");
+
+            // Force refresh order data
+            queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
+            queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
+            queryClient.invalidateQueries({
+              queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", editingOrder.id],
+            });
+
+            // Immediately reopen order details
+            setOrderDetailsOpen(true);
+
+            // Additional refresh after delay to ensure UI is updated
+            setTimeout(() => {
+              queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
+              queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
+            }, 200);
+          }
+        }}
+        table={editingTable}
+        existingOrder={editingOrder}
+        mode="edit"
+      />
+
+      {/* Order Details Dialog - Now shows list of orders */}
       <Dialog
         open={orderDetailsOpen}
         onOpenChange={(open) => {
@@ -3157,425 +3344,413 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
           }
         }}
       >
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{t("orders.orderDetails")}</DialogTitle>
+            <DialogTitle>
+              Danh sách đơn hàng - Bàn {selectedTable?.tableNumber}
+            </DialogTitle>
             <DialogDescription>
-              {selectedOrder &&
-                `${t("orders.orderNumber")}: ${selectedOrder.orderNumber}`}
+              {selectedTable &&
+              activeOrders.filter((o) => o.tableId === selectedTable.id)
+                .length > 0
+                ? `${activeOrders.filter((o) => o.tableId === selectedTable.id).length} đơn hàng đang hoạt động`
+                : "Không có đơn hàng nào"}
             </DialogDescription>
           </DialogHeader>
 
-          {selectedOrder && (
+          {selectedTable && (
             <div className="space-y-4">
-              {/* Order Info */}
-              <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="text-sm text-gray-600">
-                    {t("orders.table")} {t("orders.orderNumber").toLowerCase()}:
-                  </p>
-                  <p className="font-medium">T{selectedTable?.tableNumber}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">
-                    {t("orders.customerCount")}:
-                  </p>
-                  <p className="font-medium">
-                    {selectedOrder.customerCount} {t("orders.people")}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">
-                    {t("orders.orderTime")}:
-                  </p>
-                  <p className="font-medium">
-                    {new Date(selectedOrder.orderedAt).toLocaleTimeString(
-                      currentLanguage === "ko"
-                        ? "ko-KR"
-                        : currentLanguage === "en"
-                          ? "en-US"
-                          : "vi-VN",
-                      {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      },
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">
-                    {t("orders.orderStatus")}:
-                  </p>
-                  <Badge
-                    variant={
-                      selectedOrder.status === "paid" ? "default" : "secondary"
-                    }
-                  >
-                    {selectedOrder.status === "paid"
-                      ? t("orders.status.paid")
-                      : t("orders.status.pending")}
-                  </Badge>
-                </div>
-              </div>
+              {/* List of orders for this table */}
+              {activeOrders
+                .filter((order) => order.tableId === selectedTable.id)
+                .map((order, index) => {
+                  let subtotal = Number(order.subtotal || 0);
+                  let displayTax = Math.floor(Number(order.tax || 0));
+                  let orderTotal = Math.floor(Number(order.total || 0));
+                  let orderDiscount = Math.floor(Number(order.discount || 0));
+                  let displaySubtotal = Math.floor(subtotal + orderDiscount);
+                  if (order.priceIncludeTax) {
+                    displaySubtotal = Math.floor(
+                      subtotal + displayTax + orderDiscount,
+                    );
+                  }
 
-              {/* Order Items */}
-              <div className="space-y-3">
-                <h4 className="font-semibold text-gray-700 mb-3">
-                  {t("orders.itemsOrdered")}:
-                </h4>
-                {orderItemsLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full" />
-                  </div>
-                ) : orderItems &&
-                  Array.isArray(orderItems) &&
-                  orderItems.length > 0 ? (
-                  <>
-                    <div className="text-sm text-green-600 font-medium mb-2">
-                      ✅ {t("orders.showing")} {orderItems.length}{" "}
-                      {t("orders.items")} - {t("orders.quantity")}{" "}
-                      {orderItems.reduce(
-                        (sum, item) => sum + Number(item.quantity || 0),
-                        0,
-                      )}{" "}
-                      - {t("orders.orderNumber")} {selectedOrder.orderNumber}
-                    </div>
-                    {orderItems.map((item: any) => {
-                      const unitPrice = Number(item.unitPrice || 0);
-                      const quantity = Number(item.quantity || 0);
-                      const itemDiscount = Number(item.discount || 0); // Lấy giảm giá từ database
-                      const itemTotal = Number(item.total || 0); // Lấy tổng tiền từ database
-
-                      console.log(
-                        `📊 Table Grid Order Details: Using database values for item ${item.id}:`,
-                        {
-                          productId: item.productId,
-                          productName: item.productName,
-                          unitPrice,
-                          quantity,
-                          itemDiscount,
-                          itemTotal,
-                        },
-                      );
-
-                      // Calculate price after discount for each item
-                      const priceAfterDiscount =
-                        itemDiscount > 0 ? itemTotal / quantity : unitPrice;
-
-                      return (
-                        <div
-                          key={item.id}
-                          className="bg-gray-50 p-3 rounded-lg"
-                        >
+                  return (
+                    <Card key={order.id} className="border-2">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          {/* Order Header */}
                           <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900">
-                                {item.productName ||
-                                  getProductName(item.productId)}
-                              </div>
-                              <div className="text-sm text-gray-600 mt-1">
-                                {t("orders.quantity")}: {item.quantity}
-                              </div>
-                              {itemDiscount > 0 && (
-                                <div className="text-sm text-red-600 mt-1">
-                                  {t("orders.discount")}: -
-                                  {Math.floor(itemDiscount).toLocaleString(
-                                    "vi-VN",
-                                  )}{" "}
-                                  ₫
-                                </div>
-                              )}
+                            <div>
+                              <h4 className="font-bold text-lg text-blue-600">
+                                {order.orderNumber}
+                              </h4>
+                              <p className="text-sm text-gray-600">
+                                {new Date(order.orderedAt).toLocaleTimeString(
+                                  currentLanguage === "ko"
+                                    ? "ko-KR"
+                                    : currentLanguage === "en"
+                                      ? "en-US"
+                                      : "vi-VN",
+                                  {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  },
+                                )}{" "}
+                                - {order.customerCount} {t("orders.people")}
+                              </p>
                             </div>
                             <div className="text-right">
-                              <div className="text-lg font-semibold text-gray-900">
-                                {Math.floor(
-                                  unitPrice * quantity,
-                                ).toLocaleString("vi-VN")}{" "}
-                                ₫
-                              </div>
-                              <div className="text-sm text-gray-600">
-                                {Math.floor(unitPrice).toLocaleString("vi-VN")}{" "}
-                                ₫/{t("orders.item")}
-                              </div>
+                              <Badge
+                                variant={
+                                  order.status === "paid"
+                                    ? "default"
+                                    : "secondary"
+                                }
+                              >
+                                {order.status === "paid"
+                                  ? t("orders.status.paid")
+                                  : t("orders.status.pending")}
+                              </Badge>
                             </div>
                           </div>
-                          {item.notes && (
-                            <div className="mt-2 text-sm text-gray-600 italic">
-                              {t("orders.notes")}: {item.notes}
+
+                          <Separator />
+
+                          {/* Order Summary */}
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-600">
+                                {t("pos.totalAmount")}
+                              </span>
+                              <span className="font-medium">
+                                {displaySubtotal.toLocaleString("vi-VN")} ₫
+                              </span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-600">Thuế:</span>
+                              <span className="font-medium">
+                                {displayTax.toLocaleString("vi-VN")} ₫
+                              </span>
+                            </div>
+                            {orderDiscount > 0 && (
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-600">
+                                  {t("reports.discount")}:
+                                </span>
+                                <span className="font-medium text-red-600">
+                                  -{orderDiscount.toLocaleString("vi-VN")} ₫
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex justify-between text-base font-bold pt-2 border-t">
+                              <span>{t("reports.totalMoney")}:</span>
+                              <span className="text-blue-600">
+                                {(() => {
+                                  return Math.floor(orderTotal).toLocaleString(
+                                    "vi-VN",
+                                  );
+                                })()}{" "}
+                                ₫
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Action Buttons */}
+                          {order.status !== "paid" && (
+                            <div className="space-y-2 pt-2">
+                              {/* Order-specific action buttons - Redesigned */}
+                              <div className="grid grid-cols-3 gap-2">
+                                {/* 1. Gọi thêm - Màu xanh dương */}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedOrder(order);
+                                    setEditingOrder(order);
+                                    setEditingTable(selectedTable);
+                                    // Keep orderDetailsOpen true - don't close it
+                                    setEditOrderOpen(true);
+                                  }}
+                                  className="text-xs bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 hover:border-blue-400"
+                                >
+                                  <Plus className="w-3 h-3 mr-1" />
+                                  Gọi thêm
+                                </Button>
+
+                                {/* 2. Thanh toán - Màu xanh lá */}
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  onClick={async () => {
+                                    console.log(
+                                      "🎯 Payment button for order:",
+                                      order.id,
+                                    );
+
+                                    try {
+                                      // Fetch order items for this specific order
+                                      const response = await apiRequest(
+                                        "GET",
+                                        `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${order.id}`,
+                                      );
+                                      const orderItemsData =
+                                        await response.json();
+
+                                      const processedItems = orderItemsData.map(
+                                        (item: any) => ({
+                                          id: item.id,
+                                          productId: item.productId,
+                                          productName:
+                                            item.productName ||
+                                            getProductName(item.productId),
+                                          price: item.unitPrice,
+                                          quantity: item.quantity,
+                                          discount: item.discount || "0",
+                                          total: item.total,
+                                          sku:
+                                            item.productSku ||
+                                            `SP${item.productId}`,
+                                          taxRate: (() => {
+                                            const product = Array.isArray(
+                                              products,
+                                            )
+                                              ? products.find(
+                                                  (p: any) =>
+                                                    p.id === item.productId,
+                                                )
+                                              : null;
+                                            return product?.taxRate
+                                              ? parseFloat(product.taxRate)
+                                              : 10;
+                                          })(),
+                                        }),
+                                      );
+
+                                      const previewData = {
+                                        ...order,
+                                        transactionId: `PREVIEW-${Date.now()}`,
+                                        createdAt: new Date().toISOString(),
+                                        cashierName: "Table Service",
+                                        paymentMethod: "preview",
+                                        items: processedItems,
+                                        subtotal: order.subtotal,
+                                        tax: order.tax,
+                                        total: order.total,
+                                        discount: order.discount || "0",
+                                        exactTotal: Number(order.total || 0),
+                                        exactSubtotal: Number(
+                                          order.subtotal || 0,
+                                        ),
+                                        exactTax: Number(order.tax || 0),
+                                        exactDiscount: Number(
+                                          order.discount || 0,
+                                        ),
+                                        orderItems: orderItemsData,
+                                      };
+
+                                      setPreviewReceipt(previewData);
+                                      setOrderDetailsOpen(false);
+                                      console.log(
+                                        "📄 Showing receipt preview for payment confirmation",
+                                      );
+                                      setShowReceiptPreview(true);
+                                    } catch (error) {
+                                      console.error(
+                                        "❌ Error preparing payment:",
+                                        error,
+                                      );
+                                      toast({
+                                        title: "Lỗi",
+                                        description:
+                                          "Không thể chuẩn bị thanh toán. Vui lòng thử lại.",
+                                        variant: "destructive",
+                                      });
+                                    }
+                                  }}
+                                  className="text-xs bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                  <CreditCard className="w-3 h-3 mr-1" />
+                                  Thanh toán
+                                </Button>
+
+                                {/* 3. More dropdown button - Màu xám */}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs bg-gray-50 border-gray-300 text-gray-700 hover:bg-gray-100 hover:border-gray-400 flex items-center justify-center"
+                                    >
+                                      <span className="text-lg leading-none">
+                                        •••
+                                      </span>
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                    align="end"
+                                    className="w-48"
+                                  >
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        console.log(
+                                          "🔪 Opening split order modal for order:",
+                                          order.id,
+                                        );
+                                        setSelectedOrder(order);
+                                        setSplitOrderOpen(true);
+                                      }}
+                                    >
+                                      <Plus className="w-4 h-4 mr-2" />
+                                      Tách đơn
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={async () => {
+                                        console.log(
+                                          "📄 Print bill for order:",
+                                          order.id,
+                                        );
+
+                                        try {
+                                          // Fetch order items for this specific order
+                                          const response = await apiRequest(
+                                            "GET",
+                                            `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${order.id}`,
+                                          );
+                                          const orderItemsData =
+                                            await response.json();
+
+                                          const exactSubtotal = Number(
+                                            order.subtotal || 0,
+                                          );
+                                          const exactTax = Number(
+                                            order.tax || 0,
+                                          );
+                                          const exactDiscount = Number(
+                                            order.discount || 0,
+                                          );
+                                          const exactTotal = Number(
+                                            order.total || 0,
+                                          );
+
+                                          const processedItems =
+                                            orderItemsData.map((item: any) => ({
+                                              id: item.id,
+                                              productId: item.productId,
+                                              productName:
+                                                item.productName ||
+                                                getProductName(item.productId),
+                                              price: item.unitPrice,
+                                              quantity: item.quantity,
+                                              total: item.total,
+                                              discount: item.discount || "0",
+                                              sku:
+                                                item.productSku ||
+                                                `SP${item.productId}`,
+                                              taxRate: (() => {
+                                                const product = Array.isArray(
+                                                  products,
+                                                )
+                                                  ? products.find(
+                                                      (p: any) =>
+                                                        p.id === item.productId,
+                                                    )
+                                                  : null;
+                                                return product?.taxRate
+                                                  ? parseFloat(product.taxRate)
+                                                  : 10;
+                                              })(),
+                                            }));
+
+                                          const billData = {
+                                            ...order,
+                                            transactionId:
+                                              order.orderNumber ||
+                                              `BILL-${order.id}`,
+                                            items: processedItems,
+                                            subtotal: exactSubtotal.toString(),
+                                            tax: exactTax.toString(),
+                                            discount: exactDiscount.toString(),
+                                            total: exactTotal.toString(),
+                                            exactSubtotal: exactSubtotal,
+                                            exactTax: exactTax,
+                                            exactDiscount: exactDiscount,
+                                            exactTotal: exactTotal,
+                                            paymentMethod: "unpaid",
+                                            amountReceived: "0",
+                                            change: "0",
+                                            cashierName: "Table Service",
+                                            createdAt:
+                                              order.orderedAt ||
+                                              new Date().toISOString(),
+                                            customerName: order.customerName,
+                                            tableNumber:
+                                              getTableInfo(order.tableId)
+                                                ?.tableNumber || "N/A",
+                                          };
+
+                                          setSelectedReceipt(billData);
+                                          setOrderDetailsOpen(false);
+                                          setShowReceiptModal(true);
+                                        } catch (error) {
+                                          console.error(
+                                            "❌ Error preparing bill:",
+                                            error,
+                                          );
+                                          toast({
+                                            title: "Lỗi",
+                                            description:
+                                              "Không thể tạo hóa đơn. Vui lòng thử lại.",
+                                            variant: "destructive",
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      <Printer className="w-4 h-4 mr-2" />
+                                      In hóa đơn
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        setSelectedOrder(order);
+                                        setPointsPaymentOpen(true);
+                                      }}
+                                    >
+                                      <Users className="w-4 h-4 mr-2" />
+                                      TT điểm
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        if (
+                                          window.confirm(
+                                            `${t("common.areyouremoteorder")}`,
+                                          )
+                                        ) {
+                                          deleteOrderMutation.mutate(order.id);
+                                        }
+                                      }}
+                                      className="text-red-600 focus:text-red-600"
+                                    >
+                                      <X className="w-4 h-4 mr-2" />
+                                      {t("orders.cancelOrder")}
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             </div>
                           )}
                         </div>
-                      );
-                    })}
-                  </>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    {t("orders.noItems")}
-                  </div>
-                )}
-              </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
 
-              <Separator className="my-4" />
-
-              {/* Order Summary - Use direct database values */}
-              <div className="space-y-3 bg-gray-50 p-4 rounded-lg">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">
-                    {t("reports.subtotal")}:
-                  </span>
-                  <span className="font-medium">
-                    {Number(selectedOrder.subtotal || 0).toLocaleString(
-                      "vi-VN",
-                    )}{" "}
-                    ₫
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">{t("reports.tax")}:</span>
-                  <span className="font-medium">
-                    {Number(selectedOrder.tax || 0).toLocaleString("vi-VN")} ₫
-                  </span>
-                </div>
-                {Number(selectedOrder.discount || 0) > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">
-                      {t("reports.discount")}:
-                    </span>
-                    <span className="font-medium text-red-600">
-                      -
-                      {Number(selectedOrder.discount || 0).toLocaleString(
-                        "vi-VN",
-                      )}{" "}
-                      ₫
-                    </span>
-                  </div>
-                )}
-                <Separator />
-                <div className="flex justify-between">
-                  <span className="text-lg font-bold text-gray-900">
-                    {t("reports.totalMoney")}:
-                  </span>
-                  <span className="text-lg font-bold text-blue-600">
-                    {Number(selectedOrder.total || 0).toLocaleString("vi-VN")} ₫
-                  </span>
-                </div>
-              </div>
-
-              {/* Payment Buttons */}
-              {selectedOrder.status !== "paid" && (
-                <div className="pt-4 space-y-3">
-                  <Button
-                    onClick={() => {
-                      console.log(
-                        "🎯 Table: Starting receipt preview flow like POS",
-                      );
-
-                      if (
-                        !selectedOrder ||
-                        !orderItems ||
-                        !Array.isArray(orderItems)
-                      ) {
-                        console.error("❌ Missing order data for preview");
-                        toast({
-                          title: "Lỗi",
-                          description:
-                            "Không thể tạo xem trước hóa đơn. Vui lòng thử lại.",
-                          variant: "destructive",
-                        });
-                        return;
-                      }
-
-                      // Process items for receipt without recalculation - use database values
-                      const processedItems = orderItems.map((item: any) => {
-                        return {
-                          id: item.id,
-                          productId: item.productId,
-                          productName:
-                            item.productName || getProductName(item.productId),
-                          price: parseFloat(item.unitPrice || "0"),
-                          quantity: item.quantity,
-                          sku: item.productSku || `SP${item.productId}`,
-                          taxRate: (() => {
-                            const product = Array.isArray(products)
-                              ? products.find(
-                                  (p: any) => p.id === item.productId,
-                                )
-                              : null;
-                            return product?.taxRate
-                              ? parseFloat(product.taxRate)
-                              : 10;
-                          })(),
-                          discount: item.discount || "0",
-                          discountAmount: item.discount || "0",
-                          unitPrice: item.unitPrice,
-                          total: item.total,
-                        };
-                      });
-
-                      // Create preview receipt data using EXACT database values - NO calculation
-                      const previewData = {
-                        ...selectedOrder,
-                        transactionId: `PREVIEW-${Date.now()}`,
-                        createdAt: new Date().toISOString(),
-                        cashierName: "Table Service",
-                        paymentMethod: "preview", // Placeholder method
-                        items: processedItems,
-                        // Use EXACT database values without any calculation
-                        subtotal: selectedOrder.subtotal,
-                        tax: selectedOrder.tax,
-                        total: selectedOrder.total,
-                        discount: selectedOrder.discount || "0",
-                        exactTotal: Number(selectedOrder.total || 0),
-                        exactSubtotal: Number(selectedOrder.subtotal || 0),
-                        exactTax: Number(selectedOrder.tax || 0),
-                        exactDiscount: Number(selectedOrder.discount || 0),
-                        orderItems: orderItems, // Keep original order items for payment flow
-                      };
-
-                      console.log(
-                        "📄 Table: Showing receipt preview with EXACT database values (NO calculation)",
-                      );
-                      console.log("💰 Database values used:", {
-                        subtotal: selectedOrder.subtotal,
-                        tax: selectedOrder.tax,
-                        discount: selectedOrder.discount,
-                        total: selectedOrder.total,
-                        source: "database_direct",
-                      });
-                      setPreviewReceipt(previewData);
-                      setOrderDetailsOpen(false);
-                      setShowReceiptPreview(true);
-                    }}
-                    className="w-full bg-green-600 hover:bg-green-700"
-                    size="lg"
-                  >
-                    <CreditCard className="w-4 h-4 mr-2" />
-                    {t("orders.payment")}
-                  </Button>
-                  <Button
-                    onClick={() => setPointsPaymentOpen(true)}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700"
-                    size="lg"
-                  >
-                    <Users className="w-4 h-4 mr-2" />
-                    {t("orders.pointsPaymentTitle")}
-                  </Button>
-                  <Button
-                    onClick={async () => {
-                      console.log(
-                        "🖨️ Print bill button clicked for order:",
-                        selectedOrder?.orderNumber,
-                      );
-
-                      try {
-                        // Use EXACT database values from selectedOrder - NO calculation
-                        const exactSubtotal = Number(
-                          selectedOrder.subtotal || 0,
-                        );
-                        const exactTax = Number(selectedOrder.tax || 0);
-                        const exactDiscount = Number(
-                          selectedOrder.discount || 0,
-                        );
-                        const exactTotal = Number(selectedOrder.total || 0);
-
-                        console.log(
-                          "📊 Using EXACT database values for receipt:",
-                          {
-                            exactSubtotal,
-                            exactTax,
-                            exactDiscount,
-                            exactTotal,
-                            source: "database_direct_no_calculation",
-                          },
-                        );
-
-                        // Create receipt data using EXACT database values
-                        const processedItems = orderItems.map((item: any) => ({
-                          id: item.id,
-                          productId: item.productId,
-                          productName:
-                            item.productName || getProductName(item.productId),
-                          price: item.unitPrice,
-                          quantity: item.quantity,
-                          total: item.total,
-                          unitPrice: item.unitPrice,
-                          discount: item.discount || "0",
-                          sku: item.productSku || `SP${item.productId}`,
-                          taxRate: (() => {
-                            const product = Array.isArray(products)
-                              ? products.find(
-                                  (p: any) => p.id === item.productId,
-                                )
-                              : null;
-                            return product?.taxRate
-                              ? parseFloat(product.taxRate)
-                              : 10;
-                          })(),
-                        }));
-
-                        const billData = {
-                          ...selectedOrder,
-                          transactionId:
-                            selectedOrder.orderNumber ||
-                            `BILL-${selectedOrder.id}`,
-                          items: processedItems,
-                          // Use EXACT database values - same as order details display
-                          subtotal: exactSubtotal.toString(),
-                          tax: exactTax.toString(),
-                          discount: exactDiscount.toString(),
-                          total: exactTotal.toString(),
-                          exactSubtotal: exactSubtotal,
-                          exactTax: exactTax,
-                          exactDiscount: exactDiscount,
-                          exactTotal: exactTotal,
-                          paymentMethod: "unpaid",
-                          amountReceived: "0",
-                          change: "0",
-                          cashierName: "Table Service",
-                          createdAt:
-                            selectedOrder.orderedAt || new Date().toISOString(),
-                          customerName: selectedOrder.customerName,
-                          customerTaxCode: null,
-                          invoiceNumber: null,
-                          tableNumber:
-                            getTableInfo(selectedOrder.tableId)?.tableNumber ||
-                            "N/A",
-                        };
-
-                        console.log(
-                          "📄 Table: Showing receipt modal with EXACT database values",
-                        );
-                        console.log("📊 Bill data matches order details:", {
-                          orderDetailsSubtotal: selectedOrder.subtotal,
-                          receiptSubtotal: billData.subtotal,
-                          orderDetailsTax: selectedOrder.tax,
-                          receiptTax: billData.tax,
-                          orderDetailsDiscount: selectedOrder.discount,
-                          receiptDiscount: billData.discount,
-                          orderDetailsTotal: selectedOrder.total,
-                          receiptTotal: billData.total,
-                        });
-
-                        // Show receipt modal without auto-printing
-                        setSelectedReceipt(billData);
-                        setOrderDetailsOpen(false);
-                        setShowReceiptModal(true);
-                      } catch (error) {
-                        console.error("❌ Error preparing bill:", error);
-                        toast({
-                          title: "Lỗi",
-                          description:
-                            "Không thể tạo hóa đơn. Vui lòng thử lại.",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                    className="w-full bg-gray-600 hover:bg-gray-700 text-white"
-                    size="lg"
-                  >
-                    <Printer className="w-4 h-4 mr-2" />
-                    {t("orders.printBill")}
-                  </Button>
+              {/* No orders message */}
+              {activeOrders.filter(
+                (order) => order.tableId === selectedTable.id,
+              ).length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  Bàn này chưa có đơn hàng nào
                 </div>
               )}
             </div>
@@ -3583,8 +3758,20 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
         </DialogContent>
       </Dialog>
 
+      {/* Split Order Modal */}
+      <SplitOrderModal
+        isOpen={splitOrderOpen}
+        onClose={() => setSplitOrderOpen(false)}
+        order={selectedOrder}
+        orderItems={orderItems || []}
+        onSplit={(splitData) => {
+          console.log("🔪 Starting split order:", splitData);
+          handleSplitOrder(splitData);
+        }}
+      />
+
       {/* Receipt Preview Modal - Step 1: "Xem trước hóa đơn" - Exactly like POS */}
-      {showReceiptPreview && (
+      {showReceiptPreview && previewReceipt && (
         <ReceiptModal
           isOpen={showReceiptPreview}
           onClose={() => {
@@ -3623,7 +3810,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
             setShowReceiptPreview(false);
             setShowPaymentMethodModal(true);
           }}
-          isPreview={true}
+          isPreview={showReceiptPreview}
           receipt={previewReceipt}
           cartItems={
             previewReceipt?.items?.map((item: any) => ({
@@ -3645,7 +3832,6 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
               ? previewReceipt.exactTotal || parseFloat(previewReceipt.total)
               : 0
           }
-          isTitle={false}
         />
       )}
 
@@ -3655,8 +3841,6 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
           isOpen={showPaymentMethodModal}
           onClose={() => {
             setShowPaymentMethodModal(false);
-            setShowReceiptPreview(false);
-            setIsShowTitle(false);
             setOrderForPayment(null);
           }}
           onSelectMethod={handlePaymentMethodSelect}
@@ -3774,8 +3958,6 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
           isOpen={showEInvoiceModal}
           onClose={() => {
             setShowEInvoiceModal(false);
-            setIsShowTitle(true);
-            setShowReceiptPreview(false);
             setOrderForEInvoice(null);
           }}
           onConfirm={handleEInvoiceConfirm}
@@ -3825,191 +4007,18 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
       )}
 
       {/* Receipt Modal - Final receipt after payment - ENHANCED with aggressive refresh */}
-      {showReceiptModal && selectedReceipt && !showReceiptPreview && (
+      {showReceiptModal && selectedReceipt && (
         <ReceiptModal
           isOpen={showReceiptModal}
-          onClose={async () => {
-            console.log(
-              "🔴 Table: Receipt modal closing - AGGRESSIVE data refresh starting",
-            );
-
-            // IMMEDIATE: Clear all modal states first
+          onClose={() => {
+            console.log("🔒 Receipt Modal: Closing receipt modal from table");
             setShowReceiptModal(false);
             setSelectedReceipt(null);
-            setOrderForPayment(null);
-            setShowPaymentMethodModal(false);
-            setShowEInvoiceModal(false);
-            setShowReceiptPreview(false);
-            setPreviewReceipt(null);
-            setOrderDetailsOpen(false);
-            setSelectedOrder(null);
-            setSelectedPaymentMethod("");
-
-            // AGGRESSIVE DATA REFRESH - Multiple strategies
-            console.log(
-              "🔄 Table: Starting MULTI-STRATEGY data refresh after receipt modal close",
-            );
-
-            try {
-              // Strategy 1: Complete cache clearing
-              queryClient.clear();
-              queryClient.removeQueries();
-
-              // Strategy 2: Force immediate fresh data fetch with timestamp to bypass any cache
-              const timestamp = Date.now().toString();
-              const [freshTables, freshOrders] = await Promise.all([
-                fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables?_t=${timestamp}&_force=refresh`, {
-                  cache: "no-store",
-                  headers: {
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                    Pragma: "no-cache",
-                    Expires: "0",
-                  },
-                }).then((r) => r.json()),
-                fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders?_t=${timestamp}&_force=refresh`, {
-                  cache: "no-store",
-                  headers: {
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                    Pragma: "no-cache",
-                    Expires: "0",
-                  },
-                }).then((r) => r.json()),
-              ]);
-
-              // Strategy 3: Set fresh data immediately in cache
-              queryClient.setQueryData(["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"], freshTables);
-              queryClient.setQueryData(["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"], freshOrders);
-
-              console.log(
-                "✅ Table: Fresh data loaded and cached after receipt modal close",
-              );
-
-              // Strategy 4: Multiple timed invalidations to force re-renders
-              setTimeout(() => {
-                queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
-                queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-              }, 50);
-
-              setTimeout(() => {
-                queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
-                queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-              }, 150);
-
-              setTimeout(() => {
-                // Force one more invalidation to ensure UI updates
-                queryClient.invalidateQueries();
-              }, 300);
-            } catch (fetchError) {
-              console.error(
-                "❌ Table: Error during aggressive fetch, falling back:",
-                fetchError,
-              );
-
-              // Strategy 5: Fallback with forced refetch
-              try {
-                await Promise.all([refetchTables(), refetchOrders()]);
-                console.log("✅ Table: Fallback refresh completed");
-              } catch (fallbackError) {
-                console.error(
-                  "❌ Table: Fallback refresh also failed:",
-                  fallbackError,
-                );
-              }
-            }
-
-            // Strategy 6: Send WebSocket signal for cross-page coordination
-            try {
-              const protocol =
-                window.location.protocol === "https:" ? "wss:" : "ws:";
-              const wsUrl = `${protocol}//${window.location.host}/ws`;
-              const ws = new WebSocket(wsUrl);
-
-              ws.onopen = () => {
-                const refreshSignal = {
-                  type: "force_refresh",
-                  success: true,
-                  source: "table-grid-receipt-close",
-                  reason: "receipt_modal_closed_with_payment",
-                  force_refresh: true,
-                  timestamp: new Date().toISOString(),
-                };
-
-                console.log(
-                  "📡 Table: Sending AGGRESSIVE WebSocket refresh signal:",
-                  refreshSignal,
-                );
-                ws.send(JSON.stringify(refreshSignal));
-
-                setTimeout(() => ws.close(), 100);
-              };
-            } catch (wsError) {
-              console.warn(
-                "⚠️ Table: WebSocket signal failed (non-critical):",
-                wsError,
-              );
-            }
-
-            // Strategy 7: Dispatch multiple refresh events
-            const refreshEvents = [
-              new CustomEvent("forceDataRefresh", {
-                detail: {
-                  reason: "receipt_modal_closed_aggressive",
-                  source: "table-grid",
-                  forceRefresh: true,
-                  aggressive: true,
-                  timestamp: new Date().toISOString(),
-                },
-              }),
-              new CustomEvent("paymentCompleted", {
-                detail: {
-                  action: "modal_closed_force_refresh",
-                  source: "table-grid",
-                  forceRefresh: true,
-                  timestamp: new Date().toISOString(),
-                },
-              }),
-              new CustomEvent("refreshTableData", {
-                detail: {
-                  reason: "receipt_modal_closed",
-                  source: "table-grid",
-                  forceRefresh: true,
-                  timestamp: new Date().toISOString(),
-                },
-              }),
-            ];
-
-            refreshEvents.forEach((event) => {
-              console.log(`📡 Table: Dispatching ${event.type} event`);
-              window.dispatchEvent(event);
-            });
-
-            toast({
-              title: "Thành công",
-              description: "Thanh toán hoàn tất và dữ liệu đã được cập nhật",
-            });
-
-            console.log(
-              "✅ Table: AGGRESSIVE receipt modal close and data refresh completed",
-            );
           }}
           receipt={selectedReceipt}
-          cartItems={
-            selectedReceipt?.items?.map((item: any) => ({
-              id: item.productId || item.id,
-              name: item.productName || item.name,
-              price: parseFloat(item.price || item.unitPrice || "0"),
-              quantity: item.quantity,
-              sku: item.sku || `SP${item.productId}`,
-              taxRate: (() => {
-                const product = Array.isArray(products)
-                  ? products.find((p: any) => p.id === item.productId)
-                  : null;
-                return product?.taxRate ? parseFloat(product.taxRate) : 10;
-              })(),
-            })) || []
-          }
-          isPreview={false} // Show as preview if there's an order waiting for payment
+          isPreview={!!orderForPayment} // Show as preview if there's an order waiting for payment
           onConfirm={orderForPayment ? handleReceiptConfirm : undefined}
+          isTitle={false}
         />
       )}
 
@@ -4035,18 +4044,23 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span>Tổng cộng:</span>
+                  <span>{t("pos.totalAmount")}</span>
                   <span className="font-medium">
-                    {Math.floor(
-                      Number(selectedOrder.subtotal || 0),
-                    ).toLocaleString("vi-VN")}{" "}
+                    {(() => {
+                      return Math.floor(
+                        Number(selectedOrder.total || "0") +
+                          Number(selectedOrder.discount || "0"),
+                      ).toLocaleString("vi-VN");
+                    })()}{" "}
                     ₫
                   </span>
                 </div>
                 {selectedOrder.discount &&
                   Number(selectedOrder.discount) > 0 && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-red-600">Giảm giá:</span>
+                      <span className="text-red-600">
+                        {t("reports.discount")}:
+                      </span>
                       <span className="font-medium text-red-600">
                         -
                         {Math.floor(
@@ -4057,7 +4071,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
                     </div>
                   )}
                 <div className="flex justify-between text-sm font-bold border-t pt-2 mt-2">
-                  <span>Tổng tiền:</span>
+                  <span>{t("reports.totalMoney")}:</span>
                   <span className="font-bold text-green-600">
                     {Math.floor(
                       Number(selectedOrder.total || 0),
@@ -4239,7 +4253,6 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
                     : Math.floor(
                         Number(selectedOrder?.total || 0),
                       ).toLocaleString("vi-VN")}{" "}
-                  ₫
                 </p>
                 {mixedPaymentData && (
                   <div className="mt-2 pt-2 border-t border-gray-300">

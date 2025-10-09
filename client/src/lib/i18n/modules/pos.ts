@@ -133,6 +133,7 @@ export interface POSTranslations {
   subtotal: string;
   tax: string;
   total: string;
+  totalAmount: string;
   paymentMethod: string;
   amountReceived: string;
   phone: string;
@@ -310,6 +311,7 @@ export const posTranslations: { [key: string]: POSTranslations } = {
     subtotal: "소계:",
     tax: "세금:",
     total: "총계:",
+    totalAmount: "금액:",
     phone: "전화:",
 
     // Printer configuration
@@ -485,6 +487,7 @@ export const posTranslations: { [key: string]: POSTranslations } = {
     subtotal: "Subtotal:",
     tax: "Tax (8.25%):",
     total: "Total:",
+    totalAmount: "Amount:",
     paymentMethodLabel: "Payment Method:",
     amountReceivedLabel: "Amount Received:",
     phone: "Phone:",
@@ -662,6 +665,7 @@ export const posTranslations: { [key: string]: POSTranslations } = {
     subtotal: "Tạm tính:",
     tax: "Thuế:",
     total: "Tổng cộng:",
+    totalAmount: "Thành tiền:",
     paymentMethodLabel: "Phương thức thanh toán:",
     amountReceivedLabel: "Số tiền nhận:",
     phone: "Điện thoại:",

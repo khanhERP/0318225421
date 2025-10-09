@@ -281,6 +281,12 @@ export const settingsTranslations: { [key: string]: SettingsTranslations } = {
     usageStatusActive: "활성",
     usageStatusInactive: "비활성",
     selectUsageStatus: "상태를 선택하세요",
+    imageInputUrl: "URL 입력",
+    imageInputFile: "파일 업로드",
+    selectImageFile: "이미지 파일을 선택하거나",
+    dragDropUpload: "드래그앤드롭으로 업로드",
+    removeFile: "파일 제거",
+    fileSizeExceeded: "이미지 크기는 5MB를 초과할 수 없습니다",
 
     // Placeholders
     categoryNamePlaceholder: "카테고리 이름을 입력하세요",
@@ -625,6 +631,12 @@ export const settingsTranslations: { [key: string]: SettingsTranslations } = {
     usageStatusActive: "Active",
     usageStatusInactive: "Inactive",
     selectUsageStatus: "Select status",
+    imageInputUrl: "Enter URL",
+    imageInputFile: "Upload File",
+    selectImageFile: "Select image file or",
+    dragDropUpload: "Drag and drop to upload",
+    removeFile: "Remove file",
+    fileSizeExceeded: "Image size cannot exceed 5MB",
 
     // Placeholders
     categoryNamePlaceholder: "Enter category name",
@@ -969,6 +981,12 @@ export const settingsTranslations: { [key: string]: SettingsTranslations } = {
     usageStatusActive: "Hoạt động",
     usageStatusInactive: "Không hoạt động",
     selectUsageStatus: "Chọn trạng thái",
+    imageInputUrl: "Nhập URL",
+    imageInputFile: "Tải file lên",
+    selectImageFile: "Chọn file hình ảnh hoặc",
+    dragDropUpload: "Kéo thả để tải lên",
+    removeFile: "Xóa file",
+    fileSizeExceeded: "Kích thước ảnh không được vượt quá 5MB",
 
     // Placeholders
     categoryNamePlaceholder: "Nhập tên danh mục",

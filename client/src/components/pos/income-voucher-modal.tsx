@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "@/lib/i18n";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +39,7 @@ interface IncomeVoucher {
   amount: number;
   account: string;
   recipient: string;
+  receiverName?: string;
   phone: string;
   category: string;
   description: string;
@@ -50,18 +52,12 @@ interface IncomeVoucherModalProps {
   mode: "create" | "edit";
 }
 
-const INCOME_CATEGORIES = [
-  "Bán hàng",
-  "Dịch vụ", 
-  "Thu nợ",
-  "Thu khác",
-  "Hoàn tiền",
-];
-
-const CASH_ACCOUNTS = [
-  "Tiền mặt",
-  "Ngân hàng",
-  "Ví điện tử",
+const INCOME_CATEGORY_KEYS = [
+  "sales",
+  "service", 
+  "debtCollection",
+  "other",
+  "refund",
 ];
 
 export default function IncomeVoucherModal({ 
@@ -70,18 +66,100 @@ export default function IncomeVoucherModal({
   voucher, 
   mode 
 }: IncomeVoucherModalProps) {
+  const { t } = useTranslation();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isEditing, setIsEditing] = useState(mode === "create");
   const queryClient = useQueryClient();
+
+  // Load payment methods from localStorage (same as expense voucher)
+  const getPaymentMethods = () => {
+    const savedPaymentMethods = localStorage.getItem("paymentMethods");
+
+    const defaultPaymentMethods = [
+      {
+        id: 1,
+        nameKey: "cash",
+        type: "cash",
+        enabled: true,
+        icon: "💵",
+      },
+      {
+        id: 2,
+        nameKey: "creditCard",
+        type: "card",
+        enabled: false,
+        icon: "💳",
+      },
+      {
+        id: 3,
+        nameKey: "debitCard",
+        type: "debit",
+        enabled: false,
+        icon: "💳",
+      },
+      {
+        id: 4,
+        nameKey: "momo",
+        type: "digital",
+        enabled: false,
+        icon: "📱",
+      },
+      {
+        id: 5,
+        nameKey: "zalopay",
+        type: "digital",
+        enabled: false,
+        icon: "📱",
+      },
+      {
+        id: 6,
+        nameKey: "vnpay",
+        type: "digital",
+        enabled: false,
+        icon: "💳",
+      },
+      {
+        id: 7,
+        nameKey: "qrCode",
+        type: "qr",
+        enabled: true,
+        icon: "📱",
+      },
+      {
+        id: 8,
+        nameKey: "shopeepay",
+        type: "digital",
+        enabled: false,
+        icon: "🛒",
+      },
+      {
+        id: 9,
+        nameKey: "grabpay",
+        type: "digital",
+        enabled: false,
+        icon: "🚗",
+      },
+    ];
+
+    const paymentMethods = savedPaymentMethods
+      ? JSON.parse(savedPaymentMethods)
+      : defaultPaymentMethods;
+
+    // Filter to only return enabled payment methods
+    return paymentMethods.filter((method: any) => method.enabled === true);
+  };
+
+  const paymentMethods = getPaymentMethods();
   
   const [formData, setFormData] = useState<IncomeVoucher>({
     voucherNumber: "",
     date: new Date().toISOString().split('T')[0],
     amount: 0,
-    account: "Tiền mặt",
+    account: "cash", // Use nameKey instead of hardcoded Vietnamese
     recipient: "",
+    receiverName: "",
     phone: "",
-    category: "Thu khác",
+    category: "other",
     description: "",
   });
 
@@ -97,6 +175,7 @@ export default function IncomeVoucherModal({
       setFormData(prev => ({
         ...prev,
         voucherNumber: `PT${dateStr}${timeStr}`,
+        account: "cash", // Use nameKey instead of hardcoded Vietnamese
       }));
       setIsEditing(true);
     }
@@ -199,8 +278,8 @@ export default function IncomeVoucherModal({
     // Validate required fields
     if (!formData.voucherNumber?.trim()) {
       toast({
-        title: "Lỗi",
-        description: "Vui lòng nhập số phiếu thu",
+        title: t('common.error'),
+        description: t('common.enterVoucherNumber'),
         variant: "destructive",
       });
       return;
@@ -208,8 +287,8 @@ export default function IncomeVoucherModal({
 
     if (!formData.recipient?.trim()) {
       toast({
-        title: "Lỗi",
-        description: "Vui lòng nhập đối tượng nộp",
+        title: t('common.error'),
+        description: t('common.enterRecipient'),
         variant: "destructive",
       });
       return;
@@ -217,8 +296,8 @@ export default function IncomeVoucherModal({
 
     if (!formData.amount || formData.amount <= 0) {
       toast({
-        title: "Lỗi",
-        description: "Vui lòng nhập số tiền hợp lệ (lớn hơn 0)",
+        title: t('common.error'),
+        description: t('common.enterValidAmount'),
         variant: "destructive",
       });
       return;
@@ -226,8 +305,8 @@ export default function IncomeVoucherModal({
 
     if (!formData.date?.trim()) {
       toast({
-        title: "Lỗi",
-        description: "Vui lòng chọn ngày thu",
+        title: t('common.error'),
+        description: t('common.selectDate'),
         variant: "destructive",
       });
       return;
@@ -239,15 +318,20 @@ export default function IncomeVoucherModal({
       id: voucher?.id, // Include ID for update
       voucherNumber: formData.voucherNumber.trim(),
       recipient: formData.recipient.trim(),
-      account: formData.account || "Tiền mặt",
-      category: formData.category || "Thu khác",
+      account: formData.account || "cash", // Use nameKey instead of hardcoded Vietnamese
+      category: formData.category || "other",
       date: formData.date.trim(),
       phone: formData.phone?.trim() || "",
       description: formData.description?.trim() || "",
       amount: Number(formData.amount),
     };
 
-    console.log("Saving income voucher:", cleanData);
+    console.log("💾 Saving income voucher with account value:", {
+      account: cleanData.account,
+      accountType: typeof cleanData.account,
+      voucherNumber: cleanData.voucherNumber,
+      fullData: cleanData
+    });
 
     if (mode === "create") {
       createVoucherMutation.mutate(cleanData);
@@ -269,76 +353,106 @@ export default function IncomeVoucherModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
+        <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto">
+          <DialogHeader className="border-b pb-4">
+            <DialogTitle className="flex items-center gap-3 text-xl">
               <Button variant="ghost" size="sm" onClick={onClose}>
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="w-5 h-5" />
               </Button>
-              <span>Phiếu thu</span>
+              <span className="font-bold">{t('common.incomeVoucherTitle')}</span>
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-6 p-4">
+          <div className="space-y-6 p-6">
             {/* Form Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Left Column */}
-              <div className="space-y-4">
+              <div className="space-y-5 p-4 bg-gray-50 rounded-lg border">
+                <h3 className="font-bold text-lg text-gray-800 mb-4">{t('common.voucherInfo')}</h3>
+                
                 <div>
-                  <Label htmlFor="voucherNumber">Số phiếu thu *</Label>
+                  <Label htmlFor="voucherNumber" className="text-base font-bold mb-2">
+                    {t('common.incomeVoucherNumber')} <span className="text-red-600">*</span>
+                  </Label>
                   <Input
                     id="voucherNumber"
                     value={formData.voucherNumber}
                     onChange={(e) => setFormData(prev => ({ ...prev, voucherNumber: e.target.value }))}
                     disabled={!isEditing}
-                    className={!isEditing ? "bg-gray-50" : ""}
+                    className={`h-11 text-base font-bold ${!isEditing ? "bg-gray-100 text-gray-900" : "bg-white"}`}
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="date">Ngày thu *</Label>
+                  <Label htmlFor="date" className="text-base font-bold mb-2">
+                    {t('common.incomeDate')} <span className="text-red-600">*</span>
+                  </Label>
                   <Input
                     id="date"
                     type="date"
                     value={formData.date}
                     onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
                     disabled={!isEditing}
-                    className={!isEditing ? "bg-gray-50" : ""}
+                    className={`h-11 text-base font-bold ${!isEditing ? "bg-gray-100 text-gray-900" : "bg-white"}`}
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="amount">Số tiền *</Label>
+                  <Label htmlFor="amount" className="text-base font-bold mb-2">
+                    {t('common.amountLabel')} <span className="text-red-600">*</span>
+                  </Label>
                   <Input
                     id="amount"
-                    type="number"
-                    value={formData.amount || ""}
-                    onChange={(e) => setFormData(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
+                    type="text"
+                    value={formData.amount > 0 ? formatCurrency(formData.amount) : ""}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '');
+                      setFormData(prev => ({ ...prev, amount: parseFloat(value) || 0 }));
+                    }}
                     disabled={!isEditing}
-                    className={!isEditing ? "bg-gray-50" : ""}
+                    className={`h-11 text-base font-bold ${!isEditing ? "bg-gray-100 text-gray-900" : "bg-white"}`}
                     placeholder="0"
                   />
-                  {formData.amount > 0 && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      {formatCurrency(formData.amount)} VND
-                    </p>
-                  )}
                 </div>
 
                 <div>
-                  <Label htmlFor="account">Tài khoản thu *</Label>
+                  <Label htmlFor="account" className="text-base font-bold mb-2">
+                    {t('common.incomeAccount')} <span className="text-red-600">*</span>
+                  </Label>
                   <Select
                     value={formData.account}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, account: value }))}
                     disabled={!isEditing}
                   >
-                    <SelectTrigger className={!isEditing ? "bg-gray-50" : ""}>
+                    <SelectTrigger className={`h-11 text-base font-bold ${!isEditing ? "bg-gray-100 text-gray-900" : "bg-white"}`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {CASH_ACCOUNTS.map((account) => (
-                        <SelectItem key={account} value={account}>
-                          {account}
+                      {paymentMethods.map((method) => (
+                        <SelectItem key={method.id} value={method.nameKey} className="text-base">
+                          {t(`common.${method.nameKey}`)} {method.icon}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="category" className="text-base font-bold mb-2">
+                    {t('common.incomeCategory')} <span className="text-red-600">*</span>
+                  </Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                    disabled={!isEditing}
+                  >
+                    <SelectTrigger className={`h-11 text-base font-bold ${!isEditing ? "bg-gray-100 text-gray-900" : "bg-white"}`}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INCOME_CATEGORY_KEYS.map((categoryKey) => (
+                        <SelectItem key={categoryKey} value={categoryKey} className="text-base">
+                          {t(`common.incomeCategories.${categoryKey}`)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -347,123 +461,112 @@ export default function IncomeVoucherModal({
               </div>
 
               {/* Right Column */}
-              <div className="space-y-4">
+              <div className="space-y-5 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h3 className="font-bold text-lg text-gray-800 mb-4">{t('common.recipientInfo')}</h3>
+                
                 <div>
-                  <Label htmlFor="recipient">Đối tượng nộp *</Label>
+                  <Label htmlFor="recipient" className="text-base font-bold mb-2">
+                    {t('common.recipient')} <span className="text-red-600">*</span>
+                  </Label>
                   <Input
                     id="recipient"
                     value={formData.recipient}
                     onChange={(e) => setFormData(prev => ({ ...prev, recipient: e.target.value }))}
                     disabled={!isEditing}
-                    className={!isEditing ? "bg-gray-50" : ""}
-                    placeholder="Tên người/công ty nộp tiền"
+                    className={`h-11 text-base font-bold ${!isEditing ? "bg-blue-100 text-gray-900" : "bg-white"}`}
+                    placeholder={t('common.recipientPlaceholder')}
                   />
                 </div>
 
                 <div>
-                  <Label htmlFor="phone">Người nhận</Label>
+                  <Label htmlFor="receiverName" className="text-base font-bold mb-2">{t('common.receiverName')}</Label>
+                  <Input
+                    id="receiverName"
+                    value={formData.receiverName || ""}
+                    onChange={(e) => setFormData(prev => ({ ...prev, receiverName: e.target.value }))}
+                    disabled={!isEditing}
+                    className={`h-11 text-base font-bold ${!isEditing ? "bg-blue-100 text-gray-900" : "bg-white"}`}
+                    placeholder={t('common.receiverNamePlaceholder')}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="phone" className="text-base font-bold mb-2">{t('common.phone')}</Label>
                   <Input
                     id="phone"
                     value={formData.phone}
                     onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                     disabled={!isEditing}
-                    className={!isEditing ? "bg-gray-50" : ""}
-                    placeholder="Tên người nhận tiền"
+                    className={`h-11 text-base font-bold ${!isEditing ? "bg-blue-100 text-gray-900" : "bg-white"}`}
+                    placeholder={t('common.phoneNumberPlaceholder')}
                   />
-                </div>
-
-                <div>
-                  <Label htmlFor="phone">Điện thoại</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                    disabled={!isEditing}
-                    className={!isEditing ? "bg-gray-50" : ""}
-                    placeholder="Số điện thoại"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="category">Loại thu *</Label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
-                    disabled={!isEditing}
-                  >
-                    <SelectTrigger className={!isEditing ? "bg-gray-50" : ""}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {INCOME_CATEGORIES.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
             </div>
 
             {/* Description */}
-            <div>
-              <Label htmlFor="description">Diễn giải</Label>
+            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+              <Label htmlFor="description" className="text-base font-bold mb-2">{t('common.explanation')}</Label>
               <Textarea
                 id="description"
                 value={formData.description}
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                 disabled={!isEditing}
-                className={!isEditing ? "bg-gray-50" : ""}
-                placeholder="Mô tả chi tiết về khoản thu..."
+                className={`text-base font-semibold ${!isEditing ? "bg-green-100 text-gray-900" : "bg-white"}`}
+                placeholder={t('common.explanationPlaceholder')}
                 rows={4}
               />
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-between pt-4 border-t">
-              <div className="flex gap-2">
+            <div className="flex justify-between pt-4 border-t-2">
+              <div className="flex gap-3">
                 {mode === "edit" && (
                   <>
                     <Button
                       variant="destructive"
-                      size="sm"
+                      size="lg"
                       onClick={() => setShowDeleteDialog(true)}
                       disabled={deleteVoucherMutation.isPending}
+                      className="h-11 text-base"
                     >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Xóa
+                      <Trash2 className="w-5 h-5 mr-2" />
+                      {t('common.delete')}
                     </Button>
                     <Button
                       variant="outline"
-                      size="sm"
+                      size="lg"
                       onClick={() => setIsEditing(true)}
                       disabled={isEditing}
+                      className="h-11 text-base"
                     >
-                      <Edit className="w-4 h-4 mr-2" />
-                      Sửa
+                      <Edit className="w-5 h-5 mr-2" />
+                      {t('common.edit')}
                     </Button>
                   </>
                 )}
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-3">
                 <Button
                   variant="outline"
+                  size="lg"
                   onClick={onClose}
                   disabled={createVoucherMutation.isPending || updateVoucherMutation.isPending}
+                  className="h-11 text-base"
                 >
-                  <X className="w-4 h-4 mr-2" />
-                  Đóng
+                  <X className="w-5 h-5 mr-2" />
+                  {t('common.close')}
                 </Button>
                 {isEditing && (
                   <Button
+                    size="lg"
                     onClick={handleSave}
                     disabled={createVoucherMutation.isPending || updateVoucherMutation.isPending}
-                    className="bg-green-600 hover:bg-green-700"
+                    className="bg-green-600 hover:bg-green-700 h-11 text-base px-8"
                   >
-                    <Save className="w-4 h-4 mr-2" />
-                    Lưu
+                    <Save className="w-5 h-5 mr-2" />
+                    {t('common.save')}
                   </Button>
                 )}
               </div>
@@ -476,21 +579,21 @@ export default function IncomeVoucherModal({
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xác nhận xóa</AlertDialogTitle>
+            <AlertDialogTitle>{t('common.confirmDelete')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Bạn có muốn xóa phiếu thu <strong>{formData.voucherNumber}</strong> này không?
+              {t('common.confirmDeleteVoucher').replace('{voucherNumber}', formData.voucherNumber)}
               <br />
-              <span className="text-red-600">Hành động này không thể hoàn tác.</span>
+              <span className="text-red-600">{t('common.cannotUndo')}</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Bỏ qua</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.skip')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleteVoucherMutation.isPending}
               className="bg-red-600 hover:bg-red-700"
             >
-              Đồng ý
+              {t('common.agree')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -81,6 +81,8 @@ import { PointsManagementModal } from "@/components/customers/points-management-
 import { EmployeeFormModal } from "@/components/employees/employee-form-modal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PrinterConfigModal } from "@/components/pos/printer-config-modal";
+import { POSHeader } from "@/components/pos/header";
+import { RightSidebar } from "@/components/ui/right-sidebar";
 
 // E-invoice software providers mapping
 const EINVOICE_PROVIDERS = [
@@ -242,10 +244,11 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     stock: 0,
     categoryId: "",
     imageUrl: "",
-    floor: "1층",
-    zone: "전체구역",
+    floor: "1",
+    zone: "A",
     imageInputMethod: "url" as "url" | "file",
     selectedImageFile: null as File | null,
+    trackInventory: true, // Default to true
   });
 
   // Fetch store settings
@@ -315,8 +318,8 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
     closeTime: "22:00",
     priceIncludesTax: false,
     defaultFloor: "1", // Added for floor management
-    floorPrefix: "층", // Added for floor management
-    zonePrefix: "구역", // Added for zone management
+    floorPrefix: "1", // Added for floor management
+    zonePrefix: "A", // Added for zone management
     defaultZone: "A", // Added for zone management
   });
 
@@ -336,8 +339,8 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
         closeTime: storeData.closeTime || "22:00",
         priceIncludesTax: storeData.priceIncludesTax || false,
         defaultFloor: storeData.defaultFloor || "1",
-        floorPrefix: storeData.floorPrefix || "층",
-        zonePrefix: storeData.zonePrefix || "구역",
+        floorPrefix: storeData.floorPrefix || "1",
+        zonePrefix: storeData.zonePrefix || "A",
         defaultZone: storeData.defaultZone || "A",
       });
     }
@@ -614,10 +617,11 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       stock: 0,
       categoryId: "",
       imageUrl: "",
-      floor: "1층",
-      zone: "전체구역",
+      floor: "1",
+      zone: "A",
       imageInputMethod: "url",
       selectedImageFile: null,
+      trackInventory: true,
     });
   };
 
@@ -820,6 +824,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
         stock: Number(productForm.stock),
         floor: productForm.floor, // Add floor
         zone: productForm.zone, // Add zone
+        trackInventory: productForm.trackInventory,
       };
 
       // Handle file upload if file method is selected
@@ -888,6 +893,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
         stock: Number(productForm.stock),
         floor: productForm.floor, // Add floor
         zone: productForm.zone, // Add zone
+        trackInventory: productForm.trackInventory,
       };
 
       // Handle file upload if file method is selected
@@ -997,11 +1003,12 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       stock: product.stock,
       categoryId: product.categoryId.toString(),
       imageUrl: product.imageUrl || "",
-      floor: product.floor || "1층",
-      zone: product.zone || "A구역",
+      floor: product.floor || "1",
+      zone: product.zone || "A",
       imageInputMethod:
         product.imageUrl && product.imageUrl.trim() !== "" ? "url" : "url",
       selectedImageFile: null,
+      trackInventory: product.trackInventory !== undefined ? product.trackInventory : true,
     });
     setShowProductForm(true);
   };
@@ -1444,41 +1451,45 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-20 relative">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div
-          className="absolute inset-0 opacity-5"
-          style={{
-            backgroundImage: `radial-gradient(circle at 25% 25%, #10b981 0%, transparent 50%),
+    <>
+      <POSHeader onLogout={onLogout} />
+      <div className="flex min-h-screen bg-gray-50 pt-20">
+        <RightSidebar />
+        <div className="flex-1 relative">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div
+            className="absolute inset-0 opacity-5"
+            style={{
+              backgroundImage: `radial-gradient(circle at 25% 25%, #10b981 0%, transparent 50%),
                            radial-gradient(circle at 75% 25%, #059669 0%, transparent 50%),
                            radial-gradient(circle at 25% 75%, #065f46 0%, transparent 50%),
                            radial-gradient(circle at 75% 75%, #059669 0%, transparent 50%)`,
-            backgroundSize: "100px 100px",
-          }}
-        ></div>
-      </div>
-
-      <div className="relative z-10 container mx-auto p-6">
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                <SettingsIcon className="w-8 h-8 text-green-600" />
-                {t("settings.title")}
-              </h1>
-              <p className="text-gray-600">{t("settings.description")}</p>
-            </div>
-            <Button
-              onClick={() => (window.location.href = "/")}
-              variant="outline"
-              className="bg-white hover:bg-green-50 border-green-200 text-green-700 hover:text-green-800"
-            >
-              <Home className="w-4 h-4 mr-2" />
-              {t("settings.backToPos")}
-            </Button>
-          </div>
+              backgroundSize: "100px 100px",
+            }}
+          ></div>
         </div>
+
+        <div className="relative z-10 container mx-auto p-6">
+          <div className="mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+                  <SettingsIcon className="w-8 h-8 text-green-600" />
+                  {t("settings.title")}
+                </h1>
+                <p className="text-gray-600">{t("settings.description")}</p>
+              </div>
+              <Button
+                onClick={() => (window.location.href = "/")}
+                variant="outline"
+                className="bg-white hover:bg-green-50 border-green-200 text-green-700 hover:text-green-800"
+              >
+                <Home className="w-4 h-4 mr-2" />
+                {t("settings.backToPos")}
+              </Button>
+            </div>
+          </div>
 
         <div className="w-full">
           <Tabs
@@ -3603,19 +3614,19 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                     🍽️ {t("settings.categoryIcons.mainDish")}
                   </SelectItem>
                   <SelectItem value="fas fa-coffee">
-                    ☕ {t("settings.categoryIcons.beverage")}
+                    ☕ {t("settings.categoryIcons.beverages")}
                   </SelectItem>
                   <SelectItem value="fas fa-cookie">
-                    🍪 {t("settings.categoryIcons.snack")}
+                    🍪 {t("settings.categoryIcons.snacks")}
                   </SelectItem>
                   <SelectItem value="fas fa-ice-cream">
-                    🍨 {t("settings.categoryIcons.dessert")}
+                    🍨 {t("settings.categoryIcons.desserts")}
                   </SelectItem>
                   <SelectItem value="fas fa-beer">
                     🍺 {t("settings.categoryIcons.alcoholic")}
                   </SelectItem>
                   <SelectItem value="fas fa-apple-alt">
-                    🍎 {t("settings.categoryIcons.fruit")}
+                    🍎 {t("settings.categoryIcons.fruits")}
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -3787,7 +3798,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                 {t("tables.floorLabel")}
               </Label>
               <Select
-                value={productForm.floor || "1층"}
+                value={productForm.floor}
                 onValueChange={(value) =>
                   setProductForm((prev) => ({ ...prev, floor: value }))
                 }
@@ -3796,16 +3807,36 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                   <SelectValue placeholder={t("tables.floorPlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1층">1층</SelectItem>
-                  <SelectItem value="2층">2층</SelectItem>
-                  <SelectItem value="3층">3층</SelectItem>
-                  <SelectItem value="4층">4층</SelectItem>
-                  <SelectItem value="5층">5층</SelectItem>
-                  <SelectItem value="6층">6층</SelectItem>
-                  <SelectItem value="7층">7층</SelectItem>
-                  <SelectItem value="8층">8층</SelectItem>
-                  <SelectItem value="9층">9층</SelectItem>
-                  <SelectItem value="10층">10층</SelectItem>
+                  <SelectItem value="1">
+                    {t("common.floor")} 1
+                  </SelectItem>
+                  <SelectItem value="2">
+                    {t("common.floor")} 2
+                  </SelectItem>
+                  <SelectItem value="3">
+                    {t("common.floor")} 3
+                  </SelectItem>
+                  <SelectItem value="4">
+                    {t("common.floor")} 4
+                  </SelectItem>
+                  <SelectItem value="5">
+                    {t("common.floor")} 5
+                  </SelectItem>
+                  <SelectItem value="6">
+                    {t("common.floor")} 6
+                  </SelectItem>
+                  <SelectItem value="7">
+                    {t("common.floor")} 7
+                  </SelectItem>
+                  <SelectItem value="8">
+                    {t("common.floor")} 8
+                  </SelectItem>
+                  <SelectItem value="9">
+                    {t("common.floor")} 9
+                  </SelectItem>
+                  <SelectItem value="10">
+                    {t("common.floor")} 10
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -3815,7 +3846,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                 {t("tables.zoneLabel")}
               </Label>
               <Select
-                value={productForm.zone || "전체구역"}
+                value={productForm.zone}
                 onValueChange={(value) =>
                   setProductForm((prev) => ({ ...prev, zone: value }))
                 }
@@ -3824,21 +3855,30 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                   <SelectValue placeholder={t("tables.zonePlaceholder")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="전체구역">
-                    {currentLanguage === "ko"
-                      ? "전체구역"
-                      : currentLanguage === "en"
-                        ? "All Zones"
-                        : "Tất cả khu vực"}
+                  <SelectItem value="A">
+                    {t("common.zone")} A
                   </SelectItem>
-                  <SelectItem value="A구역">A구역</SelectItem>
-                  <SelectItem value="B구역">B구역</SelectItem>
-                  <SelectItem value="C구역">C구역</SelectItem>
-                  <SelectItem value="D구역">D구역</SelectItem>
-                  <SelectItem value="E구역">E구역</SelectItem>
-                  <SelectItem value="F구역">F구역</SelectItem>
-                  <SelectItem value="VIP구역">VIP구역</SelectItem>
-                  <SelectItem value="테라스구역">테라스구역</SelectItem>
+                  <SelectItem value="B">
+                    {t("common.zone")} B
+                  </SelectItem>
+                  <SelectItem value="C">
+                    {t("common.zone")} C
+                  </SelectItem>
+                  <SelectItem value="D">
+                    {t("common.zone")} D
+                  </SelectItem>
+                  <SelectItem value="E">
+                    {t("common.zone")} E
+                  </SelectItem>
+                  <SelectItem value="F">
+                    {t("common.zone")} F
+                  </SelectItem>
+                  <SelectItem value="Vip">
+                    {t("common.zone")} VIP
+                  </SelectItem>
+                  <SelectItem value="All">
+                    {t("common.all")}
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -3868,7 +3908,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                     className="flex items-center gap-2"
                   >
                     <Link className="w-4 h-4" />
-                    URL 입력
+                    {t("settings.imageInputUrl")}
                   </Button>
                   <Button
                     type="button"
@@ -3888,7 +3928,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                     className="flex items-center gap-2"
                   >
                     <FileImage className="w-4 h-4" />
-                    파일 업로드
+                    {t("settings.imageInputFile")}
                   </Button>
                 </div>
 
@@ -3926,11 +3966,11 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                               <Upload className="w-8 h-8 mb-2 text-gray-400" />
                               <p className="mb-2 text-sm text-gray-500">
                                 <span className="font-semibold">
-                                  이미지 파일을 선택하거나
+                                  {t("settings.selectImageFile")}
                                 </span>
                               </p>
                               <p className="text-xs text-gray-500">
-                                드래그엤드롭으로 업로드
+                                {t("settings.dragDropUpload")}
                               </p>
                             </>
                           )}
@@ -4813,12 +4853,14 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       </Dialog>
 
       {/* Printer Configuration Modal */}
-      {showPrinterConfig && (
-        <PrinterConfigModal
-          isOpen={showPrinterConfig}
-          onClose={() => setShowPrinterConfig(false)}
-        />
-      )}
-    </div>
+        {showPrinterConfig && (
+          <PrinterConfigModal
+            isOpen={showPrinterConfig}
+            onClose={() => setShowPrinterConfig(false)}
+          />
+        )}
+        </div>
+      </div>
+    </>
   );
 }

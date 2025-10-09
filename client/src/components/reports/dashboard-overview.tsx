@@ -184,8 +184,7 @@ export function DashboardOverview() {
               total: completedOrders[0].total,
               subtotal: completedOrders[0].subtotal,
               status: completedOrders[0].status,
-              date:
-                completedOrders[0].orderedAt || completedOrders[0].createdAt,
+              createdAt: completedOrders[0].createdAt,
             }
           : null,
       });
@@ -266,6 +265,7 @@ export function DashboardOverview() {
       const hourlyOrders: { [key: number]: number } = {};
 
       completedOrders.forEach((order: any) => {
+        // Use orderedAt if available, otherwise fall back to createdAt
         const orderDate = new Date(order.orderedAt || order.createdAt);
         if (!isNaN(orderDate.getTime())) {
           const hour = orderDate.getHours();

@@ -368,6 +368,24 @@ export function PrinterConfigModal({
                   </Select>
                 </div>
 
+                {formData.connectionType === "usb" && (
+                  <div>
+                    <Label htmlFor="productId">Product ID (USB)</Label>
+                    <Input
+                      id="productId"
+                      type="text"
+                      value={formData.macAddress}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          macAddress: e.target.value,
+                        })
+                      }
+                      placeholder="VD: 1234 hoặc USB-PRINTER-001"
+                    />
+                  </div>
+                )}
+
                 {formData.connectionType === "network" && (
                   <>
                     <div>
@@ -575,6 +593,13 @@ export function PrinterConfigModal({
                               </div>
                               <div className="text-sm text-gray-500">
                                 {config.printerType} - {config.connectionType}
+                                {config.connectionType === "usb" &&
+                                  config.macAddress && (
+                                    <span>
+                                      {" "}
+                                      (Product ID: {config.macAddress})
+                                    </span>
+                                  )}
                                 {config.connectionType === "network" &&
                                   config.ipAddress && (
                                     <span>

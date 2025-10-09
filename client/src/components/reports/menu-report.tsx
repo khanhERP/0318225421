@@ -123,7 +123,7 @@ function MenuReport() {
     retry: 2,
   });
 
-  // Query products
+  // Query products - filter by search term
   const { data: products = [] } = useQuery({
     queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products", selectedCategory, productType, productSearch],
     queryFn: async () => {
@@ -144,6 +144,7 @@ function MenuReport() {
       }
     },
     retry: 2,
+    enabled: true, // Always enabled to reload when productSearch changes
   });
 
   // Query menu analysis data
@@ -153,13 +154,14 @@ function MenuReport() {
     error: analysisError,
     refetch,
   } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/menu-analysis", startDate, endDate, selectedCategory],
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/menu-analysis", startDate, endDate, selectedCategory, productSearch],
     queryFn: async () => {
       try {
         const params = new URLSearchParams({
           startDate,
           endDate,
           ...(selectedCategory !== "all" && { categoryId: selectedCategory }),
+          ...(productSearch && productSearch.trim() !== "" && { search: productSearch.trim() }),
         });
 
         const response = await apiRequest(
@@ -747,23 +749,6 @@ function MenuReport() {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>{t("reports.menuAnalysis") || "Phân tích theo menu"}</span>
-            <Button
-              onClick={() => {
-                refetch();
-                queryClient.invalidateQueries({
-                  queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/menu-analysis"],
-                });
-              }}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-              disabled={analysisLoading}
-            >
-              <RefreshCw
-                className={`w-4 h-4 ${analysisLoading ? "animate-spin" : ""}`}
-              />
-              {t("common.refresh") || "Tải lại"}
-            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -796,7 +781,7 @@ function MenuReport() {
                         {t("reports.quantitySold") || "Số lượng bán"}
                       </th>
                       <th className="text-right py-2 px-4">
-                        {t("reports.revenue") || "Tổng doanh thu"}
+                        {t("reports.totalRevenue")}
                       </th>
                       <th className="text-right py-2 px-4">
                         {t("reports.averagePrice") || "Giá trung bình"}

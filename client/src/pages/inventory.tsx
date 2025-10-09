@@ -675,7 +675,9 @@ export default function InventoryPage({ onLogout }: InventoryPageProps) {
                                     ? t("tables.materialType")
                                     : product.productType === 3
                                       ? t("tables.finishedProductType")
-                                      : t("tables.goodsType")}
+                                      : product.productType === 4
+                                        ? t("tables.expensesType")
+                                        : t("tables.goodsType")}
                               </Badge>
                             </td>
                             <td className="py-4 px-2">
@@ -853,6 +855,9 @@ export default function InventoryPage({ onLogout }: InventoryPageProps) {
                               </SelectItem>
                               <SelectItem value="3">
                                 {t("tables.finishedProductType")}
+                              </SelectItem>
+                              <SelectItem value="4">
+                                {t("tables.expensesType")}
                               </SelectItem>
                             </SelectContent>
                           </Select>

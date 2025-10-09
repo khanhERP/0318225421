@@ -56,6 +56,7 @@ interface Invoice {
   invoiceStatus: number;
   notes: string;
   createdAt: string;
+  updatedAt?: string; // Added updatedAt field
   type?: "invoice" | "order"; // Added to differentiate
   displayNumber?: string;
   displayStatus?: number;
@@ -225,6 +226,8 @@ export default function SalesOrders() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [orderNumberSearch, setOrderNumberSearch] = useState(orderParam || "");
   const [customerCodeSearch, setCustomerCodeSearch] = useState("");
+  const [orderStatusFilter, setOrderStatusFilter] = useState("all");
+  const [einvoiceStatusFilter, setEinvoiceStatusFilter] = useState("all");
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null); // Renamed to selectedItem for clarity
   const [isEditing, setIsEditing] = useState(false);
   const [editableInvoice, setEditableInvoice] = useState<Invoice | null>(null); // Renamed to editableItem
@@ -240,6 +243,20 @@ export default function SalesOrders() {
   const [printReceiptData, setPrintReceiptData] = useState<any>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Handle column sort
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      // Toggle sort order if same field
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New field, default to ascending
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  };
 
   // Fetch store settings
   useEffect(() => {
@@ -329,6 +346,39 @@ export default function SalesOrders() {
     },
     staleTime: 300000, // Cache for 5 minutes
   });
+
+  // Query tables to map tableId to table number
+  const { data: tables = [] } = useQuery({
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"],
+    queryFn: async () => {
+      try {
+        const response = await apiRequest("GET", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error("Error fetching tables:", error);
+        return [];
+      }
+    },
+    staleTime: 300000, // Cache for 5 minutes
+  });
+
+  const getTableNumber = (tableId: number): string => {
+    const table = tables.find((t: any) => t.id === tableId);
+    // Use table.name if available, fallback to table.number or table.tableNumber
+    const tableName = table?.name || table?.number || table?.tableNumber || tableId;
+
+    // Check if tableName already starts with "Bàn" or "Ban" to avoid duplication
+    const tableNameStr = String(tableName);
+    if (tableNameStr.toLowerCase().startsWith('bàn') || tableNameStr.toLowerCase().startsWith('ban')) {
+      return tableNameStr;
+    }
+
+    return `Bàn ${tableName}`;
+  };
 
   const isLoading = ordersLoading; // Only orders loading is relevant now
   const hasError = ordersError; // Only orders error is relevant now
@@ -798,7 +848,8 @@ export default function SalesOrders() {
         total: order.total || "0",
         paymentMethod: order.paymentMethod || "cash",
         notes: order.notes || "",
-        createdAt: order.orderedAt, // Use orderedAt as createdAt
+        createdAt: order.orderedAt || order.createdAt, // Use orderedAt as primary, fallback to createdAt
+        updatedAt: order.updatedAt, // Keep updatedAt for cancellation/completion time
         discount: order.discount || "0", // Map discount field
         priceIncludeTax: order.priceIncludeTax || false, // Map priceIncludeTax field
       }))
@@ -829,14 +880,115 @@ export default function SalesOrders() {
                   .toLowerCase()
                   .includes(customerCodeSearch.toLowerCase()));
 
-            return customerMatch && orderMatch && customerCodeMatch;
+            // Order status filter
+            const orderStatusMatch =
+              orderStatusFilter === "all" ||
+              (orderStatusFilter === "paid" && (item.status === "paid" || item.displayStatus === 1)) ||
+              (orderStatusFilter === "pending" && (item.status === "pending" || item.displayStatus === 2)) ||
+              (orderStatusFilter === "cancelled" && (item.status === "cancelled" || item.displayStatus === 3));
+
+            // E-invoice status filter
+            const einvoiceStatusMatch =
+              einvoiceStatusFilter === "all" ||
+              (einvoiceStatusFilter === "0" && item.einvoiceStatus === 0) ||
+              (einvoiceStatusFilter === "1" && item.einvoiceStatus === 1) ||
+              (einvoiceStatusFilter === "2" && item.einvoiceStatus === 2) ||
+              (einvoiceStatusFilter === "3" && item.einvoiceStatus === 3) ||
+              (einvoiceStatusFilter === "10" && item.einvoiceStatus === 10);
+
+            return customerMatch && orderMatch && customerCodeMatch && orderStatusMatch && einvoiceStatusMatch;
           } catch (error) {
             console.error("Error filtering item:", item, error);
             return false;
           }
         })
         .sort((a: any, b: any) => {
-          // Sắp xếp theo ngày tạo mới nhất lên  ầu tiên
+          // Apply custom sorting if a field is selected
+          if (sortField) {
+            let aValue: any;
+            let bValue: any;
+
+            switch (sortField) {
+              case 'orderNumber':
+                aValue = a.displayNumber || '';
+                bValue = b.displayNumber || '';
+                break;
+              case 'createdAt':
+                aValue = new Date(a.createdAt || 0).getTime();
+                bValue = new Date(b.createdAt || 0).getTime();
+                break;
+              case 'updatedAt':
+                aValue = new Date(a.updatedAt || 0).getTime();
+                bValue = new Date(b.updatedAt || 0).getTime();
+                break;
+              case 'salesChannel':
+                aValue = a.salesChannel || '';
+                bValue = b.salesChannel || '';
+                break;
+              case 'customerCode':
+                aValue = a.customerCode || a.customerTaxCode || '';
+                bValue = b.customerCode || b.customerTaxCode || '';
+                break;
+              case 'customerName':
+                aValue = a.customerName || '';
+                bValue = b.customerName || '';
+                break;
+              case 'subtotal':
+                aValue = parseFloat(a.subtotal || '0');
+                bValue = parseFloat(b.subtotal || '0');
+                break;
+              case 'discount':
+                aValue = parseFloat(a.discount || '0');
+                bValue = parseFloat(b.discount || '0');
+                break;
+              case 'tax':
+                aValue = parseFloat(a.tax || '0');
+                bValue = parseFloat(b.tax || '0');
+                break;
+              case 'total':
+                aValue = parseFloat(a.total || '0');
+                bValue = parseFloat(b.total || '0');
+                break;
+              case 'employeeCode':
+                aValue = a.employeeId || 0;
+                bValue = b.employeeId || 0;
+                break;
+              case 'employeeName':
+                aValue = 'Phạm Vân Duy';
+                bValue = 'Phạm Vân Duy';
+                break;
+              case 'symbol':
+                aValue = a.symbol || a.templateNumber || '';
+                bValue = b.symbol || b.templateNumber || '';
+                break;
+              case 'invoiceNumber':
+                aValue = a.invoiceNumber || '';
+                bValue = b.invoiceNumber || '';
+                break;
+              case 'notes':
+                aValue = a.notes || '';
+                bValue = b.notes || '';
+                break;
+              case 'status':
+                aValue = a.displayStatus || 0;
+                bValue = b.displayStatus || 0;
+                break;
+              default:
+                aValue = '';
+                bValue = '';
+            }
+
+            // Compare values
+            if (typeof aValue === 'string' && typeof bValue === 'string') {
+              const comparison = aValue.localeCompare(bValue, 'vi');
+              return sortOrder === 'asc' ? comparison : -comparison;
+            } else {
+              const comparison = aValue - bValue;
+              return sortOrder === 'asc' ? comparison : -comparison;
+            }
+          }
+
+          // Default sort by date (newest first)
           const dateA = new Date(
             a.orderedAt || a.createdAt || a.date || a.invoiceDate,
           );
@@ -844,12 +996,10 @@ export default function SalesOrders() {
             b.orderedAt || b.createdAt || b.date || b.invoiceDate,
           );
 
-          // Kiểm tra tính hợp lệ của ngày
           if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
           if (isNaN(dateA.getTime())) return 1;
           if (isNaN(dateB.getTime())) return -1;
 
-          // Sắp xếp giảm dần (mới nhất lên đầu)
           return dateB.getTime() - dateA.getTime();
         })
     : [];
@@ -914,11 +1064,24 @@ export default function SalesOrders() {
   const formatDate = (dateStr: string | undefined | null): string => {
     if (!dateStr) return "";
     try {
-      return new Date(dateStr).toLocaleDateString("vi-VN", {
-        day: "2-digit",
-        month: "2-digit",
+      // Parse as UTC date and convert to Vietnam timezone (UTC+7)
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return "";
+      
+      // Convert to Vietnam timezone using toLocaleString
+      const vietnamTime = date.toLocaleString("vi-VN", {
+        timeZone: "Asia/Ho_Chi_Minh",
         year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
       });
+      
+      // Format: dd/MM/yyyy HH:mm:ss
+      return vietnamTime.replace(/(\d{2})\/(\d{2})\/(\d{4}),?\s*(\d{2}):(\d{2}):(\d{2})/, "$1/$2/$3 $4:$5:$6");
     } catch (error) {
       console.error("Error formatting date:", dateStr, error);
       return "";
@@ -1069,10 +1232,9 @@ export default function SalesOrders() {
         `DB${new Date().getFullYear()}${String(item.id).padStart(6, "0")}`;
       const orderDate = formatDate(item.date);
       const table =
-        item.type === "order" && item.tableId ? `Bàn ${item.tableId}` : "";
-      const customerCode =
-        item.customerTaxCode || `KH000${String(index + 1).padStart(3, "0")}`;
-      const customerName = item.customerName || "Khách lẻ";
+        item.type === "order" && item.tableId ? getTableNumber(item.tableId) : "";
+      const customerCode = item.customerTaxCode;
+      const customerName = item.customerName || "";
       const subtotal = parseFloat(item.subtotal || "0");
       const discount = parseFloat(item.discount || "0");
       const tax = parseFloat(item.tax || "0");
@@ -1306,7 +1468,7 @@ export default function SalesOrders() {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     {t("orders.orderNumber")}
@@ -1317,6 +1479,35 @@ export default function SalesOrders() {
                     onChange={(e) => setOrderNumberSearch(e.target.value)}
                     className="w-full"
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Trạng thái đơn hàng
+                  </label>
+                  <select
+                    value={orderStatusFilter}
+                    onChange={(e) => setOrderStatusFilter(e.target.value)}
+                    className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="all">Tất cả</option>
+                    <option value="paid">Đã thanh toán</option>
+                    <option value="pending">Chờ xử lý</option>
+                    <option value="cancelled">Đã hủy</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    Trạng thái hóa đơn điện tử
+                  </label>
+                  <select
+                    value={einvoiceStatusFilter}
+                    onChange={(e) => setEinvoiceStatusFilter(e.target.value)}
+                    className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="all">Tất cả</option>
+                    <option value="0">Chưa phát hành</option>
+                    <option value="1">Đã phát hành</option>
+                  </select>
                 </div>
               </div>
             </CardContent>
@@ -1390,79 +1581,212 @@ export default function SalesOrders() {
                                 onCheckedChange={handleSelectAll}
                               />
                             </th>
-                            <th className="w-[120px] px-3 py-3 text-left font-medium text-sm text-gray-600">
-                              <div className="leading-tight">
+                            <th 
+                              className="w-[120px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('orderNumber')}
+                            >
+                              <div className="leading-tight flex items-center gap-1">
                                 {t("orders.orderCode")}
+                                {sortField === 'orderNumber' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
                               </div>
                             </th>
-                            <th className="w-[100px] px-3 py-3 text-left font-medium text-sm text-gray-600">
-                              <div className="leading-tight">
-                                {t("orders.orderDate")}
+                            <th 
+                              className="w-[180px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('createdAt')}
+                            >
+                              <div className="leading-tight flex items-center gap-1">
+                                Ngày tạo đơn
+                                {sortField === 'createdAt' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
                               </div>
                             </th>
-                            <th className="w-[80px] px-3 py-3 text-left font-medium text-sm text-gray-600">
-                              <div className="leading-tight">
+                            <th 
+                              className="w-[180px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('updatedAt')}
+                            >
+                              <div className="leading-tight flex items-center gap-1">
+                                Ngày hủy đơn/hoàn thành
+                                {sortField === 'updatedAt' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
+                              </div>
+                            </th>
+                            <th 
+                              className="w-[80px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('salesChannel')}
+                            >
+                              <div className="leading-tight flex items-center gap-1">
                                 {t("orders.orderSource")}
+                                {sortField === 'salesChannel' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
                               </div>
                             </th>
-                            <th className="w-[120px] px-3 py-3 text-left font-medium text-sm text-gray-600">
-                              <div className="leading-tight">
+                            <th 
+                              className="w-[120px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('customerCode')}
+                            >
+                              <div className="leading-tight flex items-center gap-1">
                                 {t("orders.customerCode")}
+                                {sortField === 'customerCode' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
                               </div>
                             </th>
-                            <th className="w-[150px] px-3 py-3 text-left font-medium text-sm text-gray-600">
-                              <div className="leading-tight">
+                            <th 
+                              className="w-[150px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('customerName')}
+                            >
+                              <div className="leading-tight flex items-center gap-1">
                                 {t("orders.customerName")}
+                                {sortField === 'customerName' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
                               </div>
                             </th>
-                            <th className="w-[100px] px-3 py-3 text-right font-medium text-sm text-gray-600">
-                              <div className="leading-tight">
+                            <th 
+                              className="w-[100px] px-3 py-3 text-right font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('subtotal')}
+                            >
+                              <div className="leading-tight flex items-center justify-end gap-1">
                                 {t("common.subtotalAmount")}
+                                {sortField === 'subtotal' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
                               </div>
                             </th>
-                            <th className="w-[80px] px-3 py-3 text-right font-medium text-sm text-gray-600">
-                              <div className="leading-tight">
+                            <th 
+                              className="w-[80px] px-3 py-3 text-right font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('discount')}
+                            >
+                              <div className="leading-tight flex items-center justify-end gap-1">
                                 {t("common.discount")}
+                                {sortField === 'discount' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
                               </div>
                             </th>
-                            <th className="w-[90px] px-3 py-3 text-right font-medium text-sm text-gray-600">
-                              <div className="leading-tight">
+                            <th 
+                              className="w-[90px] px-3 py-3 text-right font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('tax')}
+                            >
+                              <div className="leading-tight flex items-center justify-end gap-1">
                                 {t("common.tax")}
+                                {sortField === 'tax' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
                               </div>
                             </th>
-                            <th className="w-[110px] px-3 py-3 text-right font-medium text-sm text-gray-600">
-                              <div className="leading-tight">
+                            <th 
+                              className="w-[110px] px-3 py-3 text-right font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('total')}
+                            >
+                              <div className="leading-tight flex items-center justify-end gap-1">
                                 {t("common.paid")}
+                                {sortField === 'total' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
                               </div>
                             </th>
-                            <th className="w-[110px] px-3 py-3 text-left font-medium text-sm text-gray-600">
-                              <div className="leading-tight">
+                            <th 
+                              className="w-[110px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('employeeCode')}
+                            >
+                              <div className="leading-tight flex items-center gap-1">
                                 {t("common.employeeCode")}
+                                {sortField === 'employeeCode' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
                               </div>
                             </th>
-                            <th className="w-[120px] px-3 py-3 text-left font-medium text-sm text-gray-600">
-                              <div className="leading-tight">
+                            <th 
+                              className="w-[120px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('employeeName')}
+                            >
+                              <div className="leading-tight flex items-center gap-1">
                                 {t("common.employeeName")}
+                                {sortField === 'employeeName' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
                               </div>
                             </th>
-                            <th className="w-[120px] px-3 py-3 text-left font-medium text-sm text-gray-600">
-                              <div className="leading-tight">
+                            <th 
+                              className="w-[120px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('symbol')}
+                            >
+                              <div className="leading-tight flex items-center gap-1">
                                 {t("common.invoiceSymbol")}
+                                {sortField === 'symbol' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
                               </div>
                             </th>
-                            <th className="w-[110px] px-3 py-3 text-left font-medium text-sm text-gray-600">
-                              <div className="leading-tight">
+                            <th 
+                              className="w-[110px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('invoiceNumber')}
+                            >
+                              <div className="leading-tight flex items-center gap-1">
                                 {t("common.invoiceNumber")}
+                                {sortField === 'invoiceNumber' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
                               </div>
                             </th>
-                            <th className="w-[200px] px-3 py-3 text-left font-medium text-sm text-gray-600">
-                              <div className="leading-tight">
+                            <th 
+                              className="w-[200px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('notes')}
+                            >
+                              <div className="leading-tight flex items-center gap-1">
                                 {t("common.notes")}
+                                {sortField === 'notes' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
                               </div>
                             </th>
-                            <th className="w-[100px] px-3 py-3 text-center font-medium text-sm text-gray-600">
-                              <div className="leading-tight">
+                            <th 
+                              className="w-[100px] px-3 py-3 text-center font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                              onClick={() => handleSort('status')}
+                            >
+                              <div className="leading-tight flex items-center justify-center gap-1">
                                 {t("common.status")}
+                                {sortField === 'status' && (
+                                  <span className="text-blue-600">
+                                    {sortOrder === 'asc' ? '↑' : '↓'}
+                                  </span>
+                                )}
                               </div>
                             </th>
                           </tr>
@@ -1471,7 +1795,7 @@ export default function SalesOrders() {
                           {filteredInvoices.length === 0 ? (
                             <tr>
                               <td
-                                colSpan={16}
+                                colSpan={17}
                                 className="p-8 text-center text-sm text-gray-500"
                               >
                                 <div className="flex flex-col items-center gap-2">
@@ -1555,7 +1879,28 @@ export default function SalesOrders() {
                                     </td>
                                     <td className="px-3 py-3">
                                       <div className="text-sm truncate">
-                                        {formatDate(item.date)}
+                                        {formatDate(item.createdAt)}
+                                      </div>
+                                    </td>
+                                    <td className="px-3 py-3">
+                                      <div className="text-sm truncate">
+                                        {(() => {
+                                          // Show completion/cancellation date based on status
+                                          if (
+                                            item.displayStatus === 1 ||
+                                            item.status === "paid"
+                                          ) {
+                                            // Completed - show updatedAt
+                                            return formatDate(item.updatedAt);
+                                          } else if (
+                                            item.displayStatus === 3 ||
+                                            item.status === "cancelled"
+                                          ) {
+                                            // Cancelled - show updatedAt
+                                            return formatDate(item.updatedAt);
+                                          }
+                                          return "-";
+                                        })()}
                                       </div>
                                     </td>
                                     <td className="px-3 py-3">
@@ -1563,7 +1908,7 @@ export default function SalesOrders() {
                                         {(() => {
                                           if (item.salesChannel === "table") {
                                             return item.tableId
-                                              ? `Bàn ${item.tableId}`
+                                              ? getTableNumber(item.tableId)
                                               : "Bàn";
                                           } else if (
                                             item.salesChannel === "pos"
@@ -1661,7 +2006,7 @@ export default function SalesOrders() {
                                     selectedInvoice.id === item.id &&
                                     selectedInvoice.type === item.type && (
                                       <tr>
-                                        <td colSpan={16} className="p-0">
+                                        <td colSpan={17} className="p-0">
                                           <div className="p-4 border-l-4 border-blue-500 bg-gray-50">
                                             <Card className="shadow-lg">
                                               <CardHeader className="pb-3">
@@ -1709,13 +2054,13 @@ export default function SalesOrders() {
                                                               <Input
                                                                 type="date"
                                                                 value={
-                                                                  editableInvoice.orderedAt?.split(
+                                                                  editableInvoice.createdAt?.split(
                                                                     "T",
                                                                   )[0] || ""
                                                                 }
                                                                 onChange={(e) =>
                                                                   updateEditableInvoiceField(
-                                                                    "orderedAt",
+                                                                    "createdAt",
                                                                     e.target
                                                                       .value,
                                                                   )
@@ -1724,7 +2069,7 @@ export default function SalesOrders() {
                                                               />
                                                             ) : (
                                                               formatDate(
-                                                                selectedInvoice.orderedAt,
+                                                                selectedInvoice.createdAt,
                                                               )
                                                             )}
                                                           </td>
@@ -1779,13 +2124,16 @@ export default function SalesOrders() {
                                                             )}
                                                           </td>
                                                           <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                            Phương thức thanh
-                                                            toán:
+                                                            Bàn:
                                                           </td>
                                                           <td className="py-1 pr-6">
-                                                            {getPaymentMethodName(
-                                                              selectedInvoice.paymentMethod,
-                                                            )}
+                                                            {selectedInvoice.salesChannel ===
+                                                              "table" &&
+                                                            selectedInvoice.tableId
+                                                              ? getTableNumber(
+                                                                  selectedInvoice.tableId,
+                                                                )
+                                                              : "-"}
                                                           </td>
                                                           <td className="py-1 pr-4 font-medium whitespace-nowrap">
                                                             Trạng thái:
@@ -1794,9 +2142,9 @@ export default function SalesOrders() {
                                                             {(() => {
                                                               const statusLabels =
                                                                 {
-                                                                  1: "Hoàn thành",
-                                                                  2: "Đang phục vụ",
-                                                                  3: "Đã hủy",
+                                                                  1: `${t("common.completed")}`,
+                                                                  2: `${(t("common.serving"))}`,
+                                                                  3: `${t("common.cancelled")}`,
                                                                 };
                                                               return (
                                                                 statusLabels[
@@ -1844,16 +2192,6 @@ export default function SalesOrders() {
                                                                 return "Giao hàng";
                                                               return "Ăn tại chỗ";
                                                             })()}
-                                                          </td>
-                                                          <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                            Bàn:
-                                                          </td>
-                                                          <td className="py-1 pr-6">
-                                                            {selectedInvoice.salesChannel ===
-                                                              "table" &&
-                                                            selectedInvoice.tableId
-                                                              ? `Bàn ${selectedInvoice.tableId}`
-                                                              : "-"}
                                                           </td>
                                                           <td className="py-1 pr-4 font-medium whitespace-nowrap">
                                                             Ký hiệu hóa đơn:
@@ -1909,7 +2247,9 @@ export default function SalesOrders() {
                                                             )}
                                                           </td>
                                                           <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                            Trạng thái HĐ:
+                                                            {t(
+                                                              "common.invoiceStatusLabel",
+                                                            )}
                                                           </td>
                                                           <td className="py-1">
                                                             {(() => {
@@ -1917,15 +2257,6 @@ export default function SalesOrders() {
                                                                 {
                                                                   0: "Chưa phát hành",
                                                                   1: "Đã phát hành",
-                                                                  2: "Tạo nháp",
-                                                                  3: "Đã duyệt",
-                                                                  4: "Đã bị thay thế (hủy)",
-                                                                  5: "Thay thế tạm",
-                                                                  6: "Thay thế",
-                                                                  7: "Đã bị điều chỉnh",
-                                                                  8: "Điều chỉnh tạm",
-                                                                  9: "Điều chỉnh",
-                                                                  10: "Đã hủy",
                                                                 };
                                                               return (
                                                                 statusLabels[
@@ -2009,13 +2340,7 @@ export default function SalesOrders() {
                                                               {index + 1}
                                                             </div>
                                                             <div className="col-span-2 text-left py-1">
-                                                              SP
-                                                              {String(
-                                                                item.productId,
-                                                              ).padStart(
-                                                                3,
-                                                                "0",
-                                                              )}
+                                                              {item.sku || item.productSku || `SP${String(item.productId).padStart(3, "0")}`}
                                                             </div>
                                                             <div
                                                               className="col-span-2 text-left py-1 truncate"
@@ -2048,115 +2373,14 @@ export default function SalesOrders() {
                                                                     item.quantity ||
                                                                       "0",
                                                                   );
-                                                                const product =
-                                                                  products?.find(
-                                                                    (p: any) =>
-                                                                      p.id ===
-                                                                      item.productId,
-                                                                  );
-                                                                const priceIncludeTax =
-                                                                  selectedInvoice.priceIncludeTax ||
-                                                                  false;
 
                                                                 // Calculate subtotal, tax, and discount for this item
                                                                 const itemSubtotal =
                                                                   unitPrice *
                                                                   quantity;
 
-                                                                // Calculate tax for this item
-                                                                let itemTax = 0;
-                                                                if (
-                                                                  product?.taxRate &&
-                                                                  parseFloat(
-                                                                    product.taxRate,
-                                                                  ) > 0
-                                                                ) {
-                                                                  const taxRate =
-                                                                    parseFloat(
-                                                                      product.taxRate,
-                                                                    ) / 100;
-                                                                  if (
-                                                                    priceIncludeTax
-                                                                  ) {
-                                                                    // When price includes tax: tax = subtotal - (subtotal / (1 + taxRate))
-                                                                    itemTax =
-                                                                      itemSubtotal -
-                                                                      itemSubtotal /
-                                                                        (1 +
-                                                                          taxRate);
-                                                                  } else {
-                                                                    // When price doesn't include tax: tax = subtotal * taxRate
-                                                                    itemTax =
-                                                                      itemSubtotal *
-                                                                      taxRate;
-                                                                  }
-                                                                }
-
-                                                                // Calculate discount for this item (proportional to its subtotal)
-                                                                const orderDiscount =
-                                                                  parseFloat(
-                                                                    selectedInvoice.discount ||
-                                                                      "0",
-                                                                  );
-                                                                let itemDiscount = 0;
-                                                                if (
-                                                                  orderDiscount >
-                                                                  0
-                                                                ) {
-                                                                  // Get total subtotal of all items to calculate proportional discount
-                                                                  const totalOrderSubtotal =
-                                                                    orderItems.reduce(
-                                                                      (
-                                                                        sum,
-                                                                        orderItem,
-                                                                      ) => {
-                                                                        const orderItemPrice =
-                                                                          parseFloat(
-                                                                            orderItem.unitPrice ||
-                                                                              "0",
-                                                                          );
-                                                                        const orderItemQty =
-                                                                          parseInt(
-                                                                            orderItem.quantity ||
-                                                                              "0",
-                                                                          );
-                                                                        return (
-                                                                          sum +
-                                                                          orderItemPrice *
-                                                                            orderItemQty
-                                                                        );
-                                                                      },
-                                                                      0,
-                                                                    );
-
-                                                                  if (
-                                                                    totalOrderSubtotal >
-                                                                    0
-                                                                  ) {
-                                                                    itemDiscount =
-                                                                      (orderDiscount *
-                                                                        itemSubtotal) /
-                                                                      totalOrderSubtotal;
-                                                                  }
-                                                                }
-
-                                                                // Apply formula: tổng tiền = priceIncludeTax ? subtotal - discount : subtotal - discount + tax
-                                                                let itemTotal;
-                                                                if (
-                                                                  priceIncludeTax
-                                                                ) {
-                                                                  itemTotal =
-                                                                    itemSubtotal -
-                                                                    itemDiscount;
-                                                                } else {
-                                                                  itemTotal =
-                                                                    itemSubtotal -
-                                                                    itemDiscount +
-                                                                    itemTax;
-                                                                }
-
                                                                 return formatCurrency(
-                                                                  itemTotal.toString(),
+                                                                  itemSubtotal.toString(),
                                                                 );
                                                               })()}
                                                             </div>
@@ -2178,13 +2402,13 @@ export default function SalesOrders() {
                                                                   item.quantity ||
                                                                     "0",
                                                                 );
-                                                              const discount =
+                                                              const itemDiscount =
                                                                 parseFloat(
                                                                   item.discount ||
                                                                     "0",
                                                                 );
                                                               const priceIncludesTax =
-                                                                storeSettings?.priceIncludesTax ||
+                                                                selectedInvoice?.priceIncludeTax ||
                                                                 false;
 
                                                               // Find the product to get taxRate
@@ -2202,49 +2426,7 @@ export default function SalesOrders() {
                                                                   : null;
 
                                                               let taxAmount = 0;
-                                                              let itemDiscountAmount = 0;
                                                               let totalSum = 0;
-
-                                                              // Calculate discount for this item first
-                                                              if (
-                                                                discount > 0
-                                                              ) {
-                                                                const totalBeforeDiscount =
-                                                                  orderItems.reduce(
-                                                                    (
-                                                                      sum,
-                                                                      orderItem,
-                                                                    ) => {
-                                                                      return (
-                                                                        sum +
-                                                                        parseFloat(
-                                                                          orderItem.unitPrice ||
-                                                                            "0",
-                                                                        ) *
-                                                                          parseInt(
-                                                                            orderItem.quantity ||
-                                                                              "0",
-                                                                          )
-                                                                      );
-                                                                    },
-                                                                    0,
-                                                                  );
-
-                                                                if (
-                                                                  totalBeforeDiscount >
-                                                                  0
-                                                                ) {
-                                                                  const itemTotal =
-                                                                    unitPrice *
-                                                                    quantity;
-                                                                  itemDiscountAmount =
-                                                                    Math.floor(
-                                                                      (discount *
-                                                                        itemTotal) /
-                                                                        totalBeforeDiscount,
-                                                                    );
-                                                                }
-                                                              }
 
                                                               if (
                                                                 product?.taxRate &&
@@ -2261,8 +2443,9 @@ export default function SalesOrders() {
                                                                   priceIncludesTax
                                                                 ) {
                                                                   // When price includes tax:
+                                                                  // giá bao gồm thuế = (price - (discount/quantity)) * quantity
                                                                   const discountPerUnit =
-                                                                    itemDiscountAmount /
+                                                                    itemDiscount /
                                                                     quantity;
                                                                   const adjustedPrice =
                                                                     Math.max(
@@ -2273,12 +2456,14 @@ export default function SalesOrders() {
                                                                   const giaGomThue =
                                                                     adjustedPrice *
                                                                     quantity;
+                                                                  // subtotal = giá bao gồm thuế / (1 + (taxRate / 100)) (làm tròn)
                                                                   const tamTinh =
                                                                     Math.round(
                                                                       giaGomThue /
                                                                         (1 +
                                                                           taxRate),
                                                                     );
+                                                                  // tax = giá bao gồm thuế - subtotal
                                                                   taxAmount =
                                                                     giaGomThue -
                                                                     tamTinh;
@@ -2286,8 +2471,9 @@ export default function SalesOrders() {
                                                                     giaGomThue;
                                                                 } else {
                                                                   // When price doesn't include tax:
+                                                                  // subtotal = (price - (discount/quantity)) * quantity
                                                                   const discountPerUnit =
-                                                                    itemDiscountAmount /
+                                                                    itemDiscount /
                                                                     quantity;
                                                                   const adjustedPrice =
                                                                     Math.max(
@@ -2298,14 +2484,14 @@ export default function SalesOrders() {
                                                                   const tamTinh =
                                                                     adjustedPrice *
                                                                     quantity;
+                                                                  // tax = subtotal * (taxRate / 100) (làm tròn)
                                                                   taxAmount =
                                                                     Math.round(
                                                                       tamTinh *
                                                                         taxRate,
                                                                     );
                                                                   totalSum =
-                                                                    tamTinh -
-                                                                    discountPerUnit +
+                                                                    tamTinh +
                                                                     taxAmount;
                                                                 }
                                                               }
@@ -2500,7 +2686,7 @@ export default function SalesOrders() {
                                                                 </span>
                                                                 <span className="font-bold">
                                                                   {formatCurrency(
-                                                                    paidAmount,
+                                                                    parseFloat(selectedInvoice.total || "0"),
                                                                   )}
                                                                 </span>
                                                               </div>
@@ -2555,23 +2741,66 @@ export default function SalesOrders() {
                                                                     : "0"}
                                                                 </span>
                                                               </div>
-                                                              <div className="flex justify-between border-t pt-2 mt-2">
-                                                                <span className="font-semibold">
-                                                                  Phương thức
-                                                                  thanh toán:
-                                                                </span>
-                                                                <span className="font-bold text-blue-600">
-                                                                  {getPaymentMethodName(
-                                                                    selectedInvoice.paymentMethod,
-                                                                  )}
-                                                                </span>
-                                                              </div>
-                                                            </>
+                                                              </>
                                                           );
                                                         })()}
                                                       </div>
                                                     </div>
                                                   </div>
+
+                                                  {/* Multi-payment details section */}
+                                                  {(() => {
+                                                    const paymentMethod = selectedInvoice.paymentMethod;
+                                                    try {
+                                                      if (paymentMethod && typeof paymentMethod === 'string') {
+                                                        const parsed = JSON.parse(paymentMethod);
+                                                        if (Array.isArray(parsed) && parsed.length > 0) {
+                                                          return (
+                                                            <div className="flex justify-end mt-4">
+                                                              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg border border-blue-200 inline-block max-w-sm">
+                                                                <h4 className="font-semibold text-blue-800 mb-2 text-sm">Thanh toán nhiều phương thức:</h4>
+                                                                <div className="space-y-1">
+                                                                  {parsed.map((pm: any, idx: number) => (
+                                                                    <div key={idx} className="flex items-center gap-3 text-sm">
+                                                                      <span className="text-blue-600">•</span>
+                                                                      <span className="font-medium">{getPaymentMethodName(pm.method)}:</span>
+                                                                      <span className="text-green-600 font-bold ml-auto">
+                                                                        {formatCurrency(pm.amount)} ₫
+                                                                      </span>
+                                                                    </div>
+                                                                  ))}
+                                                                  <div className="flex items-center gap-3 pt-2 mt-2 border-t-2 border-blue-300 text-sm">
+                                                                    <span className="font-bold text-blue-800">Tổng:</span>
+                                                                    <span className="text-blue-600 font-bold ml-auto">
+                                                                      {formatCurrency(parsed.reduce((sum: number, pm: any) => sum + pm.amount, 0))} ₫
+                                                                    </span>
+                                                                  </div>
+                                                                </div>
+                                                              </div>
+                                                            </div>
+                                                          );
+                                                        }
+                                                      }
+                                                    } catch (e) {
+                                                      // Not JSON, single payment
+                                                    }
+
+                                                    // Single payment method display
+                                                    return (
+                                                      <div className="flex justify-end mt-4">
+                                                        <div className="bg-blue-50 p-3 rounded-lg border border-blue-200 inline-block">
+                                                          <div className="flex items-center gap-3 text-sm">
+                                                            <span className="font-semibold text-gray-700">
+                                                              Phương thức thanh toán:
+                                                            </span>
+                                                            <span className="font-bold text-blue-600">
+                                                              {getPaymentMethodName(selectedInvoice.paymentMethod)}
+                                                            </span>
+                                                          </div>
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  })()}
                                                 </div>
 
                                                 <div>
@@ -2603,64 +2832,70 @@ export default function SalesOrders() {
                                                 </div>
 
                                                 <div className="flex gap-2 pt-4 border-t">
-                                                  <Button
-                                                    size="sm"
-                                                    className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white"
-                                                    onClick={() => {
-                                                      if (
-                                                        selectedInvoice &&
-                                                        selectedInvoice.status !==
-                                                          "cancelled"
-                                                      ) {
-                                                        setShowCancelDialog(
-                                                          true,
-                                                        );
+                                                  {selectedInvoice?.einvoiceStatus !== 1 && (
+                                                    <Button
+                                                      size="sm"
+                                                      className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white"
+                                                      onClick={() => {
+                                                        if (
+                                                          selectedInvoice &&
+                                                          selectedInvoice.status !==
+                                                            "cancelled"
+                                                        ) {
+                                                          setShowCancelDialog(
+                                                            true,
+                                                          );
+                                                        }
+                                                      }}
+                                                      disabled={
+                                                        selectedInvoice?.status ===
+                                                          "cancelled" ||
+                                                        cancelOrderMutation.isPending
                                                       }
-                                                    }}
-                                                    disabled={
-                                                      selectedInvoice?.status ===
-                                                        "cancelled" ||
-                                                      cancelOrderMutation.isPending
-                                                    }
-                                                  >
-                                                    <X className="w-4 h-4" />
-                                                    {cancelOrderMutation.isPending
-                                                      ? "Đang hủy..."
-                                                      : t("common.cancelOrder")}
-                                                  </Button>
+                                                    >
+                                                      <X className="w-4 h-4" />
+                                                      {cancelOrderMutation.isPending
+                                                        ? "Đang hủy..."
+                                                        : t("common.cancelOrder")}
+                                                    </Button>
+                                                  )}
                                                   {!isEditing ? (
                                                     <>
-                                                      <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="flex items-center gap-2 border-green-500 text-green-600 hover:bg-green-50"
-                                                        onClick={
-                                                          handleEditOrder
-                                                        }
-                                                      >
-                                                        <FileText className="w-4 h-4" />
-                                                        {t("common.editOrder")}
-                                                      </Button>
-                                                      <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="flex items-center gap-2 border-blue-500 text-blue-600 hover:bg-blue-50"
-                                                        onClick={() => {
-                                                          if (selectedInvoice) {
-                                                            setShowEInvoiceModal(
-                                                              true,
-                                                            );
+                                                      {selectedInvoice?.einvoiceStatus !== 1 && (
+                                                        <Button
+                                                          size="sm"
+                                                          variant="outline"
+                                                          className="flex items-center gap-2 border-green-500 text-green-600 hover:bg-green-50"
+                                                          onClick={
+                                                            handleEditOrder
                                                           }
-                                                        }}
-                                                      >
-                                                        <Mail className="w-4 h-4" />
-                                                        {selectedInvoice?.einvoiceStatus ===
-                                                        0
-                                                          ? t(
-                                                              "common.publishEInvoice",
-                                                            )
-                                                          : "Chỉnh sửa & Phát hành lại"}
-                                                      </Button>
+                                                        >
+                                                          <FileText className="w-4 h-4" />
+                                                          {t("common.editOrder")}
+                                                        </Button>
+                                                      )}
+                                                      {selectedInvoice?.einvoiceStatus !== 1 && (
+                                                        <Button
+                                                          size="sm"
+                                                          variant="outline"
+                                                          className="flex items-center gap-2 border-blue-500 text-blue-600 hover:bg-blue-50"
+                                                          onClick={() => {
+                                                            if (selectedInvoice) {
+                                                              setShowEInvoiceModal(
+                                                                true,
+                                                              );
+                                                            }
+                                                          }}
+                                                        >
+                                                          <Mail className="w-4 h-4" />
+                                                          {selectedInvoice?.einvoiceStatus ===
+                                                          0
+                                                            ? t(
+                                                                "common.publishEInvoice",
+                                                              )
+                                                            : "Chỉnh sửa & Phát hành lại"}
+                                                        </Button>
+                                                      )}
                                                       <Button
                                                         size="sm"
                                                         variant="outline"

@@ -19,6 +19,8 @@ export const purchasesTranslations = {
     purchaseType: "구매 형태",
     selectPurchaseType: "구매 형태를 선택하세요",
     duplicatePurchaseOrder: "구매 주문 복사",
+    viewPurchaseOrder: "구매 주문 보기",
+    viewOrderDescription: "구매 주문 상세 보기",
     onTime: "정시",
     rating: "평점",
 
@@ -193,8 +195,8 @@ export const purchasesTranslations = {
     poNumberPlaceholder: "PO 번호를 입력하세요",
     notesPlaceholder: "메모나 특별 지시사항을 입력하세요",
     orderSummary: "주문 요약",
-    selectProducts: "상품 선택",
-    selectProductsDescription: "주문할 상품을 선택하세요",
+    selectProducts: "품목 선택",
+    selectProductsDescription: "주문할 품목을 선택하세요",
     searchProducts: "상품 검색",
     noItemsSelected: "선택된 상품이 없습니다",
     clickAddItemToStart: "'상품 추가' 버튼을 클릭해서 시작하세요",
@@ -234,6 +236,11 @@ export const purchasesTranslations = {
     subtotalAmount: "소계",
     rowNumber: "STT",
     createNewPurchaseOrder: "새 구매 입고 생성",
+    productNameColumn: "제품명",
+    productCode: "제품 코드",
+    itemName: "품목명",
+    productCodeColumn: "상품 코드",
+    itemNameColumn: "품목명",
 
     // Filter labels
     fromDateLabel: "시작일",
@@ -246,6 +253,7 @@ export const purchasesTranslations = {
     assignedTo: "담당자",
     selectEmployee: "직원 선택",
     receiptNumber: "입고 번호",
+    receiptNumberLabel: "입고 번호",
 
     // Delete functionality
     deleteSelected: "선택 항목 삭제",
@@ -253,6 +261,15 @@ export const purchasesTranslations = {
     confirmDeleteMessage: "개의 구매 입고 전표를 삭제하시겠습니까?",
     deleteSuccess: "개의 구매 입고 전표가 성공적으로 삭제되었습니다",
     deleteFailed: "구매 입고 전표 삭제에 실패했습니다",
+
+    // File attachments for view page
+    attachedFilesCount: "첨부 파일",
+    noAttachedFiles: "첨부 파일 없음",
+    dragOrClickToUpload: "파일을 드래그하거나 클릭하여 업로드",
+    uploadingFiles: "파일 업로드 중...",
+    notesPlaceholder: "구매 주문 메모를 입력하세요",
+    selectProducts: "상품 선택",
+    searchProducts: "상품 이름 또는 SKU로 검색",
   },
 
   en: {
@@ -275,6 +292,8 @@ export const purchasesTranslations = {
     purchaseType: "Purchase Type",
     selectPurchaseType: "Select purchase type",
     duplicatePurchaseOrder: "Duplicate Purchase Order",
+    viewPurchaseOrder: "View Purchase Order",
+    viewOrderDescription: "View purchase order details", 
     onTime: "On Time",
     rating: "Rating",
 
@@ -449,8 +468,8 @@ export const purchasesTranslations = {
     poNumberPlaceholder: "Enter PO number",
     notesPlaceholder: "Enter notes or special instructions",
     orderSummary: "Order Summary",
-    selectProducts: "Select Products",
-    selectProductsDescription: "Choose products to order",
+    selectProducts: "Select Items",
+    selectProductsDescription: "Choose items to order",
     searchProducts: "Search products",
     noItemsSelected: "No items selected",
     clickAddItemToStart: "Click 'Add Item' button to start",
@@ -508,6 +527,11 @@ export const purchasesTranslations = {
     subtotalAmount: "Subtotal",
     rowNumber: "No",
     createNewPurchaseOrder: "Create Purchase Receipt",
+    productNameColumn: "Product Name",
+    productCode: "Product Code",
+    itemName: "Item Name",
+    productCodeColumn: "Product Code",
+    itemNameColumn: "Item Name",
 
     // Filter labels
     fromDateLabel: "From Date",
@@ -520,6 +544,7 @@ export const purchasesTranslations = {
     assignedTo: "Assigned To",
     selectEmployee: "Select Employee",
     receiptNumber: "Receipt Number",
+    receiptNumberLabel: "Receipt Number",
 
     // Delete functionality
     deleteSelected: "Delete Selected",
@@ -527,6 +552,15 @@ export const purchasesTranslations = {
     confirmDeleteMessage: "purchase receipts?",
     deleteSuccess: "purchase receipts deleted successfully",
     deleteFailed: "Failed to delete purchase receipts",
+
+    // File attachments for view page
+    attachedFilesCount: "Attached Files",
+    noAttachedFiles: "No attached files",
+    dragOrClickToUpload: "Drag files or click to upload",
+    uploadingFiles: "Uploading files...",
+    notesPlaceholder: "Enter notes for purchase order",
+    selectProducts: "Select Products",
+    searchProducts: "Search by product name or SKU",
   },
 
   vi: {
@@ -726,8 +760,8 @@ export const purchasesTranslations = {
     poNumberPlaceholder: "Nhập số PO",
     notesPlaceholder: "Nhập ghi chú hoặc hướng dẫn đặc biệt",
     orderSummary: "Tóm tắt phiếu nhập",
-    selectProducts: "Chọn sản phẩm",
-    selectProductsDescription: "Chọn sản phẩm để đặt hàng",
+    selectProducts: "Chọn mặt hàng",
+    selectProductsDescription: "Chọn mặt hàng để đặt hàng",
     searchProducts: "Tìm kiếm sản phẩm",
     noItemsSelected: "Không có mục nào được chọn",
     clickAddItemToStart: "Nhấp vào nút 'Thêm mục' để bắt đầu",
@@ -785,6 +819,11 @@ export const purchasesTranslations = {
     subtotalAmount: "Thành tiền",
     rowNumber: "STT",
     createNewPurchaseOrder: "Tạo phiếu nhập",
+    productNameColumn: "Tên sản phẩm",
+    productCode: "Mã hàng",
+    itemName: "Tên mặt hàng",
+    productCodeColumn: "Mã hàng",
+    itemNameColumn: "Tên mặt hàng",
 
     // Filter labels
     fromDateLabel: "Từ ngày",
@@ -797,6 +836,7 @@ export const purchasesTranslations = {
     assignedTo: "Người phụ trách",
     selectEmployee: "Chọn nhân viên",
     receiptNumber: "Số phiếu nhập",
+    receiptNumberLabel: "Số phiếu nhập",
 
     // Delete functionality
     deleteSelected: "Xóa phiếu nhập",
@@ -804,5 +844,14 @@ export const purchasesTranslations = {
     confirmDeleteMessage: "phiếu nhập hàng?",
     deleteSuccess: "phiếu nhập hàng đã được xóa thành công",
     deleteFailed: "Không thể xóa phiếu nhập hàng",
+
+    // File attachments for view page
+    attachedFilesCount: "Đính kèm tệp",
+    noAttachedFiles: "Không có tệp đính kèm",
+    dragOrClickToUpload: "Kéo thả hoặc nhấp để tải tệp",
+    uploadingFiles: "Đang tải lên...",
+    notesPlaceholder: "Nhập ghi chú cho phiếu nhập",
+    selectProducts: "Chọn sản phẩm",
+    searchProducts: "Tìm kiếm theo tên hoặc SKU",
   }
 };

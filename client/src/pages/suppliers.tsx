@@ -44,7 +44,7 @@ export default function SuppliersPage({ onLogout }: SuppliersPageProps) {
   const { data: supplierStats } = useQuery({
     queryKey: ['https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-orders/supplier-stats'],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/purchase-orders/supplier-stats');
+      const response = await apiRequest('GET', 'https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-orders/supplier-stats');
       return response.json();
     },
   });

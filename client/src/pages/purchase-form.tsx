@@ -134,6 +134,8 @@ export default function PurchaseFormPage({
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [productSearch, setProductSearch] = useState("");
   const [isNewProductDialogOpen, setIsNewProductDialogOpen] = useState(false);
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const [selectedProductIndex, setSelectedProductIndex] = useState(0);
   const [selectedItems, setSelectedItems] = useState<
     Array<{
       productId: number;
@@ -143,8 +145,14 @@ export default function PurchaseFormPage({
       receivedQuantity: number;
       unitPrice: number;
       total: number;
+      discountPercent?: number; // Added for clarity
+      discountAmount?: number; // Added for clarity
+      updatedFromAmount?: boolean; // Flag for UI update source
+      updatedFromPercent?: boolean; // Flag for UI update source
     }>
   >([]);
+  const [skuSuggestions, setSkuSuggestions] = useState<Record<number, any[]>>({});
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<Record<number, number>>({});
   const [attachedFiles, setAttachedFiles] = useState<
     Array<{
       id?: number;
@@ -351,10 +359,12 @@ export default function PurchaseFormPage({
         productId: 0,
         productName: "",
         sku: "",
-        quantity: 1,
+        quantity: 0,
         receivedQuantity: 0,
         unitPrice: 0,
         total: 0,
+        discountPercent: 0,
+        discountAmount: 0,
       };
       setSelectedItems([defaultEmptyRow]);
     }
@@ -400,6 +410,8 @@ export default function PurchaseFormPage({
             total:
               parseFloat(item.total || "0") ||
               parseFloat(item.unitPrice || "0") * (item.quantity || 0),
+            discountPercent: parseFloat(item.discountPercent || "0"),
+            discountAmount: parseFloat(item.discountAmount || "0"),
           })),
         );
       } else {
@@ -409,10 +421,12 @@ export default function PurchaseFormPage({
           productId: 0,
           productName: "",
           sku: "",
-          quantity: 1,
+          quantity: 0,
           receivedQuantity: 0,
           unitPrice: 0,
           total: 0,
+          discountPercent: 0,
+          discountAmount: 0,
         };
         setSelectedItems([defaultEmptyRow]);
       }
@@ -515,8 +529,52 @@ export default function PurchaseFormPage({
     createProductMutation.mutate(payload);
   };
 
+  // Handle product selection from keyboard
+  const handleProductSelect = (product: ProductSelectionItem) => {
+    addProduct(product);
+
+    // Auto-focus to product name field after selection
+    setTimeout(() => {
+      // Find the index of the item that was just updated
+      const targetIndex = selectedItemId !== null
+        ? selectedItems.findIndex(item => item.productId === selectedItemId)
+        : selectedItems.findIndex(item => item.productId === 0 || item.productId === product.id);
+
+      if (targetIndex >= 0) {
+        const productInput = document.querySelector(`[data-testid="input-product-${targetIndex}"]`) as HTMLInputElement;
+        if (productInput) {
+          productInput.focus();
+          productInput.select();
+        }
+      }
+    }, 150);
+  };
+
   // Add product to order
   const addProduct = (product: ProductSelectionItem) => {
+    // If replacing an existing item
+    if (selectedItemId !== null) {
+      const itemIndex = selectedItems.findIndex(
+        (item) => item.productId === selectedItemId,
+      );
+
+      if (itemIndex >= 0) {
+        const updatedItems = [...selectedItems];
+        updatedItems[itemIndex] = {
+          ...updatedItems[itemIndex],
+          productId: product.id,
+          productName: product.name,
+          sku: product.sku,
+          unitPrice: product.unitPrice || 0,
+          total: updatedItems[itemIndex].quantity * (product.unitPrice || 0),
+        };
+        setSelectedItems(updatedItems);
+        setSelectedItemId(null);
+        setIsProductDialogOpen(false);
+        return;
+      }
+    }
+
     const existingIndex = selectedItems.findIndex(
       (item) => item.productId === product.id,
     );
@@ -539,10 +597,12 @@ export default function PurchaseFormPage({
         productId: product.id,
         productName: product.name,
         sku: product.sku,
-        quantity: 1,
+        quantity: 0,
         receivedQuantity: 0,
         unitPrice: product.unitPrice || 0,
-        total: product.unitPrice || 0,
+        total: 0,
+        discountPercent: 0,
+        discountAmount: 0,
       };
 
       if (emptyRowIndex >= 0) {
@@ -555,6 +615,7 @@ export default function PurchaseFormPage({
         setSelectedItems([...selectedItems, newItem]);
       }
     }
+    setSelectedItemId(null);
     setIsProductDialogOpen(false);
   };
 
@@ -575,45 +636,64 @@ export default function PurchaseFormPage({
     if (field === "quantity" || field === "unitPrice") {
       const item = updatedItems[index];
       item.total = item.quantity * item.unitPrice;
+
+      // Khi quantity/price thay đổi: tính lại discountAmount từ %CK hiện tại
+      const subtotal = item.quantity * item.unitPrice;
+      const discountPercent = (item as any).discountPercent || 0;
+      (item as any).discountAmount = subtotal * (discountPercent / 100);
+      (item as any).updatedFromPercent = true;
+      (item as any).updatedFromAmount = false;
     }
     setSelectedItems(updatedItems);
   };
 
-  // Handle keyboard navigation
+  // Handle keyboard navigation with Arrow keys, Enter, and Tab
   const handleKeyDown = (
     e: React.KeyboardEvent,
     index: number,
     fieldType: string,
   ) => {
+    // Define field order for navigation - sku is first, then product name
+    const fieldOrder = [
+      "sku",
+      "product",
+      "quantity",
+      "unitPrice",
+      "subtotal",
+      "discountPercent",
+      "discountAmount",
+      "total",
+    ];
+    const currentFieldIndex = fieldOrder.indexOf(fieldType);
+
+    // Enter or Tab - move to next field
     if (e.key === "Enter" || e.key === "Tab") {
       e.preventDefault();
 
-      // Define field order for navigation
-      const fieldOrder = [
-        "product",
-        "quantity",
-        "unitPrice",
-        "subtotal",
-        "discountPercent",
-        "discountAmount",
-        "total",
-      ];
-      const currentFieldIndex = fieldOrder.indexOf(fieldType);
-
-      if (
-        fieldType === "total" ||
-        currentFieldIndex === fieldOrder.length - 1
-      ) {
-        // At the last field (total), add new row and focus on product field of new row
-        addNewEmptyRow();
-        setTimeout(() => {
-          const newRowProductInput = document.querySelector(
-            `[data-testid="input-product-${index + 1}"]`,
-          ) as HTMLInputElement;
-          if (newRowProductInput) {
-            newRowProductInput.focus();
-          }
-        }, 100);
+      if (fieldType === "total" || currentFieldIndex === fieldOrder.length - 1) {
+        // At the last field (total), check if this is the last row
+        if (index === selectedItems.length - 1) {
+          // Last row - add new row and focus on SKU field of new row
+          addNewEmptyRow();
+          setTimeout(() => {
+            const newRowSkuInput = document.querySelector(
+              `[data-testid="input-sku-${index + 1}"]`,
+            ) as HTMLInputElement;
+            if (newRowSkuInput) {
+              newRowSkuInput.focus();
+            }
+          }, 100);
+        } else {
+          // Not last row - move to SKU field of next row
+          setTimeout(() => {
+            const nextRowSkuInput = document.querySelector(
+              `[data-testid="input-sku-${index + 1}"]`,
+            ) as HTMLInputElement;
+            if (nextRowSkuInput) {
+              nextRowSkuInput.focus();
+            }
+          }, 50);
+        }
       } else {
         // Move to next field in same row
         const nextFieldType = fieldOrder[currentFieldIndex + 1];
@@ -624,7 +704,65 @@ export default function PurchaseFormPage({
           if (nextInput) {
             nextInput.focus();
           }
-        }, 100);
+        }, 50);
+      }
+    }
+    // Arrow Right - move to next field
+    else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      if (currentFieldIndex < fieldOrder.length - 1) {
+        const nextFieldType = fieldOrder[currentFieldIndex + 1];
+        setTimeout(() => {
+          const nextInput = document.querySelector(
+            `[data-testid="input-${nextFieldType}-${index}"]`,
+          ) as HTMLInputElement;
+          if (nextInput) {
+            nextInput.focus();
+          }
+        }, 50);
+      }
+    }
+    // Arrow Left - move to previous field
+    else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      if (currentFieldIndex > 0) {
+        const prevFieldType = fieldOrder[currentFieldIndex - 1];
+        setTimeout(() => {
+          const prevInput = document.querySelector(
+            `[data-testid="input-${prevFieldType}-${index}"]`,
+          ) as HTMLInputElement;
+          if (prevInput) {
+            prevInput.focus();
+          }
+        }, 50);
+      }
+    }
+    // Arrow Down - move to same field in next row
+    else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (index < selectedItems.length - 1) {
+        setTimeout(() => {
+          const nextRowInput = document.querySelector(
+            `[data-testid="input-${fieldType}-${index + 1}"]`,
+          ) as HTMLInputElement;
+          if (nextRowInput) {
+            nextRowInput.focus();
+          }
+        }, 50);
+      }
+    }
+    // Arrow Up - move to same field in previous row
+    else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (index > 0) {
+        setTimeout(() => {
+          const prevRowInput = document.querySelector(
+            `[data-testid="input-${fieldType}-${index - 1}"]`,
+          ) as HTMLInputElement;
+          if (prevRowInput) {
+            prevRowInput.focus();
+          }
+        }, 50);
       }
     }
   };
@@ -635,10 +773,12 @@ export default function PurchaseFormPage({
       productId: 0,
       productName: "",
       sku: "",
-      quantity: 1,
+      quantity: 0,
       receivedQuantity: 0,
       unitPrice: 0,
       total: 0,
+      discountPercent: 0,
+      discountAmount: 0,
     };
     setSelectedItems([...selectedItems, newEmptyRow]);
     console.log("➕ Added new empty row, total items:", selectedItems.length + 1);
@@ -655,6 +795,60 @@ export default function PurchaseFormPage({
     );
 
     return hasSupplier && hasValidItems;
+  };
+
+  // Filter products based on SKU/name input
+  const filterProductsBySku = (itemId: number, searchTerm: string) => {
+    if (!searchTerm || searchTerm.trim() === '') {
+      setSkuSuggestions(prev => ({ ...prev, [itemId]: [] }));
+      return;
+    }
+
+    const filtered = allProducts.filter((product: any) => {
+      const search = searchTerm.toLowerCase();
+      return (
+        product.name.toLowerCase().includes(search) ||
+        product.sku?.toLowerCase().includes(search)
+      );
+    }).slice(0, 5); // Limit to 5 suggestions
+
+    setSkuSuggestions(prev => ({ ...prev, [itemId]: filtered }));
+    setActiveSuggestionIndex(prev => ({ ...prev, [itemId]: 0 }));
+  };
+
+  // Select product from suggestions
+  const selectProductFromSuggestion = (index: number, product: any) => {
+    const updatedItems = [...selectedItems];
+
+    // Update the item at the specified index
+    if (index >= 0 && index < updatedItems.length) {
+      updatedItems[index] = {
+        ...updatedItems[index],
+        productId: product.id,
+        productName: product.name,
+        sku: product.sku,
+        unitPrice: product.unitPrice || 0,
+        total: updatedItems[index].quantity * (product.unitPrice || 0),
+        // Reset discount flags when a new product is selected
+        discountPercent: 0,
+        discountAmount: 0,
+        updatedFromAmount: false,
+        updatedFromPercent: false,
+      };
+    }
+
+    setSelectedItems(updatedItems);
+    setSkuSuggestions(prev => ({ ...prev, [index]: [] }));
+    setActiveSuggestionIndex(prev => ({ ...prev, [index]: 0 }));
+
+    // Auto-focus to product name field after selection
+    setTimeout(() => {
+      const productInput = document.querySelector(`[data-testid="input-product-${index}"]`) as HTMLInputElement;
+      if (productInput) {
+        productInput.focus();
+        productInput.select(); // Also select the text for easy viewing
+      }
+    }, 100);
   };
 
   // Remove item
@@ -705,7 +899,7 @@ export default function PurchaseFormPage({
       }
 
       const newFile = {
-        fileName: `${Date.now()}_${file.name}`,
+        fileName: file.name, // Use original filename directly
         originalFileName: file.name,
         fileType: file.type,
         fileSize: file.size,
@@ -763,7 +957,7 @@ export default function PurchaseFormPage({
         const hasProductName = item.productName && item.productName.trim() !== "";
         const hasQuantity = item.quantity > 0;
         const hasPrice = item.unitPrice >= 0;
-        
+
         return hasProductName && hasQuantity && hasPrice;
       });
 
@@ -785,7 +979,7 @@ export default function PurchaseFormPage({
 
       // Get form values
       const formValues = form.getValues();
-      
+
       // Auto-generate receipt number if empty
       let finalReceiptNumber = formValues.receiptNumber?.trim();
       if (!finalReceiptNumber) {
@@ -803,7 +997,7 @@ export default function PurchaseFormPage({
       // Validate required fields
       if (!formValues.supplierId || formValues.supplierId === 0) {
         toast({
-          title: "Lỗi", 
+          title: "Lỗi",
           description: "Vui lòng chọn nhà cung cấp",
           variant: "destructive",
         });
@@ -815,13 +1009,13 @@ export default function PurchaseFormPage({
         toast({
           title: "Lỗi",
           description: "Số phiếu nhập không được để trống",
-          variant: "destructive", 
+          variant: "destructive",
         });
         setIsSubmitting(false);
         return;
       }
 
-      
+
 
       if (!formValues.purchaseDate) {
         toast({
@@ -843,20 +1037,29 @@ export default function PurchaseFormPage({
         employeeId: formValues.employeeId || null,
         purchaseDate: formValues.purchaseDate,
         actualDeliveryDate: formValues.actualDeliveryDate || null,
+        purchaseType: formValues.purchaseType || null,
         subtotal: subtotalAmount.toFixed(2),
         tax: "0.00",
         total: subtotalAmount.toFixed(2),
         notes: formValues.notes?.trim() || null,
-        items: validItems.map((item) => ({
-          productId: item.productId || null,
-          productName: item.productName,
-          sku: item.sku || "",
-          quantity: item.quantity,
-          receivedQuantity: item.receivedQuantity || 0,
-          unitPrice: item.unitPrice.toFixed(2),
-          total: (item.quantity * item.unitPrice).toFixed(2),
-          taxRate: "0.00"
-        })),
+        items: validItems.map((item) => {
+          // Lấy CHÍNH XÁC giá trị từ UI - không tính toán lại
+          const discountPercent = parseFloat((item as any).discountPercent || 0);
+          const discountAmount = parseFloat((item as any).discountAmount || 0);
+
+          return {
+            productId: item.productId || null,
+            productName: item.productName,
+            sku: item.sku || "",
+            quantity: item.quantity,
+            receivedQuantity: item.receivedQuantity || 0,
+            unitPrice: item.unitPrice.toFixed(2),
+            total: (item.quantity * item.unitPrice).toFixed(2),
+            taxRate: "0.00",
+            discountPercent: discountPercent.toFixed(2),
+            discountAmount: discountAmount.toFixed(2)
+          };
+        }),
       };
 
       console.log("🚀 Final submission data:", submissionData);
@@ -868,8 +1071,8 @@ export default function PurchaseFormPage({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(submissionData)
           })
-        : await fetch('/api/purchase-receipts', {
-            method: 'POST', 
+        : await fetch('https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(submissionData)
           });
@@ -882,9 +1085,112 @@ export default function PurchaseFormPage({
       const result = await response.json();
       console.log("✅ API response:", result);
 
+      // Upload attached files if any
+      if (attachedFiles.length > 0) {
+        console.log(`📎 Uploading ${attachedFiles.length} attached files...`);
+
+        const uploadPromises = attachedFiles.map(async (fileData) => {
+          // Skip files that already have an ID (already uploaded)
+          if (fileData.id) {
+            return;
+          }
+
+          if (!fileData.file) {
+            console.warn('⚠️ File data missing file object:', fileData);
+            return;
+          }
+
+          console.log(`📤 Processing file: ${fileData.originalFileName}, size: ${fileData.file.size} bytes`);
+
+          // Read file content as base64 - this preserves exact file content
+          const reader = new FileReader();
+          const fileContentPromise = new Promise<string>((resolve, reject) => {
+            reader.onload = () => {
+              const base64 = reader.result as string;
+
+              // Verify file content
+              const hasDataPrefix = base64.startsWith('data:');
+              const base64Content = hasDataPrefix ? base64.split(',')[1] : base64;
+              const calculatedSize = Math.floor((base64Content.length * 3) / 4);
+
+              console.log(`UPLOAD VERIFICATION for ${fileData.originalFileName}:`);
+              console.log(`   - Original file size: ${fileData.file.size} bytes`);
+              console.log(`   - Base64 length: ${base64.length} chars`);
+              console.log(`   - Has data URL prefix: ${hasDataPrefix}`);
+              console.log(`   - Calculated decoded size: ${calculatedSize} bytes`);
+              console.log(`   - Size match: ${Math.abs(fileData.file.size - calculatedSize) < 10 ? '✅ YES' : '❌ NO'}`);
+              console.log(`   - MIME type: ${fileData.fileType}`);
+              console.log(`   - Base64 preview: ${base64.substring(0, 100)}...`);
+
+              resolve(base64);
+            };
+            reader.onerror = (error) => {
+              console.error(`❌ File read error for ${fileData.originalFileName}:`, error);
+              reject(error);
+            };
+            reader.readAsDataURL(fileData.file!);
+          });
+
+          try {
+            const fileContent = await fileContentPromise;
+
+            // Verify file size matches
+            const base64Content = fileContent.includes(',') ? fileContent.split(',')[1] : fileContent;
+            const padding = (base64Content.match(/=/g) || []).length;
+            const calculatedSize = Math.floor((base64Content.length * 3) / 4) - padding;
+
+            console.log(`📊 File size verification for ${fileData.originalFileName}:`, {
+              originalSize: fileData.file.size,
+              calculatedSize: calculatedSize,
+              matches: Math.abs(fileData.file.size - calculatedSize) < 10 // Allow small tolerance
+            });
+
+            // Send file data as JSON with original filename preserved
+            const uploadResponse = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts/${result.id}/documents`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                fileName: fileData.fileName,
+                originalFileName: fileData.originalFileName,
+                fileType: fileData.fileType,
+                fileSize: fileData.file.size, // Use actual file size from File object
+                description: fileData.description || '',
+                fileContent: fileContent, // Send full data URL with prefix
+              }),
+            });
+
+            if (!uploadResponse.ok) {
+              const errorText = await uploadResponse.text();
+              console.error(`❌ Upload failed for ${fileData.originalFileName}:`, errorText);
+              throw new Error(`Failed to upload ${fileData.originalFileName}: ${errorText}`);
+            }
+
+            const uploadResult = await uploadResponse.json();
+            console.log(`✅ Uploaded file: ${fileData.originalFileName}, server response:`, uploadResult);
+          } catch (uploadError) {
+            console.error(`❌ Error uploading ${fileData.originalFileName}:`, uploadError);
+            throw uploadError;
+          }
+        });
+
+        try {
+          await Promise.all(uploadPromises);
+          console.log('✅ All files uploaded successfully');
+        } catch (uploadError) {
+          console.error('❌ Error uploading files:', uploadError);
+          toast({
+            title: "Cảnh báo",
+            description: "Phiếu nhập đã được tạo nhưng có lỗi khi tải lên tệp đính kèm",
+            variant: "destructive",
+          });
+        }
+      }
+
       toast({
         title: "Thành công",
-        description: isEditMode 
+        description: isEditMode
           ? "Phiếu nhập hàng đã được cập nhật thành công"
           : "Phiếu nhập hàng đã được tạo thành công",
       });
@@ -892,14 +1198,14 @@ export default function PurchaseFormPage({
       // Refresh queries and navigate
       queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts"] });
       queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/suppliers"] });
-      
+
       setTimeout(() => {
         navigate("/purchases");
       }, 1000);
 
     } catch (error: any) {
       console.error("❌ Error in form submission:", error);
-      
+
       let errorMessage = "Có lỗi xảy ra khi lưu phiếu nhập hàng";
       if (error?.message) {
         errorMessage = error.message;
@@ -1045,7 +1351,7 @@ export default function PurchaseFormPage({
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="flex items-center gap-1">
-                              <span>Số phiếu nhập</span>
+                              <span>{t("purchases.receiptNumber")}</span>
                               <span className="text-red-500">*</span>
                             </FormLabel>
                             <FormControl>
@@ -1181,18 +1487,21 @@ export default function PurchaseFormPage({
                         )}
                       />
 
-                      {/* File Attachments - Balanced with other fields */}
+                      {/* File Attachments - Files displayed inside upload box */}
                       <FormItem>
                         <FormLabel className="text-sm font-medium flex items-center gap-2">
                           <Upload className="h-4 w-4" />
-                          Đính kèm tệp
+                          {t("purchases.attachDocuments")}
                         </FormLabel>
                         <FormControl>
                           <div
-                            className="border border-dashed border-gray-300 rounded-md p-4 text-center hover:border-gray-400 transition-colors cursor-pointer bg-gray-50/50 h-[42px] flex items-center justify-center"
-                            onClick={() =>
-                              document.getElementById("file-upload")?.click()
-                            }
+                            className="border border-dashed border-gray-300 rounded-md p-3 hover:border-gray-400 transition-colors cursor-pointer bg-gray-50/50 min-h-[42px] flex flex-col"
+                            onClick={(e) => {
+                              // Only trigger file input if clicking on empty area
+                              if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.upload-prompt')) {
+                                document.getElementById("file-upload")?.click();
+                              }
+                            }}
                             onDragOver={(e) => {
                               e.preventDefault();
                               e.currentTarget.classList.add(
@@ -1216,12 +1525,61 @@ export default function PurchaseFormPage({
                               handleFileUpload(e.dataTransfer.files);
                             }}
                           >
-                            <div className="flex items-center gap-2">
-                              <Upload className="h-4 w-4 text-gray-400" />
-                              <span className="text-sm text-gray-600">
-                                Kéo thả hoặc nhấp để tải tệp
-                              </span>
-                            </div>
+                            {/* Upload Prompt - Only show if no files */}
+                            {attachedFiles.length === 0 ? (
+                              <div className="upload-prompt flex items-center justify-center gap-2">
+                                <Upload className="h-4 w-4 text-gray-400" />
+                                <span className="text-sm text-gray-600">
+                                  {t("purchases.dragOrClickToUpload")}
+                                </span>
+                              </div>
+                            ) : (
+                              /* Files List - Inside upload box */
+                              <div className="space-y-1 max-h-32 overflow-y-auto">
+                                {attachedFiles.map((file, index) => (
+                                  <div
+                                    key={index}
+                                    className="flex items-center justify-between bg-white border border-gray-200 rounded p-1.5 hover:bg-gray-50 transition-colors"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                      {getFileIcon(file.fileType)}
+                                      <div className="min-w-0 flex-1">
+                                        <p
+                                          className="text-xs font-medium text-gray-900 truncate"
+                                          title={file.originalFileName}
+                                        >
+                                          {file.originalFileName}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                          {formatFileSize(file.fileSize)}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        removeFile(index);
+                                      }}
+                                      className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ))}
+                                {/* Add more files button */}
+                                <button
+                                  type="button"
+                                  className="upload-prompt w-full text-xs text-blue-600 hover:text-blue-700 py-1 flex items-center justify-center gap-1"
+                                  onClick={() => document.getElementById("file-upload")?.click()}
+                                >
+                                  <Plus className="h-3 w-3" />
+                                  {t("purchases.addItem")}
+                                </button>
+                              </div>
+                            )}
                             <input
                               id="file-upload"
                               type="file"
@@ -1233,52 +1591,11 @@ export default function PurchaseFormPage({
                           </div>
                         </FormControl>
 
-                        {/* Files List - Compact and organized */}
-                        {attachedFiles.length > 0 && (
-                          <div className="mt-2 space-y-1">
-                            <div className="text-xs font-medium text-gray-600 flex items-center gap-1">
-                              <FileText className="h-3 w-3" />
-                              Tệp đã tải ({attachedFiles.length})
-                            </div>
-                            <div className="space-y-1 max-h-24 overflow-y-auto">
-                              {attachedFiles.map((file, index) => (
-                                <div
-                                  key={index}
-                                  className="flex items-center justify-between bg-white border border-gray-200 rounded p-2 hover:bg-gray-50 transition-colors"
-                                >
-                                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                                    {getFileIcon(file.fileType)}
-                                    <div className="min-w-0 flex-1">
-                                      <p
-                                        className="text-xs font-medium text-gray-900 truncate"
-                                        title={file.originalFileName}
-                                      >
-                                        {file.originalFileName}
-                                      </p>
-                                      <p className="text-xs text-gray-500">
-                                        {formatFileSize(file.fileSize)}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeFile(index)}
-                                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
                         {isUploading && (
                           <div className="flex items-center justify-center py-2">
                             <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
                             <span className="text-xs text-gray-600">
-                              Đang tải...
+                              {t("purchases.uploadingFiles")}
                             </span>
                           </div>
                         )}
@@ -1324,7 +1641,14 @@ export default function PurchaseFormPage({
                       </div>
                       <Dialog
                         open={isProductDialogOpen}
-                        onOpenChange={setIsProductDialogOpen}
+                        onOpenChange={(open) => {
+                          setIsProductDialogOpen(open);
+                          if (!open) {
+                            setSelectedItemId(null);
+                            setSelectedProductIndex(0);
+                            setProductSearch("");
+                          }
+                        }}
                       >
                         <DialogTrigger asChild>
                           <div style={{ display: "none" }}>
@@ -1363,20 +1687,43 @@ export default function PurchaseFormPage({
                               <Input
                                 placeholder={t("purchases.searchProducts")}
                                 value={productSearch}
-                                onChange={(e) =>
-                                  setProductSearch(e.target.value)
-                                }
+                                onChange={(e) => {
+                                  setProductSearch(e.target.value);
+                                  setSelectedProductIndex(0);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'ArrowDown') {
+                                    e.preventDefault();
+                                    setSelectedProductIndex(prev =>
+                                      prev < products.length - 1 ? prev + 1 : prev
+                                    );
+                                  } else if (e.key === 'ArrowUp') {
+                                    e.preventDefault();
+                                    setSelectedProductIndex(prev =>
+                                      prev > 0 ? prev - 1 : 0
+                                    );
+                                  } else if (e.key === 'Enter' && products.length > 0) {
+                                    e.preventDefault();
+                                    handleProductSelect(products[selectedProductIndex]);
+                                  }
+                                }}
                                 className="pl-10"
                                 data-testid="input-product-search"
+                                autoFocus
                               />
                             </div>
                             <div className="max-h-96 overflow-y-auto">
                               <div className="grid gap-2">
-                                {products.map((product: any) => (
+                                {products.map((product: any, index: number) => (
                                   <div
                                     key={product.id}
-                                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
-                                    onClick={() => addProduct(product)}
+                                    data-product-index={index}
+                                    className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition-colors ${
+                                      index === selectedProductIndex
+                                        ? 'bg-blue-50 border-blue-500'
+                                        : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                                    }`}
+                                    onClick={() => handleProductSelect(product)}
                                     data-testid={`product-${product.id}`}
                                   >
                                     <div>
@@ -1416,8 +1763,11 @@ export default function PurchaseFormPage({
                               <TableHead className="w-12 text-center p-2 font-bold">
                                 No
                               </TableHead>
+                              <TableHead className="w-32 text-center p-2 font-bold">
+                                {t("purchases.productCode")}
+                              </TableHead>
                               <TableHead className="min-w-[180px] max-w-[250px] p-2 font-bold">
-                                {t("purchases.product")}
+                                {t("purchases.itemName")}
                               </TableHead>
                               <TableHead className="w-20 text-center p-2 font-bold">
                                 {t("purchases.unit")}
@@ -1467,11 +1817,19 @@ export default function PurchaseFormPage({
                               </TableRow>
                             ) : (
                               selectedItems.map((item, index) => {
-                                const subtotal = item.quantity * item.unitPrice;
-                                const discountPercent =
-                                  (item as any).discountPercent || 0;
-                                const discountAmount =
-                                  subtotal * (discountPercent / 100);
+                                const subtotal = item.total; // Use item.total directly
+
+                                // Xử lý logic chiết khấu - ƯU TIÊN GIÁ TRỊ TỪ UI
+                                let discountPercent = (item as any).discountPercent || 0;
+                                let discountAmount = (item as any).discountAmount || 0;
+
+                                // Nếu user vừa nhập %CK → tính lại tiền chiết khấu
+                                if ((item as any).updatedFromPercent && !(item as any).updatedFromAmount) {
+                                   discountAmount = subtotal * (discountPercent / 100);
+                                }
+                                // Nếu user vừa nhập tiền chiết khấu → GIỮ NGUYÊN, KHÔNG tính lại %CK
+                                // discountAmount đã có giá trị từ UI, không cần làm gì thêm
+
                                 const finalTotal = subtotal - discountAmount;
 
                                 return (
@@ -1487,70 +1845,181 @@ export default function PurchaseFormPage({
                                       </div>
                                     </TableCell>
 
-                                    {/* 2. Mặt hàng */}
+                                    {/* 2. Mã sản phẩm (SKU) - Autocomplete with suggestions OR click to open dialog */}
                                     <TableCell className="p-2">
-                                      <div className="flex flex-col">
-                                        {item.productName ? (
-                                          <>
-                                            <p className="font-medium text-gray-900 dark:text-white line-clamp-2 leading-tight">
-                                              {item.productName}
-                                            </p>
-                                            {item.sku && (
-                                              <p className="text-xs text-gray-500 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded mt-1 inline-block w-fit">
-                                                SKU: {item.sku}
-                                              </p>
-                                            )}
-                                          </>
-                                        ) : (
-                                          <Input
-                                            placeholder="Tìm kiếm sản phẩm..."
-                                            className="w-full text-sm h-8 border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                                            disabled={viewOnly}
-                                            data-testid={`input-product-${index}`}
-                                            onKeyDown={(e) =>
-                                              handleKeyDown(e, index, "product")
-                                            }
-                                            onClick={() => {
-                                              if (!viewOnly) {
-                                                setIsProductDialogOpen(true);
+                                      <div className="relative">
+                                        <Input
+                                          type="text"
+                                          value={item.sku || ""}
+                                          onChange={(e) => {
+                                            const value = e.target.value;
+                                            updateItem(index, "sku", value);
+                                            filterProductsBySku(index, value);
+                                          }}
+                                          onClick={() => {
+                                            // Open product selector dialog when clicking on SKU field
+                                            setSelectedItemId(item.productId || index);
+                                            setIsProductDialogOpen(true);
+                                          }}
+                                          onKeyDown={(e) => {
+                                            const suggestions = skuSuggestions[index] || [];
+                                            const activeIndex = activeSuggestionIndex[index] || 0;
+                                            const hasSelectedProduct = item.productId && item.productId > 0;
+                                            const hasSuggestions = suggestions.length > 0;
+
+                                            // Arrow Down/Up - Navigate suggestions OR move to next/prev row
+                                            if (e.key === 'ArrowDown') {
+                                              if (hasSuggestions) {
+                                                e.preventDefault();
+                                                setActiveSuggestionIndex(prev => ({
+                                                  ...prev,
+                                                  [index]: Math.min(activeIndex + 1, suggestions.length - 1)
+                                                }));
+                                              } else {
+                                                // Move to same field in next row
+                                                handleKeyDown(e, index, 'sku');
                                               }
-                                            }}
-                                            readOnly
-                                          />
+                                            } else if (e.key === 'ArrowUp') {
+                                              if (hasSuggestions) {
+                                                e.preventDefault();
+                                                setActiveSuggestionIndex(prev => ({
+                                                  ...prev,
+                                                  [index]: Math.max(activeIndex - 1, 0)
+                                                }));
+                                              } else {
+                                                // Move to same field in previous row
+                                                handleKeyDown(e, index, 'sku');
+                                              }
+                                            }
+                                            // Enter - Select suggestion OR move to product name field
+                                            else if (e.key === 'Enter') {
+                                              e.preventDefault();
+
+                                              if (hasSuggestions) {
+                                                // Select from suggestion list and auto-focus to product name
+                                                selectProductFromSuggestion(index, suggestions[activeIndex]);
+                                              } else {
+                                                // Move to product name field
+                                                setTimeout(() => {
+                                                  const nextInput = document.querySelector(`[data-testid="input-product-${index}"]`) as HTMLInputElement;
+                                                  nextInput?.focus();
+                                                }, 50);
+                                              }
+                                            }
+                                            // Tab - Same as Enter
+                                            else if (e.key === 'Tab') {
+                                              e.preventDefault();
+
+                                              if (hasSuggestions) {
+                                                selectProductFromSuggestion(index, suggestions[activeIndex]);
+                                              } else {
+                                                // Move to product name field
+                                                setTimeout(() => {
+                                                  const nextInput = document.querySelector(`[data-testid="input-product-${index}"]`) as HTMLInputElement;
+                                                  nextInput?.focus();
+                                                }, 50);
+                                              }
+                                            }
+                                            // Arrow Right - Move to product name field
+                                            else if (e.key === 'ArrowRight') {
+                                              e.preventDefault();
+                                              setTimeout(() => {
+                                                const nextInput = document.querySelector(`[data-testid="input-product-${index}"]`) as HTMLInputElement;
+                                                nextInput?.focus();
+                                              }, 50);
+                                            }
+                                            // Arrow Left - Move to previous row's total field
+                                            else if (e.key === 'ArrowLeft') {
+                                              if (index > 0) {
+                                                e.preventDefault();
+                                                setTimeout(() => {
+                                                  const prevInput = document.querySelector(`[data-testid="input-total-${index - 1}"]`) as HTMLInputElement;
+                                                  prevInput?.focus();
+                                                }, 50);
+                                              }
+                                            }
+                                          }}
+                                          placeholder="Nhập mã/tên SP hoặc click để chọn"
+                                          className="w-28 text-center text-sm h-8 border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                                          disabled={viewOnly}
+                                          data-testid={`input-sku-${index}`}
+                                        />
+                                        <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400 pointer-events-none" />
+
+                                        {/* Suggestions dropdown */}
+                                        {skuSuggestions[index] && skuSuggestions[index].length > 0 && (
+                                          <div className="absolute z-50 w-64 mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                                            {skuSuggestions[index].map((product: any, idx: number) => (
+                                              <div
+                                                key={product.id}
+                                                className={`px-3 py-2 cursor-pointer text-xs ${
+                                                  idx === (activeSuggestionIndex[index] || 0)
+                                                    ? 'bg-blue-50 text-blue-700'
+                                                    : 'hover:bg-gray-50'
+                                                }`}
+                                                onClick={() => {
+                                                  selectProductFromSuggestion(index, product);
+                                                }}
+                                              >
+                                                <div className="font-medium">{product.name}</div>
+                                                <div className="text-gray-500">SKU: {product.sku}</div>
+                                                <div className="text-gray-600">{product.unitPrice?.toLocaleString('vi-VN')} ₫</div>
+                                              </div>
+                                            ))}
+                                          </div>
                                         )}
                                       </div>
                                     </TableCell>
 
-                                    {/* 3. Đơn vị tính */}
+                                    {/* 3. Mặt hàng - Display only */}
+                                    <TableCell className="p-2">
+                                      <Input
+                                        type="text"
+                                        value={item.productName}
+                                        data-testid={`input-product-${index}`}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' || e.key === 'Tab') {
+                                            e.preventDefault();
+                                            handleKeyDown(e, index, "product");
+                                          } else {
+                                            handleKeyDown(e, index, "product");
+                                          }
+                                        }}
+                                        className="w-full text-sm h-8 bg-gray-100"
+                                        placeholder="Tên sản phẩm"
+                                        readOnly
+                                        disabled={viewOnly}
+                                      />
+                                    </TableCell>
+
+                                    {/* 4. Đơn vị tính */}
                                     <TableCell className="text-center p-2">
                                       <span className="text-sm text-gray-600 bg-gray-50 px-2 py-1 rounded-full">
                                         Cái
                                       </span>
                                     </TableCell>
 
-                                    {/* 4. Số lượng */}
+                                    {/* 5. Số lượng */}
                                     <TableCell className="p-2">
                                       <Input
-                                        type="number"
+                                        type="text"
+                                        inputMode="numeric"
                                         value={item.quantity}
-                                        onChange={(e) =>
-                                          updateItem(
-                                            index,
-                                            "quantity",
-                                            parseInt(e.target.value) || 0,
-                                          )
-                                        }
+                                        onChange={(e) => {
+                                          const value = e.target.value.replace(/[^0-9]/g, '');
+                                          const numValue = parseInt(value) || 0;
+                                          updateItem(index, "quantity", numValue);
+                                        }}
                                         onKeyDown={(e) =>
                                           handleKeyDown(e, index, "quantity")
                                         }
-                                        min="1"
-                                        className="w-20 text-center text-sm h-8 border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                        className="w-20 text-center text-sm h-8 border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                         disabled={viewOnly}
                                         data-testid={`input-quantity-${index}`}
                                       />
                                     </TableCell>
 
-                                    {/* 5. Đơn giá */}
+                                    {/* 6. Đơn giá */}
                                     <TableCell className="p-2">
                                       <Input
                                         type="text"
@@ -1562,10 +2031,12 @@ export default function PurchaseFormPage({
                                             /[^0-9]/g,
                                             "",
                                           );
+                                          const newUnitPrice =
+                                            parseFloat(value) || 0;
                                           updateItem(
                                             index,
                                             "unitPrice",
-                                            parseFloat(value) || 0,
+                                            newUnitPrice,
                                           );
                                         }}
                                         onKeyDown={(e) =>
@@ -1577,7 +2048,7 @@ export default function PurchaseFormPage({
                                       />
                                     </TableCell>
 
-                                    {/* 6. Thành tiền */}
+                                    {/* 7. Thành tiền */}
                                     <TableCell className="p-2">
                                       <Input
                                         type="text"
@@ -1598,6 +2069,10 @@ export default function PurchaseFormPage({
                                             "unitPrice",
                                             newUnitPrice,
                                           );
+                                          // Also update the total to reflect the new subtotal
+                                          const updatedItems = [...selectedItems];
+                                          updatedItems[index].total = newSubtotal;
+                                          setSelectedItems(updatedItems);
                                         }}
                                         onKeyDown={(e) =>
                                           handleKeyDown(e, index, "subtotal")
@@ -1608,19 +2083,22 @@ export default function PurchaseFormPage({
                                       />
                                     </TableCell>
 
-                                    {/* 7. % Chiết khấu */}
+                                    {/* 8. % Chiết khấu */}
                                     <TableCell className="p-2">
                                       <Input
                                         type="number"
-                                        value={discountPercent.toFixed(1)}
+                                        value={Math.round(discountPercent)}
                                         onChange={(e) => {
-                                          const updatedItems = [
-                                            ...selectedItems,
-                                          ];
-                                          (
-                                            updatedItems[index] as any
-                                          ).discountPercent =
-                                            parseFloat(e.target.value) || 0;
+                                          const newDiscountPercent = parseInt(e.target.value) || 0;
+                                          const updatedItems = [...selectedItems];
+                                          const subtotal = item.quantity * item.unitPrice;
+
+                                          // Cập nhật %CK và TỰ ĐỘNG tính lại tiền chiết khấu
+                                          (updatedItems[index] as any).discountPercent = newDiscountPercent;
+                                          (updatedItems[index] as any).discountAmount = subtotal * (newDiscountPercent / 100);
+                                          (updatedItems[index] as any).updatedFromPercent = true;
+                                          (updatedItems[index] as any).updatedFromAmount = false;
+
                                           setSelectedItems(updatedItems);
                                         }}
                                         onKeyDown={(e) =>
@@ -1632,20 +2110,14 @@ export default function PurchaseFormPage({
                                         }
                                         min="0"
                                         max="100"
-                                        step="0.1"
+                                        step="1"
                                         className="w-16 text-center text-sm h-8 border-gray-300 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
                                         disabled={viewOnly}
                                         data-testid={`input-discountPercent-${index}`}
-                                        onBlur={(e) => {
-                                          const value = parseFloat(e.target.value) || 0;
-                                          const updatedItems = [...selectedItems];
-                                          (updatedItems[index] as any).discountPercent = parseFloat(value.toFixed(1));
-                                          setSelectedItems(updatedItems);
-                                        }}
                                       />
                                     </TableCell>
 
-                                    {/* 8. Chiết khấu */}
+                                    {/* 9. Chiết khấu */}
                                     <TableCell className="p-2">
                                       <Input
                                         type="text"
@@ -1657,23 +2129,14 @@ export default function PurchaseFormPage({
                                             /[^0-9]/g,
                                             "",
                                           );
-                                          const newDiscountAmount =
-                                            parseFloat(value) || 0;
-                                          const updatedItems = [
-                                            ...selectedItems,
-                                          ];
+                                          const newDiscountAmount = parseFloat(value) || 0;
+                                          const updatedItems = [...selectedItems];
 
-                                          // Calculate discount percentage based on manual discount amount input
-                                          const newDiscountPercent =
-                                            subtotal > 0
-                                              ? (newDiscountAmount / subtotal) *
-                                                100
-                                              : 0;
+                                          // LƯU CHÍNH XÁC discountAmount từ UI - GIỮ NGUYÊN %CK
+                                          (updatedItems[index] as any).discountAmount = newDiscountAmount;
+                                          (updatedItems[index] as any).updatedFromAmount = true;
+                                          (updatedItems[index] as any).updatedFromPercent = false;
 
-                                          (
-                                            updatedItems[index] as any
-                                          ).discountPercent =
-                                            newDiscountPercent;
                                           setSelectedItems(updatedItems);
                                         }}
                                         onKeyDown={(e) =>
@@ -1689,7 +2152,7 @@ export default function PurchaseFormPage({
                                       />
                                     </TableCell>
 
-                                    {/* 9. Tổng tiền */}
+                                    {/* 10. Tổng tiền */}
                                     <TableCell className="text-right font-bold text-green-600 text-sm p-2">
                                       <Input
                                         type="text"
@@ -1739,7 +2202,12 @@ export default function PurchaseFormPage({
                                   </div>
                                 </TableCell>
 
-                                {/* Tổng cộng */}
+                                {/* Mã sản phẩm - empty for summary */}
+                                <TableCell className="text-center p-2">
+                                  <span className="text-sm text-blue-600">-</span>
+                                </TableCell>
+
+                                {/* Tên sản phẩm - Placeholder for "TỔNG CỘNG" */}
                                 <TableCell className="p-2 font-bold text-blue-800">
                                   TỔNG CỘNG
                                 </TableCell>
@@ -1761,7 +2229,7 @@ export default function PurchaseFormPage({
                                   <span className="text-sm text-blue-600">-</span>
                                 </TableCell>
 
-                                {/* Tổng thành tiền */}
+                                {/* Tổng thành tiền (Subtotal before discount) */}
                                 <TableCell className="p-2">
                                   <div className="w-24 text-right font-bold text-blue-800 bg-blue-100 border border-blue-300 rounded px-2 py-1">
                                     {selectedItems.reduce((sum, item) => {
@@ -1776,26 +2244,45 @@ export default function PurchaseFormPage({
                                   <span className="text-sm text-blue-600">-</span>
                                 </TableCell>
 
-                                {/* Tổng chiết khấu */}
+                                {/* Total Discount */}
                                 <TableCell className="p-2">
                                   <div className="w-24 text-right font-bold text-red-800 bg-red-100 border border-red-300 rounded px-2 py-1">
                                     {selectedItems.reduce((sum, item) => {
+                                      // Lấy giá trị chiết khấu đã được tính toán từ item
+                                      const discountPercent = parseFloat((item as any).discountPercent || 0);
+                                      const discountAmount = parseFloat((item as any).discountAmount || 0);
                                       const subtotal = item.quantity * item.unitPrice;
-                                      const discountPercent = (item as any).discountPercent || 0;
-                                      const discountAmount = subtotal * (discountPercent / 100);
-                                      return sum + discountAmount;
+
+                                      // Nếu có discountAmount được set rõ ràng, dùng nó
+                                      // Nếu không, tính từ discountPercent
+                                      let finalDiscountAmount = discountAmount;
+                                      if (discountAmount === 0 && discountPercent > 0) {
+                                        finalDiscountAmount = subtotal * (discountPercent / 100);
+                                      }
+
+                                      return sum + finalDiscountAmount;
                                     }, 0).toLocaleString("ko-KR")}
                                   </div>
                                 </TableCell>
 
-                                {/* Tổng tiền cuối cùng */}
+                                {/* Tổng tiền cuối cùng (after discount) */}
                                 <TableCell className="p-2">
                                   <div className="w-28 text-right font-bold text-green-800 bg-green-100 border border-green-300 rounded px-2 py-1">
                                     {selectedItems.reduce((sum, item) => {
                                       const subtotal = item.quantity * item.unitPrice;
-                                      const discountPercent = (item as any).discountPercent || 0;
-                                      const discountAmount = subtotal * (discountPercent / 100);
-                                      const finalTotal = subtotal - discountAmount;
+
+                                      // Lấy giá trị chiết khấu đã được tính toán từ item
+                                      const discountPercent = parseFloat((item as any).discountPercent || 0);
+                                      const discountAmount = parseFloat((item as any).discountAmount || 0);
+
+                                      // Nếu có discountAmount được set rõ ràng, dùng nó
+                                      // Nếu không, tính từ discountPercent
+                                      let finalDiscountAmount = discountAmount;
+                                      if (discountAmount === 0 && discountPercent > 0) {
+                                        finalDiscountAmount = subtotal * (discountPercent / 100);
+                                      }
+
+                                      const finalTotal = subtotal - finalDiscountAmount;
                                       return sum + finalTotal;
                                     }, 0).toLocaleString("ko-KR")}
                                   </div>
