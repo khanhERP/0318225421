@@ -111,7 +111,6 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
       setOrderDetailsOpen(false);
       setPaymentMethodsOpen(false);
       setShowPaymentMethodModal(false);
-      setShowEInvoiceModal(false);
       setShowReceiptModal(false);
       setShowReceiptPreview(false);
       setPreviewReceipt(null);
@@ -135,7 +134,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
         handlePrintCompleted as EventListener,
       );
     };
-  }, [queryClient]);
+  }, [queryClient, showEInvoiceModal]);
 
   const {
     data: tables,
@@ -281,6 +280,14 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
   useEffect(() => {
     const handlePaymentCompleted = (event: CustomEvent) => {
       console.log("🛡️ Table Grid: Payment completed event received");
+
+      // Don't close modals during E-invoice flow
+      if (event.detail?.fromEInvoice) {
+        console.log(
+          "🛡️ Table Grid: Payment from E-invoice, keeping modals open",
+        );
+        return;
+      }
 
       // Only invalidate - don't force refetch, let cache handle it
       if (!event.detail?.skipAllRefetch) {
@@ -556,7 +563,23 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
     const connectWebSocket = () => {
       try {
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        const host = window.location.host;
+
+        // Check if we're on a custom domain (not replit.dev)
+        const isCustomDomain = !host.includes("replit.dev");
+
+        // For custom domains, ensure proper WebSocket URL
+        const wsUrl =
+          isCustomDomain && protocol === "wss:"
+            ? `wss://${host}/ws`
+            : `${protocol}//${host}/ws`;
+
+        console.log(
+          "🔌 TableGrid: Attempting to connect to WebSocket:",
+          wsUrl,
+          "Custom domain:",
+          isCustomDomain,
+        );
         ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
@@ -2221,7 +2244,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
         if (paymentData.receipt && paymentData.shouldShowReceipt !== false) {
           console.log("📄 Table Grid: Showing final receipt modal");
           setSelectedReceipt(paymentData.receipt);
-          // setShowReceiptModal(true);
+          setShowReceiptModal(true);
         }
 
         console.log(
@@ -2419,7 +2442,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
 
       setSelectedReceipt(receiptPreview);
       setShowReceiptPreview(false);
-      setShowReceiptModal(false);
+      setShowReceiptModal(true);
 
       console.log("📄 Showing receipt preview for table payment confirmation");
     } catch (error) {
@@ -2902,7 +2925,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
 
         const receiptData = {
           transactionId: order.orderNumber || `ORD-${order.id}`,
-          items: orderItems.map((item: any) => ({
+          items: order.items.map((item: any) => ({
             id: item.id,
             productId: item.productId,
             productName: item.productName || getProductName(item.productId),
@@ -3824,6 +3847,12 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
                   ? products.find((p: any) => p.id === item.productId)
                   : null;
                 return product?.taxRate ? parseFloat(product.taxRate) : 10;
+              })(),
+              afterTaxPrice: (() => {
+                const product = Array.isArray(products)
+                  ? products.find((p: any) => p.id === item.productId)
+                  : null;
+                return product?.afterTaxPrice || null;
               })(),
             })) || []
           }

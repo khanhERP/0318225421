@@ -942,9 +942,15 @@ export function EInvoiceModal({
             invoiceNumber: null, // No invoice number yet for publish later
             symbol: selectedTemplate?.symbol || null,
             templateNumber: selectedTemplate?.templateNumber || null,
+            tradeNumber: null, // No trade number yet
             notes: `E-Invoice draft saved - MST: ${formData.taxCode || "N/A"}, Template: ${selectedTemplate?.name || "N/A"}, Đợi phát hành sau`,
             paidAt: new Date().toISOString(),
           };
+
+          console.log(
+            "📝 Order update payload for publish later:",
+            orderUpdateData,
+          );
 
           const updateResponse = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${orderId}`, {
             method: "PUT",
@@ -960,6 +966,10 @@ export function EInvoiceModal({
               "✅ Order updated successfully for publish later:",
               updatedOrder,
             );
+
+            // Force refresh order data
+            queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
+            queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
           } else {
             const errorText = await updateResponse.text();
             console.error(
@@ -1766,6 +1776,20 @@ export function EInvoiceModal({
     setIsProcessingPublish(false); // Reset specific publish button state
     setIsProcessingPublishLater(false); // Reset specific publish later button state
     setLastActionTime(0); // Reset debounce timer
+    // Clear cart
+    window.dispatchEvent(
+      new CustomEvent("clearCart", {
+        detail: {
+          source: "receipt_modal_closed",
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    );
+    window.dispatchEvent(
+      new CustomEvent("printCompleted", {
+        detail: { closeAllModals: true, refreshData: true },
+      }),
+    );
     onClose();
   };
 

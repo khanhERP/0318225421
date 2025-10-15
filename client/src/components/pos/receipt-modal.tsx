@@ -63,6 +63,7 @@ export function ReceiptModal({
     queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings"],
     queryFn: async () => {
       const response = await apiRequest("GET", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings");
+      console.log("🏢 Store settings fetched:", response.json());
       return response.json();
     },
     enabled: isOpen, // Only fetch when modal is open
@@ -243,10 +244,11 @@ export function ReceiptModal({
     }
     let content = printContent?.innerHTML ?? "";
     if (content) {
+      // content = formatForMiniPrinter(receipt, storeSettings);
       content = generatePrintHTML(printContent, false);
     }
 
-    console.log("🖨️ ============ BẮT ĐẦU IN HÓA ĐƠN ============");
+    console.log("🖨{�� ============ BẮT ĐẦU IN HÓA ĐƠN ============");
     console.log(
       `📝 Loại hóa đơn: ${isTitle ? "Hóa đơn nhân viên" : "Hóa đơn bếp"}`,
     );
@@ -477,6 +479,38 @@ export function ReceiptModal({
         handleDesktopPrint(printContent);
       }
     }
+  };
+
+  const formatForMiniPrinter = (receipt: any, config: any) => {
+    const lineBreak = "\n";
+    let formattedText = `
+      ${config.storeName || "Tên cửa hàng"}
+      Vị trí cửa hàng: ${config.address || "Địa chỉ cửa hàng"}
+      Điện thoại: ${config.phone || "Số điện thoại"}
+      ${title}
+      Số giao dịch: ${receipt.transactionId}
+      Ngày: ${new Date().toLocaleString("vi-VN")}
+      Thu ngân: ${receipt.cashierName || "Tên thu ngân"}
+      Phí ship: ${receipt.shippingFee ? `${receipt.shippingFee.toLocaleString("vi-VN")} ₫` : "0 ₫"}
+    `;
+    receipt.items.forEach((item: any) => {
+      formattedText += `
+      Tên sản phẩm: ${item.productName || "Không xác định"}
+      SKU: ${item.sku} x ${item.quantity} (${Math.round(item.price, 0).toLocaleString("vi-VN")} ₫)
+      Giảm giá: -${Math.round(item.discount, 0).toLocaleString("vi-VN")} ₫
+      `;
+    });
+
+    let sumSubtotal = receipt.items.reduce((sum: any, item: any) => {
+      return sum + item.price * item.quantity;
+    }, 0);
+    formattedText += `
+      Thành tiền: ${sumSubtotal.toLocaleString("vi-VN")} ₫
+      Thuế: ${receipt.tax.toLocaleString("vi-VN")} ₫
+      Giảm giá tổng: -${receipt.discount.toLocaleString("vi-VN")} ₫
+      Tổng tiền: ${receipt.total.toLocaleString("vi-VN")} ₫
+    `;
+    return formattedText.trim();
   };
 
   // Enhanced mobile printing handler
@@ -1005,52 +1039,19 @@ export function ReceiptModal({
 
   const handleClose = () => {
     console.log(
-      "🔴 Receipt Modal: handleClose called - closing all popups and refreshing data without notification",
+      "🔴 Receipt Modal: handleClose called - mode:",
+      isPreview ? "PREVIEW" : "FINAL",
     );
 
-    // Send refresh signal without notification
-    try {
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
-      const ws = new WebSocket(wsUrl);
-
-      ws.onopen = () => {
-        ws.send(
-          JSON.stringify({
-            type: "receipt_closed",
-            action: "refresh_all_data",
-            clearCart: true,
-            showNotification: false, // No notification when just closing
-            timestamp: new Date().toISOString(),
-          }),
-        );
-        ws.close();
-      };
-    } catch (error) {
-      console.error("Failed to send refresh signal:", error);
-    }
-
-    // Clear all popup states
+    // ALWAYS send close event to ensure all modals are closed
     if (typeof window !== "undefined") {
-      (window as any).previewReceipt = null;
-      (window as any).orderForPayment = null;
-
-      // Send event to close all popups without notification
       window.dispatchEvent(
         new CustomEvent("closeAllPopups", {
           detail: {
             source: "receipt_modal_closed",
-            showSuccessNotification: false, // No notification
-            timestamp: new Date().toISOString(),
-          },
-        }),
-      );
-
-      // Clear cart
-      window.dispatchEvent(
-        new CustomEvent("clearCart", {
-          detail: {
-            source: "receipt_modal_closed",
+            showSuccessNotification: false,
+            clearCustomer: !isPreview, // Only clear customer when closing final receipt
+            closeAllModals: true, // Explicit flag to close everything
             timestamp: new Date().toISOString(),
           },
         }),
@@ -1059,11 +1060,11 @@ export function ReceiptModal({
 
     window.dispatchEvent(
       new CustomEvent("printCompleted", {
-        detail: { closeAllModals: true, refreshData: true },
+        detail: { closeAllModals: true, refreshData: !isPreview },
       }),
     );
 
-    // Close the modal
+    // Call onClose callback
     onClose();
   };
 
@@ -1253,11 +1254,10 @@ export function ReceiptModal({
                     const quantity = item.quantity || 1;
                     const itemDiscount = parseFloat(item.discount || "0");
                     const itemSubtotal = unitPrice * quantity;
-                    const itemFinalAmount = itemSubtotal - itemDiscount;
-
                     // Calculate tax for this item based on its tax rate
                     const itemTax =
-                      (itemFinalAmount * taxRate) / (100 + taxRate);
+                      (itemSubtotal - itemDiscount) *
+                      (taxRate / (100 + taxRate));
 
                     if (!groups[taxRate]) {
                       groups[taxRate] = 0;
@@ -1606,8 +1606,8 @@ export function ReceiptModal({
                   return sum + parseFloat(item.discount || "0");
                 }, 0);
                 // Don't add order discount if item discounts exist (to avoid double counting)
-                const orderDiscount = Number(
-                  receipt?.discount || total?.discount || 0,
+                const orderDiscount = parseFloat(
+                  receipt?.discount || total?.discount || "0",
                 );
                 const totalDiscount =
                   orderDiscount > 0 ? orderDiscount : totalItemDiscount;
@@ -1624,8 +1624,8 @@ export function ReceiptModal({
                         },
                         0,
                       );
-                      const orderDiscount = Number(
-                        receipt?.discount || total?.discount || 0,
+                      const orderDiscount = parseFloat(
+                        receipt?.discount || total?.discount || "0",
                       );
                       // Show either item discounts or order discount, not both
                       const totalDiscount =

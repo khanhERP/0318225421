@@ -19,9 +19,15 @@ export function Toaster() {
         return (
           <Toast key={id} {...props}>
             <div className="grid gap-2">
-              {title && <ToastTitle className="text-sm font-semibold">{t(title as any)}</ToastTitle>}
+              {title && (
+                <ToastTitle className="text-sm font-semibold">
+                  {typeof title === 'string' && title.includes('.') ? t(title as any) : title}
+                </ToastTitle>
+              )}
               {description && (
-                <ToastDescription className="text-sm opacity-90 mt-1">{t(description as any)}</ToastDescription>
+                <ToastDescription className="text-sm opacity-90 mt-1">
+                  {typeof description === 'string' && description.includes('.') ? t(description as any) : description}
+                </ToastDescription>
               )}
             </div>
             {action}

@@ -872,8 +872,6 @@ export function PaymentMethodModal({
               ).toString(),
             notes: null,
             discount: "0.00", // Will be calculated below
-            tax: "0.00", // Will be calculated below
-            priceBeforeTax: "0.00", // Will be calculated below
           }),
         );
 
@@ -903,40 +901,15 @@ export function PaymentMethodModal({
                 itemDiscount = Math.max(0, discountAmount - allocatedDiscount);
               } else {
                 // Calculate proportional discount
-                itemDiscount =
-                  totalAmount > 0
-                    ? Math.round((discountAmount * itemTotal) / totalAmount)
-                    : 0;
+                const proportionalDiscount =
+                  (discountAmount * itemTotal) / totalAmount;
+                itemDiscount = Math.round(proportionalDiscount);
                 allocatedDiscount += itemDiscount;
-              }
-
-              // Get product to calculate tax
-              const product = products?.find((p: any) => p.id === item.productId);
-              const taxRate = product?.taxRate ? parseFloat(product.taxRate) / 100 : 0;
-
-              let itemTax = 0;
-              let itemPriceBeforeTax = 0;
-
-              if (priceIncludesTax && taxRate > 0) {
-                // When price includes tax
-                const discountPerUnit = itemDiscount / quantity;
-                const adjustedPrice = Math.max(0, unitPrice - discountPerUnit);
-                const giaGomThue = adjustedPrice * quantity;
-                itemPriceBeforeTax = Math.round(giaGomThue / (1 + taxRate));
-                itemTax = giaGomThue - itemPriceBeforeTax;
-              } else {
-                // When price doesn't include tax
-                const discountPerUnit = itemDiscount / quantity;
-                const adjustedPrice = Math.max(0, unitPrice - discountPerUnit);
-                itemPriceBeforeTax = Math.round(adjustedPrice * quantity);
-                itemTax = taxRate > 0 ? Math.round(itemPriceBeforeTax * taxRate) : 0;
               }
 
               return {
                 ...item,
                 discount: itemDiscount.toFixed(2),
-                tax: Math.round(itemTax).toString(),
-                priceBeforeTax: Math.round(itemPriceBeforeTax).toString(),
               };
             });
 
@@ -947,8 +920,6 @@ export function PaymentMethodModal({
                 unitPrice: item.unitPrice,
                 quantity: item.quantity,
                 discount: item.discount,
-                tax: item.tax,
-                priceBeforeTax: item.priceBeforeTax,
               })),
             });
           }
@@ -1253,8 +1224,6 @@ export function PaymentMethodModal({
             ).toString(),
           notes: null,
           discount: item.discount || "0", // Will be calculated below
-          tax: "0.00", // Will be calculated below
-          priceBeforeTax: "0.00", // Will be calculated below
         }),
       );
 
@@ -1289,33 +1258,11 @@ export function PaymentMethodModal({
               allocatedDiscount += itemDiscount;
             }
 
-            // Get product to calculate tax
-            const product = products?.find((p: any) => p.id === item.productId);
-            const taxRate = product?.taxRate ? parseFloat(product.taxRate) / 100 : 0;
-
-            let itemTax = 0;
-            let itemPriceBeforeTax = 0;
-
-            if (priceIncludesTax && taxRate > 0) {
-              // When price includes tax
-              const discountPerUnit = itemDiscount / quantity;
-              const adjustedPrice = Math.max(0, unitPrice - discountPerUnit);
-              const giaGomThue = adjustedPrice * quantity;
-              itemPriceBeforeTax = Math.round(giaGomThue / (1 + taxRate));
-              itemTax = giaGomThue - itemPriceBeforeTax;
-            } else {
-              // When price doesn't include tax
-              const discountPerUnit = itemDiscount / quantity;
-              const adjustedPrice = Math.max(0, unitPrice - discountPerUnit);
-              itemPriceBeforeTax = Math.round(adjustedPrice * quantity);
-              itemTax = taxRate > 0 ? Math.round(itemPriceBeforeTax * taxRate) : 0;
-            }
-
+            const itemTotal = unitPrice * quantity - itemDiscount;
+            item.total = itemTotal.toString();
             return {
               ...item,
               discount: itemDiscount.toFixed(2),
-              tax: Math.round(itemTax).toString(),
-              priceBeforeTax: Math.round(itemPriceBeforeTax).toString(),
             };
           });
 
@@ -1326,8 +1273,6 @@ export function PaymentMethodModal({
               unitPrice: item.unitPrice,
               quantity: item.quantity,
               discount: item.discount,
-              tax: item.tax,
-              priceBeforeTax: item.priceBeforeTax,
             })),
           });
         }
@@ -1421,6 +1366,9 @@ export function PaymentMethodModal({
           orderInfo.id = data.id;
           receipt.id = data.id;
           orderForPayment.id = data.id;
+
+          setShowQRCode(false);
+          setQrCodeUrl("");
 
           // ALWAYS update table status if order has a table after QR payment
           if (data.tableId) {
@@ -1649,65 +1597,8 @@ export function PaymentMethodModal({
             ).toString(),
           notes: null,
           discount: item.discount || "0",
-          tax: "0.00", // Add tax field
-          priceBeforeTax: "0.00", // Add priceBeforeTax field
         }),
       );
-
-      // Distribute discount and calculate tax/priceBeforeTax for order items
-      if (discountAmount > 0 && orderItems.length > 0) {
-        const totalAmount = orderItems.reduce((sum, item) => {
-          const unitPrice = Number(item.unitPrice || 0);
-          const quantity = Number(item.quantity || 0);
-          return sum + unitPrice * quantity;
-        }, 0);
-
-        if (totalAmount > 0) {
-          let allocatedDiscount = 0;
-          orderItems = orderItems.map((item, index) => {
-            const unitPrice = Number(item.unitPrice || 0);
-            const quantity = Number(item.quantity || 0);
-            const itemTotal = unitPrice * quantity;
-
-            let itemDiscount = 0;
-            if (index === orderItems.length - 1) {
-              itemDiscount = Math.max(0, discountAmount - allocatedDiscount);
-            } else {
-              itemDiscount =
-                totalAmount > 0
-                  ? Math.round((discountAmount * itemTotal) / totalAmount)
-                  : 0;
-              allocatedDiscount += itemDiscount;
-            }
-
-            const product = products?.find((p: any) => p.id === item.productId);
-            const taxRate = product?.taxRate ? parseFloat(product.taxRate) / 100 : 0;
-
-            let itemTax = 0;
-            let itemPriceBeforeTax = 0;
-
-            if (priceIncludesTax && taxRate > 0) {
-              const discountPerUnit = itemDiscount / quantity;
-              const adjustedPrice = Math.max(0, unitPrice - discountPerUnit);
-              const giaGomThue = adjustedPrice * quantity;
-              itemPriceBeforeTax = Math.round(giaGomThue / (1 + taxRate));
-              itemTax = giaGomThue - itemPriceBeforeTax;
-            } else {
-              const discountPerUnit = itemDiscount / quantity;
-              const adjustedPrice = Math.max(0, unitPrice - discountPerUnit);
-              itemPriceBeforeTax = Math.round(adjustedPrice * quantity);
-              itemTax = taxRate > 0 ? Math.round(itemPriceBeforeTax * taxRate) : 0;
-            }
-
-            return {
-              ...item,
-              discount: itemDiscount.toFixed(2),
-              tax: Math.round(itemTax).toString(),
-              priceBeforeTax: Math.round(itemPriceBeforeTax).toString(),
-            };
-          });
-        }
-      }
 
       const orderData = {
         orderNumber: `ORD-${Date.now()}`,
@@ -1919,10 +1810,11 @@ export function PaymentMethodModal({
 
     let orderTotal;
     if (priceIncludesTax) {
-      // When price includes tax: total = subtotal - discount (subtotal already includes tax)
+      // When priceIncludesTax = true: total = subtotal - discount (subtotal already includes tax)
       orderTotal = Math.max(0, exactSubtotal - discount);
-    } else {
-      // When price doesn't include tax: total = subtotal + tax - discount
+    } 
+    else {
+      // When priceIncludesTax = false: total = subtotal + tax - discount
       orderTotal = Math.max(0, exactSubtotal + exactTax - discount);
     }
 
@@ -1977,8 +1869,6 @@ export function PaymentMethodModal({
             ).toString(),
           notes: null,
           discount: item.discount || "0", // Will be calculated below
-          tax: "0.00", // Will be calculated below
-          priceBeforeTax: "0.00", // Will be calculated below
         }),
       );
 
@@ -2013,33 +1903,11 @@ export function PaymentMethodModal({
               allocatedDiscount += itemDiscount;
             }
 
-            // Get product to calculate tax
-            const product = products?.find((p: any) => p.id === item.productId);
-            const taxRate = product?.taxRate ? parseFloat(product.taxRate) / 100 : 0;
-
-            let itemTax = 0;
-            let itemPriceBeforeTax = 0;
-
-            if (priceIncludesTax && taxRate > 0) {
-              // When price includes tax
-              const discountPerUnit = itemDiscount / quantity;
-              const adjustedPrice = Math.max(0, unitPrice - discountPerUnit);
-              const giaGomThue = adjustedPrice * quantity;
-              itemPriceBeforeTax = Math.round(giaGomThue / (1 + taxRate));
-              itemTax = giaGomThue - itemPriceBeforeTax;
-            } else {
-              // When price doesn't include tax
-              const discountPerUnit = itemDiscount / quantity;
-              const adjustedPrice = Math.max(0, unitPrice - discountPerUnit);
-              itemPriceBeforeTax = Math.round(adjustedPrice * quantity);
-              itemTax = taxRate > 0 ? Math.round(itemPriceBeforeTax * taxRate) : 0;
-            }
-
+            const itemTotal = unitPrice * quantity - itemDiscount;
+            item.total = itemTotal.toString();
             return {
               ...item,
               discount: itemDiscount.toFixed(2),
-              tax: Math.round(itemTax).toString(),
-              priceBeforeTax: Math.round(itemPriceBeforeTax).toString(),
             };
           });
 
@@ -2050,8 +1918,6 @@ export function PaymentMethodModal({
               unitPrice: item.unitPrice,
               quantity: item.quantity,
               discount: item.discount,
-              tax: item.tax,
-              priceBeforeTax: item.priceBeforeTax,
             })),
           });
         }
@@ -2355,12 +2221,7 @@ export function PaymentMethodModal({
 
       // Set receipt data for modal
       setReceiptDataForModal(completeReceiptData);
-
-      // Close payment modal and E-invoice modal first
-      console.log(
-        "🔴 Closing payment modal and E-invoice modal before showing receipt",
-      );
-      setShowEInvoice(false);
+      setShowReceiptModal(true); // Show receipt modal
     } else {
       // If no receipt data, pass to parent via callback if available
       if (onReceiptReady) {
@@ -3316,10 +3177,6 @@ export function PaymentMethodModal({
               invoiceData.receipt = receipt;
               // Always call handleEInvoiceComplete to ensure proper processing
               handleEInvoiceComplete(invoiceData);
-
-              // Close E-Invoice modal first
-              setShowEInvoice(false);
-              setShowReceiptModal(true);
 
               // Then notify parent component with payment completion to show receipt
               onSelectMethod("paymentCompleted", {
