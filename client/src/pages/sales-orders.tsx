@@ -493,14 +493,20 @@ export default function SalesOrders() {
 
       // Clear cache completely
       queryClient.removeQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-      queryClient.removeQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", updatedOrder.id] });
+      queryClient.removeQueries({
+        queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", updatedOrder.id],
+      });
 
       // Force fresh fetch from server
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", updatedOrder.id] }),
+        queryClient.invalidateQueries({
+          queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", updatedOrder.id],
+        }),
         queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
-        queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", updatedOrder.id] }),
+        queryClient.refetchQueries({
+          queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", updatedOrder.id],
+        }),
       ]);
 
       setIsEditing(false);
@@ -1316,19 +1322,32 @@ export default function SalesOrders() {
 
         // Build complete payload with all calculated fields
         const payload: any = {
-          quantity: item.quantity !== undefined ? item.quantity : originalItem?.quantity,
-          unitPrice: item.unitPrice !== undefined ? item.unitPrice : originalItem?.unitPrice,
+          quantity:
+            item.quantity !== undefined
+              ? item.quantity
+              : originalItem?.quantity,
+          unitPrice:
+            item.unitPrice !== undefined
+              ? item.unitPrice
+              : originalItem?.unitPrice,
           total: item.total !== undefined ? item.total : originalItem?.total,
-          discount: item.discount !== undefined ? item.discount : originalItem?.discount || '0.00',
-          tax: item.tax !== undefined ? item.tax : originalItem?.tax || '0.00',
-          priceBeforeTax: item.priceBeforeTax !== undefined ? item.priceBeforeTax : originalItem?.priceBeforeTax || '0.00',
+          discount:
+            item.discount !== undefined
+              ? item.discount
+              : originalItem?.discount || "0.00",
+          tax: item.tax !== undefined ? item.tax : originalItem?.tax || "0.00",
+          priceBeforeTax:
+            item.priceBeforeTax !== undefined
+              ? item.priceBeforeTax
+              : originalItem?.priceBeforeTax || "0.00",
         };
 
         // Include optional fields if provided
         if (item.notes !== undefined) payload.notes = item.notes;
         if (item.productId !== undefined) payload.productId = item.productId;
         if (item.sku !== undefined) payload.sku = item.sku;
-        if (item.productName !== undefined) payload.productName = item.productName;
+        if (item.productName !== undefined)
+          payload.productName = item.productName;
 
         // Get values for calculation (use edited values if available, otherwise original)
         const product = products.find(
@@ -1336,22 +1355,28 @@ export default function SalesOrders() {
             p.id ===
             (item.productId ||
               originalItem?.productId ||
-              (item.sku ? products.find((prod) => prod.sku === item.sku)?.id : null)),
+              (item.sku
+                ? products.find((prod) => prod.sku === item.sku)?.id
+                : null)),
         );
 
         const priceIncludeTax =
           editableInvoice.priceIncludeTax ??
           storeSettings?.priceIncludesTax ??
           false;
-        const taxRate = product?.taxRate ? parseFloat(product.taxRate) / 100 : 0;
+        const taxRate = product?.taxRate
+          ? parseFloat(product.taxRate) / 100
+          : 0;
 
-        const unitPrice = item.unitPrice !== undefined
-          ? parseFloat(item.unitPrice)
-          : parseFloat(originalItem?.unitPrice || "0");
+        const unitPrice =
+          item.unitPrice !== undefined
+            ? parseFloat(item.unitPrice)
+            : parseFloat(originalItem?.unitPrice || "0");
 
-        const quantity = item.quantity !== undefined
-          ? parseInt(item.quantity)
-          : parseInt(originalItem?.quantity || "0");
+        const quantity =
+          item.quantity !== undefined
+            ? parseInt(item.quantity)
+            : parseInt(originalItem?.quantity || "0");
 
         // Calculate totals
         let itemSubtotal = unitPrice * quantity;
@@ -1385,7 +1410,9 @@ export default function SalesOrders() {
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`Failed to update order item ${item.id}: ${errorText}`);
+          throw new Error(
+            `Failed to update order item ${item.id}: ${errorText}`,
+          );
         }
       }
 
@@ -1396,7 +1423,11 @@ export default function SalesOrders() {
       );
       const allCurrentItems = await allCurrentItemsResponse.json();
 
-      console.log("📊 Recalculating order totals from", allCurrentItems.length, "items");
+      console.log(
+        "📊 Recalculating order totals from",
+        allCurrentItems.length,
+        "items",
+      );
 
       const priceIncludeTax =
         editableInvoice.priceIncludeTax ??
@@ -1409,7 +1440,9 @@ export default function SalesOrders() {
 
       allCurrentItems.forEach((item: any) => {
         const product = products.find((p: any) => p.id === item.productId);
-        const taxRate = product?.taxRate ? parseFloat(product.taxRate) / 100 : 0;
+        const taxRate = product?.taxRate
+          ? parseFloat(product.taxRate) / 100
+          : 0;
         const unitPrice = parseFloat(item.unitPrice || "0");
         const quantity = parseInt(item.quantity || "0");
         const itemSubtotal = unitPrice * quantity;
@@ -1465,9 +1498,13 @@ export default function SalesOrders() {
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", editableInvoice.id] }),
+        queryClient.invalidateQueries({
+          queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", editableInvoice.id],
+        }),
         queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
-        queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", editableInvoice.id] }),
+        queryClient.refetchQueries({
+          queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", editableInvoice.id],
+        }),
       ]);
 
       // Reset editing state
@@ -1538,14 +1575,132 @@ export default function SalesOrders() {
   }>({});
 
   const updateOrderItemField = (itemId: number, field: string, value: any) => {
-    // Update local state only, don't save to database yet
-    setEditedOrderItems((prev) => ({
-      ...prev,
-      [itemId]: {
-        ...prev[itemId],
-        [field]: value,
-      },
-    }));
+    setEditedOrderItems((prev) => {
+      const currentItem = prev[itemId] || {};
+      const originalItem = orderItems.find((item: any) => item.id === itemId);
+      
+      // Get current or updated values
+      let quantity = currentItem.quantity !== undefined ? currentItem.quantity : (originalItem?.quantity || 1);
+      let unitPrice = currentItem.unitPrice !== undefined ? parseFloat(currentItem.unitPrice) : parseFloat(originalItem?.unitPrice || "0");
+      
+      // Update the changed field
+      if (field === 'quantity') {
+        quantity = parseInt(value) || 1;
+      } else if (field === 'unitPrice') {
+        unitPrice = parseFloat(value) || 0;
+      }
+      
+      // Calculate total = quantity × unitPrice
+      const calculatedTotal = Math.floor(quantity * unitPrice);
+      
+      return {
+        ...prev,
+        [itemId]: {
+          ...currentItem,
+          [field]: value,
+          // Always update total when quantity or unitPrice changes
+          ...(field === 'quantity' || field === 'unitPrice' ? { total: calculatedTotal.toString() } : {}),
+        },
+      };
+    });
+  };
+
+  // Handle keyboard navigation for order items table
+  const handleOrderItemKeyDown = (
+    e: React.KeyboardEvent,
+    index: number,
+    fieldType: string,
+  ) => {
+    // Only editable fields (có input)
+    const editableFields = [
+      "sku",
+      "productName",
+      "quantity",
+      "unitPrice",
+    ];
+    const currentFieldIndex = editableFields.indexOf(fieldType);
+    
+    // Get visible items (not deleted)
+    const visibleItems = orderItems.filter(
+      (item: any) => !editedOrderItems[item.id]?._deleted,
+    );
+
+    // Enter or Tab - move to next editable field
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+
+      if (currentFieldIndex === editableFields.length - 1) {
+        // At the last editable field (unitPrice)
+        if (index < visibleItems.length - 1) {
+          // Not the last row, move to first field of next row
+          setTimeout(() => {
+            const nextRowInput = document.querySelector(
+              `[data-field="orderitem-${editableFields[0]}-${index + 1}"]`,
+            ) as HTMLInputElement;
+            nextRowInput?.focus();
+          }, 50);
+        }
+      } else {
+        // Move to next editable field in same row
+        const nextFieldType = editableFields[currentFieldIndex + 1];
+        setTimeout(() => {
+          const nextInput = document.querySelector(
+            `[data-field="orderitem-${nextFieldType}-${index}"]`,
+          ) as HTMLInputElement;
+          nextInput?.focus();
+        }, 50);
+      }
+    }
+    // Arrow Right - move to next editable field
+    else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      if (currentFieldIndex < editableFields.length - 1) {
+        const nextFieldType = editableFields[currentFieldIndex + 1];
+        setTimeout(() => {
+          const nextInput = document.querySelector(
+            `[data-field="orderitem-${nextFieldType}-${index}"]`,
+          ) as HTMLInputElement;
+          nextInput?.focus();
+        }, 50);
+      }
+    }
+    // Arrow Left - move to previous editable field
+    else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      if (currentFieldIndex > 0) {
+        const prevFieldType = editableFields[currentFieldIndex - 1];
+        setTimeout(() => {
+          const prevInput = document.querySelector(
+            `[data-field="orderitem-${prevFieldType}-${index}"]`,
+          ) as HTMLInputElement;
+          prevInput?.focus();
+        }, 50);
+      }
+    }
+    // Arrow Down - move to same field in next row
+    else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (index < visibleItems.length - 1) {
+        setTimeout(() => {
+          const nextRowInput = document.querySelector(
+            `[data-field="orderitem-${fieldType}-${index + 1}"]`,
+          ) as HTMLInputElement;
+          nextRowInput?.focus();
+        }, 50);
+      }
+    }
+    // Arrow Up - move to same field in previous row
+    else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (index > 0) {
+        setTimeout(() => {
+          const prevRowInput = document.querySelector(
+            `[data-field="orderitem-${fieldType}-${index - 1}"]`,
+          ) as HTMLInputElement;
+          prevRowInput?.focus();
+        }, 50);
+      }
+    }
   };
 
   // Calculate totals from the filtered and sorted invoice list
@@ -1593,12 +1748,12 @@ export default function SalesOrders() {
       const unitPrice = parseFloat(
         editedItem.unitPrice !== undefined
           ? editedItem.unitPrice
-          : item.unitPrice || "0"
+          : item.unitPrice || "0",
       );
       const quantity = parseInt(
         editedItem.quantity !== undefined
           ? editedItem.quantity
-          : item.quantity || "0"
+          : item.quantity || "0",
       );
 
       const itemSubtotal = unitPrice * quantity;
@@ -3412,123 +3567,124 @@ export default function SalesOrders() {
                                                                       "0",
                                                                   );
 
-                                                                // Calculate total before discount for proportional distribution
-                                                                const totalBeforeDiscount =
-                                                                  visibleItems.reduce(
-                                                                    (
-                                                                      sum,
-                                                                      it,
-                                                                    ) => {
-                                                                      const editedIt =
-                                                                        editedOrderItems[
-                                                                          it.id
-                                                                        ] || {};
-                                                                      const itPrice =
-                                                                        parseFloat(
-                                                                          editedIt.unitPrice !==
-                                                                            undefined
-                                                                            ? editedIt.unitPrice
-                                                                            : it.unitPrice ||
-                                                                                "0",
-                                                                        );
-                                                                      const itQty =
-                                                                        parseInt(
-                                                                          editedIt.quantity !==
-                                                                            undefined
-                                                                            ? editedIt.quantity
-                                                                            : it.quantity ||
-                                                                                "0",
-                                                                        );
-                                                                      return (
-                                                                        sum +
-                                                                        itPrice *
-                                                                          itQty
-                                                                      );
-                                                                    },
-                                                                    0,
-                                                                  );
-
-                                                                // Calculate discount for this item
+                                                                // Get discount from editedOrderItems if available, otherwise calculate
                                                                 let itemDiscountAmount = 0;
-                                                                if (
-                                                                  orderDiscount >
-                                                                    0 &&
-                                                                  totalBeforeDiscount >
-                                                                    0
+                                                                
+                                                                if (editedItem.discount !== undefined) {
+                                                                  // Use the allocated discount from editedOrderItems
+                                                                  itemDiscountAmount = parseFloat(editedItem.discount);
+                                                                } else if (
+                                                                  orderDiscount > 0
                                                                 ) {
-                                                                  const isLastItem =
-                                                                    index ===
-                                                                    visibleItems.length -
-                                                                      1;
-                                                                  const itemSubtotal =
-                                                                    unitPrice *
-                                                                    quantity;
-
-                                                                  if (
-                                                                    isLastItem
-                                                                  ) {
-                                                                    // Last item gets remaining discount
-                                                                    const previousDiscounts =
-                                                                      visibleItems
-                                                                        .slice(
-                                                                          0,
-                                                                          -1,
-                                                                        )
-                                                                        .reduce(
-                                                                          (
-                                                                            sum,
-                                                                            it,
-                                                                          ) => {
-                                                                            const editedIt =
-                                                                              editedOrderItems[
-                                                                                it
-                                                                                  .id
-                                                                              ] || {};
-                                                                            const itPrice =
-                                                                              parseFloat(
-                                                                                editedIt.unitPrice !==
-                                                                                  undefined
-                                                                                  ? editedIt.unitPrice
-                                                                                  : it.unitPrice ||
-                                                                                      "0",
-                                                                              );
-                                                                            const itQty =
-                                                                              parseInt(
-                                                                                editedIt.quantity !==
-                                                                                  undefined
-                                                                                  ? editedIt.quantity
-                                                                                  : it.quantity ||
-                                                                                      "0",
-                                                                              );
-                                                                            const itSubtotal =
-                                                                              itPrice *
-                                                                              itQty;
-                                                                            return (
-                                                                              sum +
-                                                                              Math.floor(
-                                                                                (orderDiscount *
-                                                                                  itSubtotal) /
-                                                                                  totalBeforeDiscount,
-                                                                              )
-                                                                            );
-                                                                          },
-                                                                          0,
+                                                                  // Calculate total before discount for proportional distribution
+                                                                  const totalBeforeDiscount =
+                                                                    visibleItems.reduce(
+                                                                      (
+                                                                        sum: number,
+                                                                        it,
+                                                                      ) => {
+                                                                        const editedIt =
+                                                                          editedOrderItems[
+                                                                            it.id
+                                                                          ] || {};
+                                                                        const itPrice =
+                                                                          parseFloat(
+                                                                            editedIt.unitPrice !==
+                                                                              undefined
+                                                                              ? editedIt.unitPrice
+                                                                              : it.unitPrice ||
+                                                                                  "0",
+                                                                          );
+                                                                        const itQty =
+                                                                          parseInt(
+                                                                            editedIt.quantity !==
+                                                                              undefined
+                                                                              ? editedIt.quantity
+                                                                              : it.quantity ||
+                                                                                  "0",
+                                                                          );
+                                                                        return (
+                                                                          sum +
+                                                                          itPrice *
+                                                                            itQty
                                                                         );
-                                                                    itemDiscountAmount =
-                                                                      Math.max(
-                                                                        0,
-                                                                        orderDiscount -
-                                                                          previousDiscounts,
-                                                                      );
-                                                                  } else {
-                                                                    itemDiscountAmount =
-                                                                      Math.floor(
-                                                                        (orderDiscount *
-                                                                          itemSubtotal) /
-                                                                          totalBeforeDiscount,
-                                                                      );
-                                                                    allocatedDiscount +=
-                                                                      itemDiscountAmount;
+                                                                      },
+                                                                      0,
+                                                                    );
+
+                                                                  if (totalBeforeDiscount > 0) {
+                                                                    const isLastItem =
+                                                                      index ===
+                                                                      visibleItems.length -
+                                                                        1;
+                                                                    const itemSubtotal =
+                                                                      unitPrice *
+                                                                      quantity;
+
+                                                                    if (
+                                                                      isLastItem
+                                                                    ) {
+                                                                      // Last item gets remaining discount
+                                                                      const previousDiscounts =
+                                                                        visibleItems
+                                                                          .slice(
+                                                                            0,
+                                                                            -1,
+                                                                          )
+                                                                          .reduce(
+                                                                            (
+                                                                              sum,
+                                                                              it,
+                                                                            ) => {
+                                                                              const editedIt =
+                                                                                editedOrderItems[
+                                                                                  it
+                                                                                    .id
+                                                                                ] || {};
+                                                                              const itPrice =
+                                                                                parseFloat(
+                                                                                  editedIt.unitPrice !==
+                                                                                    undefined
+                                                                                    ? editedIt.unitPrice
+                                                                                    : it.unitPrice ||
+                                                                                        "0",
+                                                                                );
+                                                                              const itQty =
+                                                                                parseInt(
+                                                                                  editedIt.quantity !==
+                                                                                    undefined
+                                                                                    ? editedIt.quantity
+                                                                                    : it.quantity ||
+                                                                                        "0",
+                                                                                );
+                                                                              const itSubtotal =
+                                                                                itPrice *
+                                                                                itQty;
+                                                                              return (
+                                                                                sum +
+                                                                                Math.floor(
+                                                                                  (orderDiscount *
+                                                                                    itSubtotal) /
+                                                                                    totalBeforeDiscount,
+                                                                                )
+                                                                              );
+                                                                            },
+                                                                            0,
+                                                                          );
+                                                                      itemDiscountAmount =
+                                                                        Math.max(
+                                                                          0,
+                                                                          orderDiscount -
+                                                                            previousDiscounts,
+                                                                        );
+                                                                    } else {
+                                                                      itemDiscountAmount =
+                                                                        Math.floor(
+                                                                          (orderDiscount *
+                                                                            itemSubtotal) /
+                                                                            totalBeforeDiscount,
+                                                                        );
+                                                                    }
                                                                   }
                                                                 }
 
@@ -3536,6 +3692,10 @@ export default function SalesOrders() {
                                                                 let itemTax = 0;
                                                                 let priceBeforeTax = 0;
                                                                 let itemTotal = 0;
+                                                                let priceTax =
+                                                                  Number(
+                                                                    product.price,
+                                                                  ) * quantity;
 
                                                                 if (
                                                                   product?.taxRate &&
@@ -3606,6 +3766,7 @@ export default function SalesOrders() {
                                                                       unitPrice -
                                                                         discountPerUnit,
                                                                     );
+
                                                                   priceBeforeTax =
                                                                     Math.round(
                                                                       adjustedPrice *
@@ -3630,23 +3791,102 @@ export default function SalesOrders() {
                                                                         1}
                                                                     </td>
                                                                     <td className="text-left py-2 px-3 border-r text-xs w-[120px]">
-                                                                      <div className="truncate">
-                                                                        {item.sku ||
-                                                                          product?.sku ||
-                                                                          "-"}
-                                                                      </div>
+                                                                      {isEditing ? (
+                                                                        <div className="relative">
+                                                                          <Input
+                                                                            list={`product-sku-list-${item.id}`}
+                                                                            value={
+                                                                              editedOrderItems[item.id]?.sku !== undefined
+                                                                                ? editedOrderItems[item.id].sku
+                                                                                : item.sku || product?.sku || ""
+                                                                            }
+                                                                            data-field={`orderitem-sku-${index}`}
+                                                                            onChange={(e) => {
+                                                                              const selectedSku = e.target.value;
+                                                                              updateOrderItemField(item.id, "sku", selectedSku);
+
+                                                                              // Tìm sản phẩm theo SKU
+                                                                              const selectedProduct = products.find(
+                                                                                (p: any) => p.sku === selectedSku
+                                                                              );
+
+                                                                              if (selectedProduct) {
+                                                                                // Cập nhật thông tin sản phẩm
+                                                                                updateOrderItemField(item.id, "productId", selectedProduct.id);
+                                                                                updateOrderItemField(item.id, "productName", selectedProduct.name);
+                                                                                updateOrderItemField(item.id, "unitPrice", selectedProduct.price);
+                                                                              }
+                                                                            }}
+                                                                            onKeyDown={(e) =>
+                                                                              handleOrderItemKeyDown(e, index, "sku")
+                                                                            }
+                                                                            className="w-full h-8 text-xs"
+                                                                            placeholder="Chọn mã hàng"
+                                                                          />
+                                                                          <datalist id={`product-sku-list-${item.id}`}>
+                                                                            {products
+                                                                              .filter((p: any) => p.isActive && p.productType !== 4)
+                                                                              .map((p: any) => (
+                                                                                <option key={p.id} value={p.sku}>
+                                                                                  {p.sku} - {p.name} ({formatCurrency(p.price)})
+                                                                                </option>
+                                                                              ))}
+                                                                          </datalist>
+                                                                        </div>
+                                                                      ) : (
+                                                                        <div className="truncate">
+                                                                          {item.sku || product?.sku || "-"}
+                                                                        </div>
+                                                                      )}
                                                                     </td>
-                                                                    <td
-                                                                      className="text-left py-2 px-3 border-r text-xs w-[150px]"
-                                                                      title={
-                                                                        item.productName
-                                                                      }
-                                                                    >
-                                                                      <div className="truncate">
-                                                                        {
-                                                                          item.productName
-                                                                        }
-                                                                      </div>
+                                                                    <td className="text-left py-2 px-3 border-r text-xs w-[150px]">
+                                                                      {isEditing ? (
+                                                                        <div className="relative">
+                                                                          <Input
+                                                                            list={`product-name-list-${item.id}`}
+                                                                            value={
+                                                                              editedOrderItems[item.id]?.productName !== undefined
+                                                                                ? editedOrderItems[item.id].productName
+                                                                                : item.productName || ""
+                                                                            }
+                                                                            data-field={`orderitem-productName-${index}`}
+                                                                            onChange={(e) => {
+                                                                              const selectedName = e.target.value;
+                                                                              updateOrderItemField(item.id, "productName", selectedName);
+
+                                                                              // Tìm sản phẩm theo tên
+                                                                              const selectedProduct = products.find(
+                                                                                (p: any) => p.name === selectedName
+                                                                              );
+
+                                                                              if (selectedProduct) {
+                                                                                // Cập nhật thông tin sản phẩm
+                                                                                updateOrderItemField(item.id, "productId", selectedProduct.id);
+                                                                                updateOrderItemField(item.id, "sku", selectedProduct.sku);
+                                                                                updateOrderItemField(item.id, "unitPrice", selectedProduct.price);
+                                                                              }
+                                                                            }}
+                                                                            onKeyDown={(e) =>
+                                                                              handleOrderItemKeyDown(e, index, "productName")
+                                                                            }
+                                                                            className="w-full h-8 text-xs"
+                                                                            placeholder="Chọn tên hàng"
+                                                                          />
+                                                                          <datalist id={`product-name-list-${item.id}`}>
+                                                                            {products
+                                                                              .filter((p: any) => p.isActive && p.productType !== 4)
+                                                                              .map((p: any) => (
+                                                                                <option key={p.id} value={p.name}>
+                                                                                  {p.name} - {p.sku} ({formatCurrency(p.price)})
+                                                                                </option>
+                                                                              ))}
+                                                                          </datalist>
+                                                                        </div>
+                                                                      ) : (
+                                                                        <div className="truncate">
+                                                                          {item.productName}
+                                                                        </div>
+                                                                      )}
                                                                     </td>
                                                                     <td className="text-center py-2 px-3 border-r text-xs w-[80px]">
                                                                       {product?.unit ||
@@ -3660,6 +3900,7 @@ export default function SalesOrders() {
                                                                           value={
                                                                             quantity
                                                                           }
+                                                                          data-field={`orderitem-quantity-${index}`}
                                                                           onChange={(
                                                                             e,
                                                                           ) => {
@@ -3694,6 +3935,15 @@ export default function SalesOrders() {
                                                                               );
                                                                             }
                                                                           }}
+                                                                          onKeyDown={(
+                                                                            e,
+                                                                          ) =>
+                                                                            handleOrderItemKeyDown(
+                                                                              e,
+                                                                              index,
+                                                                              "quantity",
+                                                                            )
+                                                                          }
                                                                           className="w-20 text-right h-8"
                                                                         />
                                                                       ) : (
@@ -3709,6 +3959,7 @@ export default function SalesOrders() {
                                                                           ).toLocaleString(
                                                                             "vi-VN",
                                                                           )}
+                                                                          data-field={`orderitem-unitPrice-${index}`}
                                                                           onChange={(
                                                                             e,
                                                                           ) => {
@@ -3728,6 +3979,15 @@ export default function SalesOrders() {
                                                                               newPrice.toString(),
                                                                             );
                                                                           }}
+                                                                          onKeyDown={(
+                                                                            e,
+                                                                          ) =>
+                                                                            handleOrderItemKeyDown(
+                                                                              e,
+                                                                              index,
+                                                                              "unitPrice",
+                                                                            )
+                                                                          }
                                                                           className="w-full text-right h-8"
                                                                         />
                                                                       ) : (
@@ -3739,11 +3999,14 @@ export default function SalesOrders() {
                                                                       )}
                                                                     </td>
                                                                     <td className="text-right py-2 px-3 border-r text-xs w-[120px]">
-                                                                      {Math.floor(
-                                                                        priceBeforeTax,
-                                                                      ).toLocaleString(
-                                                                        "vi-VN",
-                                                                      )}
+                                                                      {(() => {
+                                                                        // Use edited total if available, otherwise calculate from current values
+                                                                        const editedItem = editedOrderItems[item.id] || {};
+                                                                        if (editedItem.total !== undefined) {
+                                                                          return Math.floor(parseFloat(editedItem.total)).toLocaleString("vi-VN");
+                                                                        }
+                                                                        return Math.floor(unitPrice * quantity).toLocaleString("vi-VN");
+                                                                      })()}
                                                                     </td>
                                                                     <td className="text-red-600 text-right py-2 px-3 border-r text-xs w-[100px]">
                                                                       {Math.floor(
@@ -3819,24 +4082,25 @@ export default function SalesOrders() {
                                                     {t("common.summary")}
                                                   </h4>
                                                   <div className="bg-blue-50 p-4 rounded-lg">
-                                                    <div className="max-w-md">
+                                                    <div className="grid grid-cols-2 gap-8">
+                                                      {/* Cột trái - Các trường cũ */}
                                                       <div className="space-y-2 text-sm">
-                                                        <div className="flex justify-between ">
-                                                            <span>
-                                                              {t(
-                                                                "common.totalPayment",
-                                                              )}
-                                                              :
-                                                            </span>
-                                                            <span className="font-bold">
-                                                              {formatCurrency(
-                                                                Math.floor(
-                                                                  displayTotals.total,
-                                                                ),
-                                                              )}
-                                                              </span>
+                                                        <div className="flex justify-between items-center">
+                                                          <span>
+                                                            {t(
+                                                              "common.totalPayment",
+                                                            )}
+                                                            :
+                                                          </span>
+                                                          <span className="font-bold">
+                                                            {formatCurrency(
+                                                              Math.floor(
+                                                                displayTotals.total,
+                                                              ),
+                                                            )}
+                                                          </span>
                                                         </div>
-                                                        <div className="flex justify-between">
+                                                        <div className="flex justify-between items-center">
                                                           <span>
                                                             {t(
                                                               "common.subtotalAmount",
@@ -3853,10 +4117,7 @@ export default function SalesOrders() {
                                                         </div>
                                                         <div className="flex justify-between text-red-600">
                                                           <span>
-                                                            {t(
-                                                              "common.discount",
-                                                            )}
-                                                            :
+                                                            Chiết khấu:
                                                           </span>
                                                           {isEditing &&
                                                           editableInvoice ? (
@@ -3872,9 +4133,7 @@ export default function SalesOrders() {
                                                               onFocus={(e) =>
                                                                 e.target.select()
                                                               }
-                                                              onChange={(
-                                                                e,
-                                                              ) => {
+                                                              onChange={(e) => {
                                                                 const value =
                                                                   e.target.value.replace(
                                                                     /[^0-9]/g,
@@ -3884,31 +4143,67 @@ export default function SalesOrders() {
                                                                   parseFloat(
                                                                     value,
                                                                   ) || 0;
+
+                                                                console.log(
+                                                                  "💰 Thay đổi chiết khấu:",
+                                                                  {
+                                                                    oldDiscount:
+                                                                      editableInvoice.discount,
+                                                                    newDiscount,
+                                                                    orderItems:
+                                                                      orderItems.length,
+                                                                  },
+                                                                );
+
+                                                                // Cập nhật chiết khấu đơn hàng
                                                                 updateEditableInvoiceField(
                                                                   "discount",
                                                                   newDiscount.toString(),
                                                                 );
 
-                                                                // Allocate discount to items
+                                                                // Phân bổ chiết khấu vào từng mặt hàng theo tỷ lệ thành tiền
+                                                                const visibleItems =
+                                                                  orderItems.filter(
+                                                                    (
+                                                                      item: any,
+                                                                    ) =>
+                                                                      !editedOrderItems[
+                                                                        item.id
+                                                                      ]
+                                                                        ?._deleted,
+                                                                  );
+
                                                                 if (
                                                                   visibleItems.length >
                                                                   0
                                                                 ) {
+                                                                  // Tính tổng thành tiền trước chiết khấu
                                                                   const totalBeforeDiscount =
                                                                     visibleItems.reduce(
                                                                       (
                                                                         sum: number,
                                                                         item: any,
                                                                       ) => {
+                                                                        const editedItem =
+                                                                          editedOrderItems[
+                                                                            item
+                                                                              .id
+                                                                          ] || {};
                                                                         const unitPrice =
                                                                           parseFloat(
-                                                                            item.unitPrice ||
-                                                                              "0",
+                                                                            editedItem.unitPrice !==
+                                                                              undefined
+                                                                              ? editedItem.unitPrice
+                                                                              : item.unitPrice ||
+                                                                                  "0",
                                                                           );
                                                                         const quantity =
                                                                           parseInt(
-                                                                            item.quantity ||
-                                                                              "0",
+                                                                            editedItem.quantity !==
+                                                                              undefined
+                                                                              ? editedItem.quantity
+                                                                              : item.quantity ||
+                                                                                  "0",
                                                                           );
                                                                         return (
                                                                           sum +
@@ -3919,6 +4214,12 @@ export default function SalesOrders() {
                                                                       0,
                                                                     );
 
+                                                                  console.log(
+                                                                    "📊 Tổng thành tiền trước CK:",
+                                                                    totalBeforeDiscount,
+                                                                  );
+
+                                                                  // Phân bổ chiết khấu theo tỷ lệ
                                                                   let allocatedDiscount = 0;
                                                                   const newEditedItems =
                                                                     {
@@ -3930,17 +4231,28 @@ export default function SalesOrders() {
                                                                       item: any,
                                                                       index: number,
                                                                     ) => {
+                                                                      const editedItem =
+                                                                        editedOrderItems[
+                                                                          item
+                                                                            .id
+                                                                        ] || {};
                                                                       const unitPrice =
                                                                         parseFloat(
-                                                                          item.unitPrice ||
-                                                                            "0",
+                                                                          editedItem.unitPrice !==
+                                                                            undefined
+                                                                            ? editedItem.unitPrice
+                                                                            : item.unitPrice ||
+                                                                                "0",
                                                                         );
                                                                       const quantity =
                                                                         parseInt(
-                                                                          item.quantity ||
-                                                                            "0",
+                                                                          editedItem.quantity !==
+                                                                            undefined
+                                                                            ? editedItem.quantity
+                                                                            : item.quantity ||
+                                                                                "0",
                                                                         );
-                                                                      const itemTotal =
+                                                                      const itemSubtotal =
                                                                         unitPrice *
                                                                         quantity;
 
@@ -3950,21 +4262,23 @@ export default function SalesOrders() {
                                                                         visibleItems.length -
                                                                           1
                                                                       ) {
-                                                                        // Last item gets the remaining discount
+                                                                        // Mặt hàng cuối cùng: nhận phần CK còn lại
                                                                         itemDiscount =
                                                                           Math.max(
                                                                             0,
-                                                                            newDiscount -
-                                                                              allocatedDiscount,
+                                                                            Math.floor(
+                                                                              newDiscount -
+                                                                                allocatedDiscount,
+                                                                            ),
                                                                           );
                                                                       } else {
-                                                                        // Other items get proportional discount
+                                                                        // Các mặt hàng khác: phân bổ theo tỷ lệ
                                                                         itemDiscount =
                                                                           totalBeforeDiscount >
                                                                           0
-                                                                            ? Math.round(
+                                                                            ? Math.floor(
                                                                                 (newDiscount *
-                                                                                  itemTotal) /
+                                                                                  itemSubtotal) /
                                                                                   totalBeforeDiscount,
                                                                               )
                                                                             : 0;
@@ -3972,6 +4286,16 @@ export default function SalesOrders() {
                                                                           itemDiscount;
                                                                       }
 
+                                                                      console.log(
+                                                                        `📦 Mặt hàng ${index + 1} (${item.productName}):`,
+                                                                        {
+                                                                          itemSubtotal,
+                                                                          itemDiscount,
+                                                                          allocatedDiscount,
+                                                                        },
+                                                                      );
+
+                                                                      // Lưu chiết khấu đã phân bổ cho mặt hàng
                                                                       newEditedItems[
                                                                         item.id
                                                                       ] = {
@@ -3987,6 +4311,20 @@ export default function SalesOrders() {
 
                                                                   setEditedOrderItems(
                                                                     newEditedItems,
+                                                                  );
+
+                                                                  console.log(
+                                                                    "✅ Phân bổ CK hoàn tất:",
+                                                                    {
+                                                                      totalDiscount:
+                                                                        newDiscount,
+                                                                      totalBeforeDiscount,
+                                                                      allocatedDiscount,
+                                                                      itemCount:
+                                                                        visibleItems.length,
+                                                                      editedItems:
+                                                                        newEditedItems,
+                                                                    },
                                                                   );
                                                                 }
                                                               }}
@@ -4022,129 +4360,64 @@ export default function SalesOrders() {
                                                             )}
                                                           </span>
                                                         </div>
-                                                        <div className="flex justify-between">
-                                                          <span>
-                                                            {t(
-                                                              "common.customerPaid",
-                                                            )}
-                                                            :
-                                                          </span>
-                                                          <span className="font-bold">
-                                                            {formatCurrency(
-                                                              Math.floor(
-                                                                displayTotals.total,
-                                                              ),
-                                                            )}
-                                                          </span>
-                                                        </div>
-                                                        <div className="flex justify-between">
+                                                      </div>
+
+                                                      {/* Cột phải - Khách hàng trả và Phương thức thanh toán */}
+                                                      <div className="space-y-2 text-sm">
+                                                        {storeSettings?.businessType ===
+                                                          "laundry" && (
+                                                          <div className="flex justify-between items-center">
+                                                            <span className="font-semibold text-gray-700">
+                                                              Khách hàng trả:
+                                                            </span>
+                                                            <span className="font-bold text-green-600">
+                                                              {formatCurrency(
+                                                                Math.floor(
+                                                                  displayTotals.total,
+                                                                ),
+                                                              )}
+                                                            </span>
+                                                          </div>
+                                                        )}
+                                                        <div className="flex justify-between items-center">
                                                           <span className="font-semibold text-gray-700">
-                                                            {t("common.paymentMethodLabel")}:
+                                                            Phương thức thanh
+                                                            toán:
                                                           </span>
                                                           <span className="font-bold text-blue-600">
                                                             {(() => {
-                                                              const paymentMethod = selectedInvoice.paymentMethod;
+                                                              const paymentMethod =
+                                                                selectedInvoice.paymentMethod;
                                                               try {
-                                                                if (paymentMethod && typeof paymentMethod === "string") {
-                                                                  const parsed = JSON.parse(paymentMethod);
-                                                                  if (Array.isArray(parsed) && parsed.length > 0) {
+                                                                if (
+                                                                  paymentMethod &&
+                                                                  typeof paymentMethod ===
+                                                                    "string"
+                                                                ) {
+                                                                  const parsed =
+                                                                    JSON.parse(
+                                                                      paymentMethod,
+                                                                    );
+                                                                  if (
+                                                                    Array.isArray(
+                                                                      parsed,
+                                                                    ) &&
+                                                                    parsed.length >
+                                                                      0
+                                                                  ) {
                                                                     return "Nhiều phương thức";
                                                                   }
                                                                 }
                                                               } catch (e) {}
-                                                              return getPaymentMethodName(selectedInvoice.paymentMethod);
+                                                              return getPaymentMethodName(
+                                                                selectedInvoice.paymentMethod,
+                                                              );
                                                             })()}
                                                           </span>
                                                         </div>
                                                       </div>
                                                     </div>
                                                   </div>
-                                                  {/* Multi-payment details section - only show when multiple payment methods */}
-                                                  {(() => {
-                                                    const paymentMethod =
-                                                      selectedInvoice.paymentMethod;
-                                                    try {
-                                                      if (
-                                                        paymentMethod &&
-                                                        typeof paymentMethod ===
-                                                          "string"
-                                                      ) {
-                                                        const parsed =
-                                                          JSON.Parse(
-                                                            paymentMethod,
-                                                          );
-                                                        if (
-                                                          Array.isArray(
-                                                            parsed,
-                                                          ) &&
-                                                          parsed.length > 0
-                                                        ) {
-                                                          return (
-                                                            <div className="flex justify-end mt-4">
-                                                              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg border border-blue-200 inline-block max-w-sm">
-                                                                <h4 className="font-semibold text-blue-800 mb-2 text-sm">
-                                                                  Chi tiết thanh toán:
-                                                                </h4>
-                                                                <div className="space-y-1">
-                                                                  {parsed.map(
-                                                                    (
-                                                                      pm: any,
-                                                                      idx: number,
-                                                                    ) => (
-                                                                      <div
-                                                                        key={
-                                                                          idx
-                                                                        }
-                                                                        className="flex items-center gap-3 text-sm"
-                                                                      >
-                                                                        <span className="text-blue-600">
-                                                                          •
-                                                                        </span>
-                                                                        <span className="font-medium">
-                                                                          {getPaymentMethodName(
-                                                                            pm.method,
-                                                                          )}
-                                                                          :
-                                                                        </span>
-                                                                        <span className="text-green-600 font-bold ml-auto">
-                                                                          {formatCurrency(
-                                                                            pm.amount,
-                                                                          )}{" "}
-                                                                          ₫
-                                                                        </span>
-                                                                      </div>
-                                                                    ),
-                                                                  )}
-                                                                  <div className="flex items-center gap-3 pt-2 mt-2 border-t-2 border-blue-300 text-sm">
-                                                                    <span className="font-bold text-blue-800">
-                                                                      Tổng:
-                                                                    </span>
-                                                                    <span className="text-blue-600 font-bold ml-auto">
-                                                                      {formatCurrency(
-                                                                        parsed.reduce(
-                                                                          (
-                                                                            sum: number,
-                                                                            pm: any,
-                                                                          ) =>
-                                                                            sum +
-                                                                            pm.amount,
-                                                                          0,
-                                                                        ),
-                                                                      )}{" "}
-                                                                      ₫
-                                                                    </span>
-                                                                  </div>
-                                                                </div>
-                                                              </div>
-                                                            </div>
-                                                          );
-                                                        }
-                                                      }
-                                                    } catch (e) {
-                                                      // Not JSON, single payment - no need to display again
-                                                    }
-                                                    return null;
-                                                  })()}
                                                 </div>
 
                                                 <div>
@@ -4340,6 +4613,112 @@ export default function SalesOrders() {
                                                         )}
                                                     </>
                                                   )}
+                                                  <Button
+                                                    variant="outline"
+                                                    onClick={() => {
+                                                      if (!selectedInvoice)
+                                                        return;
+
+                                                      // Prepare receipt data for ReceiptModal
+                                                      const receiptData = {
+                                                        transactionId:
+                                                          selectedInvoice.invoiceNumber ||
+                                                          selectedInvoice.orderNumber ||
+                                                          `TXN-${selectedInvoice.id}`,
+                                                        orderId:
+                                                          selectedInvoice.id,
+                                                        id: selectedInvoice.id,
+                                                        items: orderItems.map(
+                                                          (item) => ({
+                                                            id:
+                                                              item.id ||
+                                                              item.productId,
+                                                            productId:
+                                                              item.productId,
+                                                            productName:
+                                                              item.productName ||
+                                                              item.name,
+                                                            name:
+                                                              item.productName ||
+                                                              item.name,
+                                                            price:
+                                                              item.unitPrice ||
+                                                              item.price ||
+                                                              "0",
+                                                            unitPrice:
+                                                              item.unitPrice ||
+                                                              item.price ||
+                                                              "0",
+                                                            quantity:
+                                                              item.quantity ||
+                                                              1,
+                                                            total:
+                                                              item.total || "0",
+                                                            sku:
+                                                              item.sku ||
+                                                              item.productSku ||
+                                                              `SKU${item.productId}`,
+                                                            productSku:
+                                                              item.sku ||
+                                                              item.productSku ||
+                                                              `SKU${item.productId}`,
+                                                            taxRate: parseFloat(
+                                                              item.taxRate ||
+                                                                "0",
+                                                            ),
+                                                            discount:
+                                                              item.discount ||
+                                                              "0",
+                                                          }),
+                                                        ),
+                                                        subtotal:
+                                                          displayTotals.subtotal.toString(),
+                                                        tax: displayTotals.tax.toString(),
+                                                        total:
+                                                          displayTotals.total.toString(),
+                                                        discount:
+                                                          displayTotals.discount.toString(),
+                                                        paymentMethod:
+                                                          selectedInvoice.paymentMethod ||
+                                                          "cash",
+                                                        amountReceived:
+                                                          displayTotals.total.toString(),
+                                                        change: "0",
+                                                        cashierName:
+                                                          "Phạm Vân Duy",
+                                                        createdAt:
+                                                          selectedInvoice.createdAt ||
+                                                          new Date().toISOString(),
+                                                        invoiceNumber:
+                                                          selectedInvoice.invoiceNumber ||
+                                                          selectedInvoice.orderNumber,
+                                                        customerName:
+                                                          selectedInvoice.customerName ||
+                                                          "Khách hàng",
+                                                        customerTaxCode:
+                                                          selectedInvoice.customerTaxCode ||
+                                                          null,
+                                                        customerPhone:
+                                                          selectedInvoice.customerPhone ||
+                                                          null,
+                                                        customerAddress:
+                                                          selectedInvoice.customerAddress ||
+                                                          null,
+                                                        customerEmail:
+                                                          selectedInvoice.customerEmail ||
+                                                          null,
+                                                      };
+
+                                                      setSelectedReceipt(
+                                                        receiptData,
+                                                      );
+                                                      setShowReceiptModal(true);
+                                                    }}
+                                                    className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                                                  >
+                                                    <Printer className="w-4 h-4 mr-2" />
+                                                    In hóa đơn
+                                                  </Button>
                                                   <Button
                                                     variant="outline"
                                                     onClick={() => {
@@ -4582,6 +4961,8 @@ export default function SalesOrders() {
               eInvoiceData,
             );
             setShowEInvoiceModal(false);
+            setShowReceiptModal(true);
+            setSelectedReceipt(eInvoiceData);
 
             if (eInvoiceData.success) {
               queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
@@ -4603,7 +4984,8 @@ export default function SalesOrders() {
             name: item.productName,
             price: parseFloat(item.unitPrice || "0"),
             quantity: item.quantity,
-            sku: item.productSku || item.sku || `SKU${item.productId || item.id}`,
+            sku:
+              item.productSku || item.sku || `SKU${item.productId || item.id}`,
             taxRate: parseFloat(item.taxRate || "0"),
           }))}
           source="sales-orders"
@@ -4623,7 +5005,6 @@ export default function SalesOrders() {
           }}
           receipt={selectedReceipt}
           isPreview={!selectedReceipt.paymentMethod} // Preview if no payment method yet
-          isTitle={true}
           onConfirm={() => {
             // STEP 1 → STEP 2: Receipt preview confirmed, showing payment method modal
             console.log(
@@ -4673,10 +5054,6 @@ export default function SalesOrders() {
                   queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range"],
                 }),
               ]);
-
-              // Close order details if open
-              setSelectedInvoice(null);
-              setShowInvoiceDetails(false);
 
               // Show receipt if provided
               if (data.receipt && data.shouldShowReceipt !== false) {

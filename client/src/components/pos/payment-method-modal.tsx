@@ -1812,8 +1812,7 @@ export function PaymentMethodModal({
     if (priceIncludesTax) {
       // When priceIncludesTax = true: total = subtotal - discount (subtotal already includes tax)
       orderTotal = Math.max(0, exactSubtotal - discount);
-    } 
-    else {
+    } else {
       // When priceIncludesTax = false: total = subtotal + tax - discount
       orderTotal = Math.max(0, exactSubtotal + exactTax - discount);
     }

@@ -1289,54 +1289,23 @@ export function ShoppingCart({
   const removeOrder = (orderId: string) => {
     if (orders.length <= 1) {
       toast({
-        title: "Cannot remove",
-        description: "Must have at least one order.",
+        title: "Không thể xóa",
+        description: "Phải có ít nhất một đơn hàng.",
         variant: "destructive",
       });
       return;
     }
 
-    const filteredOrders = orders.filter((order) => order.id !== orderId);
-    // Assuming setOrders is available in the parent component or managed here if orders is a local state
-    // For now, we'll just simulate the filtering if setOrders isn't directly passed or managed.
-    // If `orders` is a prop, this would need to be handled by the parent component.
-    // For demonstration, we'll assume `orders` is state managed here or passed down and mutated by parent.
-    // If `orders` is indeed managed by state here: setOrders(filteredOrders);
-
     // Remove customer for this order
-    if (typeof window !== "undefined") {
-      const shoppingCart = (window as any).shoppingCartRef;
-      if (shoppingCart?.setOrderCustomers) {
-        shoppingCart.setOrderCustomers((prev: any) => {
-          const updated = { ...prev };
-          delete updated[orderId];
-          return updated;
-        });
-      }
-    }
+    setOrderCustomers((prev) => {
+      const updated = { ...prev };
+      delete updated[orderId];
+      return updated;
+    });
 
-    // If removing active order, switch to first remaining order
-    if (orderId === activeOrderId) {
-      // Ensure there's a remaining order before switching
-      if (filteredOrders.length > 0) {
-        setActiveOrderId(filteredOrders[0].id);
-        // Also update selectedCustomer and search term based on the new active order
-        const newActiveCustomer =
-          (window as any).shoppingCartRef?.orderCustomers?.[
-            filteredOrders[0].id
-          ] || null;
-        setSelectedCustomer(newActiveCustomer);
-        setCustomerSearchTerm(
-          newActiveCustomer
-            ? `${newActiveCustomer.name} (${newActiveCustomer.phone})`
-            : "",
-        );
-      } else {
-        // No orders left, clear active order and customer
-        setActiveOrderId(undefined);
-        setSelectedCustomer(null);
-        setCustomerSearchTerm("");
-      }
+    // Use the onRemoveOrder callback from parent component
+    if (onRemoveOrder) {
+      onRemoveOrder(orderId);
     }
   };
 
@@ -2172,7 +2141,7 @@ export function ShoppingCart({
                       className="w-6 h-6 p-0"
                       disabled={
                         item.trackInventory === true &&
-                        item.quantity >= item.stock
+                        item.quantity >= (item.stock || 0)
                       }
                     >
                       <Plus size={10} />
@@ -2699,6 +2668,9 @@ export function ShoppingCart({
             console.log("🔴 POS: Closing E-invoice modal");
             setShowEInvoiceModal(false);
             setIsProcessingPayment(false);
+            
+            // Don't clear cart here - let the e-invoice modal handle it
+            console.log("🔴 POS: E-invoice modal closed without clearing cart");
           }}
           onConfirm={handleEInvoiceComplete}
           total={(() => {

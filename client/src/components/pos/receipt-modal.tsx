@@ -1058,11 +1058,13 @@ export function ReceiptModal({
       );
     }
 
-    window.dispatchEvent(
-      new CustomEvent("printCompleted", {
-        detail: { closeAllModals: true, refreshData: !isPreview },
-      }),
-    );
+    if (!isPreview) {
+      window.dispatchEvent(
+        new CustomEvent("printCompleted", {
+          detail: { closeAllModals: true, refreshData: !isPreview },
+        }),
+      );
+    }
 
     // Call onClose callback
     onClose();

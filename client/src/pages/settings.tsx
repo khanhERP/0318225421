@@ -1158,8 +1158,8 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       password: "",
       softwareName: "",
       loginUrl: "",
-      signMethod: "server",
-      cqtCode: "level1",
+      signMethod: "Ký server",
+      cqtCode: "Cấp nhất",
       notes: "",
       isActive: true,
     });
@@ -1239,17 +1239,8 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
 
   const handleEditEInvoice = (eInvoice: any) => {
     console.log("Editing E-invoice:", eInvoice);
-    setEInvoiceForm({
-      taxCode: eInvoice.taxCode || "",
-      loginId: eInvoice.loginId || "",
-      password: eInvoice.password || "",
-      softwareName: eInvoice.softwareName || "",
-      loginUrl: eInvoice.loginUrl || "",
-      signMethod: eInvoice.signMethod || "server",
-      cqtCode: eInvoice.cqtCode || "level1",
-      notes: eInvoice.notes === "-" ? "" : eInvoice.notes || "",
-      isActive: eInvoice.isActive !== undefined ? eInvoice.isActive : true,
-    });
+    
+    // Reset errors first
     setEInvoiceFormErrors({
       taxCode: "",
       loginId: "",
@@ -1257,8 +1248,25 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       softwareName: "",
       loginUrl: "",
     });
+    
+    // Set form data
+    setEInvoiceForm({
+      taxCode: eInvoice.taxCode || "",
+      loginId: eInvoice.loginId || "",
+      password: eInvoice.password || "",
+      softwareName: eInvoice.softwareName || "",
+      loginUrl: eInvoice.loginUrl || "",
+      signMethod: eInvoice.signMethod || "Ký server",
+      cqtCode: eInvoice.cqtCode || "Cấp nhất",
+      notes: eInvoice.notes === "-" ? "" : eInvoice.notes || "",
+      isActive: eInvoice.isActive !== undefined ? eInvoice.isActive : true,
+    });
+    
+    // Set editing state and show form
     setEditingEInvoice(eInvoice);
     setShowEInvoiceForm(true);
+    
+    console.log("E-invoice form opened for editing");
   };
 
   const handleDeleteEInvoice = (id: number, softwareName: string) => {
@@ -2805,7 +2813,10 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => setShowMembershipModal(true)}
+                              onClick={() => {
+                                console.log("Opening Membership Modal");
+                                setShowMembershipModal(true);
+                              }}
                             >
                               <UserCheck className="w-4 h-4 mr-2" />
                               {t("customers.membershipManagement")}
@@ -2813,7 +2824,10 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => setShowPointsManagementModal(true)}
+                              onClick={() => {
+                                console.log("Opening Points Management Modal");
+                                setShowPointsManagementModal(true);
+                              }}
                             >
                               <CreditCard className="w-4 h-4 mr-2" />
                               {t("customers.pointsManagement")}

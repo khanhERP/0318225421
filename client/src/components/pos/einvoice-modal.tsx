@@ -50,6 +50,7 @@ interface EInvoiceModalProps {
     taxRate?: number;
     afterTaxPrice?: string | number; // Add afterTaxPrice for detailed tax calculation
   }>;
+  template?: string;
   source?: "pos" | "table"; // Thêm prop để phân biệt nguồn gọi
   orderId?: number; // Thêm orderId để tự xử lý cập nhật trạng thái
   selectedPaymentMethod?: string; // Thêm prop để nhận phương thức thanh toán
@@ -60,11 +61,25 @@ export function EInvoiceModal({
   onClose,
   onConfirm,
   total,
+  template,
   cartItems = [],
   source = "pos", // Default là 'pos' để tương thích ngược
   orderId, // Thêm orderId prop
   selectedPaymentMethod = "", // Thêm selectedPaymentMethod prop
 }: EInvoiceModalProps) {
+  // Prevent modal from closing when processing
+  const handleModalClose = (open: boolean) => {
+    // Don't allow closing if any processing is happening
+    if (!open && (isPublishing || isProcessingPublish || isProcessingPublishLater)) {
+      console.log("⚠️ E-invoice: Preventing modal close during processing");
+      return;
+    }
+    
+    // If modal is being closed and not processing, call onClose
+    if (!open) {
+      onClose();
+    }
+  };
   // Debug log to track cart items data flow
   console.log("🔍 EInvoiceModal Props Analysis:");
   console.log("- isOpen:", isOpen);
@@ -281,6 +296,12 @@ export function EInvoiceModal({
         phoneNumber: "",
         email: "",
       });
+    } else {
+      // Reset all processing states when modal closes
+      setIsPublishing(false);
+      setIsProcessingPublish(false);
+      setIsProcessingPublishLater(false);
+      setLastActionTime(0);
     }
   }, [isOpen]); // Only reset when modal opens/closes
 
@@ -1772,29 +1793,36 @@ export function EInvoiceModal({
   };
 
   const handleCancel = () => {
-    setIsPublishing(false); // Reset general publishing state
-    setIsProcessingPublish(false); // Reset specific publish button state
-    setIsProcessingPublishLater(false); // Reset specific publish later button state
-    setLastActionTime(0); // Reset debounce timer
-    // Clear cart
+    console.log("🚫 E-invoice: Cancel button clicked");
+    
+    // Reset all processing states first
+    setIsPublishing(false);
+    setIsProcessingPublish(false);
+    setIsProcessingPublishLater(false);
+    setLastActionTime(0);
+    
+    // Clear cart events
     window.dispatchEvent(
       new CustomEvent("clearCart", {
         detail: {
-          source: "receipt_modal_closed",
+          source: "einvoice_modal_cancelled",
           timestamp: new Date().toISOString(),
         },
       }),
     );
+    
     window.dispatchEvent(
       new CustomEvent("printCompleted", {
         detail: { closeAllModals: true, refreshData: true },
       }),
     );
+    
+    // Close modal
     onClose();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleModalClose}>
       <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-blue-700 bg-blue-100 p-3 rounded-t-lg">

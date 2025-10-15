@@ -554,281 +554,6 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
     }
   }, [orderDetailsOpen, selectedTable, activeOrders, broadcastCartUpdate]);
 
-  // Enhanced WebSocket connection for AGGRESSIVE real-time updates
-  useEffect(() => {
-    let ws: WebSocket | null = null;
-    let reconnectTimeout: NodeJS.Timeout | null = null;
-    let shouldReconnect = true;
-
-    const connectWebSocket = () => {
-      try {
-        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const host = window.location.host;
-
-        // Check if we're on a custom domain (not replit.dev)
-        const isCustomDomain = !host.includes("replit.dev");
-
-        // For custom domains, ensure proper WebSocket URL
-        const wsUrl =
-          isCustomDomain && protocol === "wss:"
-            ? `wss://${host}/ws`
-            : `${protocol}//${host}/ws`;
-
-        console.log(
-          "🔌 TableGrid: Attempting to connect to WebSocket:",
-          wsUrl,
-          "Custom domain:",
-          isCustomDomain,
-        );
-        ws = new WebSocket(wsUrl);
-
-        ws.onopen = () => {
-          console.log("🔌 TableGrid: WebSocket connected successfully");
-          wsRef.current = ws;
-
-          // Register as table grid client
-          ws?.send(
-            JSON.stringify({
-              type: "register_table_grid",
-              timestamp: new Date().toISOString(),
-            }),
-          );
-
-          // Send initial cart state if there are active orders
-          if (activeOrders.length > 0) {
-            setTimeout(() => {
-              broadcastCartUpdate();
-            }, 500);
-          }
-        };
-
-        ws.onmessage = async (event) => {
-          try {
-            const data = JSON.parse(event.data);
-
-            // Expanded list of events that trigger aggressive refresh for table grid
-            if (
-              data.type === "popup_close" ||
-              data.type === "payment_success" ||
-              data.type === "order_status_update" ||
-              data.type === "force_refresh" ||
-              data.type === "einvoice_published" ||
-              data.type === "einvoice_saved_for_later" ||
-              data.type === "payment_completed" ||
-              data.type === "modal_closed" ||
-              data.type === "refresh_data_after_print" ||
-              data.type === "invoice_modal_closed" ||
-              data.type === "print_completed" ||
-              data.force_refresh === true
-            ) {
-              console.log(
-                "🔄 TableGrid: IMMEDIATE data refresh triggered by:",
-                data.type,
-              );
-              console.log("📊 TableGrid: Event details:", data);
-
-              // IMMEDIATE MULTI-STRATEGY REFRESH
-              try {
-                // Strategy 1: Complete cache clearing
-                queryClient.clear();
-                queryClient.removeQueries();
-
-                // Strategy 2: Force immediate fresh data fetch with multiple cache busting techniques
-                const timestamp = Date.now().toString();
-                const cacheBuster = `${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
-
-                console.log(
-                  "📡 TableGrid: Fetching fresh data with cache buster:",
-                  cacheBuster,
-                );
-
-                const [freshTables, freshOrders] = await Promise.all([
-                  fetch(
-                    `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables?_ws_refresh=${cacheBuster}&_force=true&_timestamp=${timestamp}`,
-                    {
-                      cache: "no-store",
-                      headers: {
-                        "Cache-Control": "no-cache, no-store, must-revalidate",
-                        Pragma: "no-cache",
-                        Expires: "0",
-                        "X-Requested-With": "XMLHttpRequest",
-                      },
-                    },
-                  ).then((r) => {
-                    if (!r.ok)
-                      throw new Error(`Tables fetch failed: ${r.status}`);
-                    return r.json();
-                  }),
-                  fetch(
-                    `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders?_ws_refresh=${cacheBuster}&_force=true&_timestamp=${timestamp}`,
-                    {
-                      cache: "no-store",
-                      headers: {
-                        "Cache-Control": "no-cache, no-store, must-revalidate",
-                        Pragma: "no-cache",
-                        Expires: "0",
-                        "X-Requested-With": "XMLHttpRequest",
-                      },
-                    },
-                  ).then((r) => {
-                    if (!r.ok)
-                      throw new Error(`Orders fetch failed: ${r.status}`);
-                    return r.json();
-                  }),
-                ]);
-
-                console.log("✅ TableGrid: Fresh data fetched successfully:", {
-                  tables: freshTables?.length || 0,
-                  orders: freshOrders?.length || 0,
-                });
-
-                // Strategy 3: Set fresh data immediately with forced update
-                queryClient.setQueryData(["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"], freshTables);
-                queryClient.setQueryData(["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"], freshOrders);
-
-                // Strategy 4: Multiple timed invalidations with force refetch
-                setTimeout(() => {
-                  console.log("🔄 TableGrid: First invalidation wave");
-                  queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
-                  queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-                }, 50);
-
-                setTimeout(() => {
-                  console.log("🔄 TableGrid: Second refetch wave");
-                  queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
-                  queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-                }, 200);
-
-                setTimeout(() => {
-                  console.log("🔄 TableGrid: Final force refresh wave");
-                  queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
-                  queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-                  refetchTables();
-                  refetchOrders();
-                }, 500);
-
-                console.log(
-                  "🎉 TableGrid: All refresh strategies completed successfully",
-                );
-              } catch (refreshError) {
-                console.error(
-                  "❌ TableGrid: WebSocket refresh failed, using fallback:",
-                  refreshError,
-                );
-
-                // Enhanced fallback strategy
-                queryClient.clear();
-                queryClient.removeQueries();
-
-                try {
-                  await Promise.all([refetchTables(), refetchOrders()]);
-                  console.log("✅ TableGrid: Fallback refresh completed");
-                } catch (fallbackError) {
-                  console.error(
-                    "❌ TableGrid: Even fallback failed:",
-                    fallbackError,
-                  );
-
-                  // Last resort: force page reload for critical data
-                  setTimeout(() => {
-                    if (
-                      data.type === "payment_success" ||
-                      data.type === "einvoice_published"
-                    ) {
-                      console.warn(
-                        "⚠️ TableGrid: Critical refresh failed, considering page reload...",
-                      );
-                      // Don't auto-reload, just log the issue
-                    }
-                  }, 1000);
-                }
-              }
-
-              // Strategy 5: Dispatch custom events for cross-component coordination
-              window.dispatchEvent(
-                new CustomEvent("refreshTableData", {
-                  detail: {
-                    source: "table_grid_websocket_enhanced",
-                    reason: data.type,
-                    action: data.action || "aggressive_refresh",
-                    invoiceId: data.invoiceId || null,
-                    orderId: data.orderId || null,
-                    forceRefresh: true,
-                    timestamp: new Date().toISOString(),
-                    success: true,
-                  },
-                }),
-              );
-
-              // Also dispatch to window for other components
-              window.dispatchEvent(
-                new CustomEvent("dataRefreshCompleted", {
-                  detail: {
-                    component: "table_grid",
-                    reason: data.type,
-                    timestamp: new Date().toISOString(),
-                  },
-                }),
-              );
-            }
-          } catch (error) {
-            console.error(
-              "❌ TableGrid: Error processing WebSocket message:",
-              error,
-            );
-          }
-        };
-
-        ws.onerror = (error) => {
-          console.error("❌ TableGrid: WebSocket error:", error);
-        };
-
-        ws.onclose = (event) => {
-          console.log(
-            "🔌 TableGrid: WebSocket connection closed:",
-            event.code,
-            event.reason,
-          );
-
-          // Attempt reconnection if still needed
-          if (shouldReconnect) {
-            console.log(
-              "🔄 TableGrid: Attempting WebSocket reconnection in 2 seconds...",
-            );
-            reconnectTimeout = setTimeout(connectWebSocket, 2000);
-          }
-        };
-      } catch (error) {
-        console.error(
-          "❌ TableGrid: Failed to create WebSocket connection:",
-          error,
-        );
-
-        // Retry connection after delay
-        if (shouldReconnect) {
-          reconnectTimeout = setTimeout(connectWebSocket, 3000);
-        }
-      }
-    };
-
-    // Initialize connection
-    connectWebSocket();
-
-    // Cleanup function
-    return () => {
-      console.log("🧹 TableGrid: Cleaning up WebSocket connection");
-      shouldReconnect = false;
-
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-      }
-
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.close(1000, "Component unmounting");
-      }
-    };
-  }, [queryClient, refetchTables, refetchOrders]);
-
   // Set first floor as active if no active floor is set - MUST be with other hooks
   useEffect(() => {
     if (!tables || !Array.isArray(tables)) {
@@ -2442,7 +2167,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
 
       setSelectedReceipt(receiptPreview);
       setShowReceiptPreview(false);
-      setShowReceiptModal(true);
+      setShowReceiptModal(false);
 
       console.log("📄 Showing receipt preview for table payment confirmation");
     } catch (error) {
@@ -2550,6 +2275,72 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
 
   // Handle E-invoice confirmation and complete payment
   const handleEInvoiceConfirm = async (invoiceData: any) => {
+    console.log(
+      "🔵 Table Grid: handleEInvoiceConfirm called with:",
+      invoiceData,
+    );
+
+    // Check if this is from "Phát hành sau" (publish later)
+    if (invoiceData?.publishLater) {
+      console.log("📋 Table Grid: Publish later - showing receipt directly");
+
+      // Close E-invoice modal first
+      setShowEInvoiceModal(false);
+      setOrderForEInvoice(null);
+
+      // Show receipt modal with the data from invoiceData
+      if (invoiceData.receipt) {
+        console.log(
+          "📄 Setting receipt data and opening modal:",
+          invoiceData.receipt,
+        );
+
+        // Use setTimeout to ensure modal state is clean before opening
+        setTimeout(() => {
+          setSelectedReceipt(invoiceData.receipt);
+          setShowReceiptModal(true);
+        }, 100);
+
+        toast({
+          title: "Thành công",
+          description: "Hóa đơn đã được lưu để phát hành sau",
+        });
+      }
+
+      // Refresh data
+      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
+
+      return;
+    }
+
+    // Check if this is from direct publish (Phát hành)
+    if (invoiceData?.success && invoiceData?.receipt) {
+      console.log("📋 Table Grid: Direct publish - showing receipt");
+
+      // Close E-invoice modal first
+      setShowEInvoiceModal(false);
+      setOrderForEInvoice(null);
+
+      // Show receipt modal with delay to ensure clean state
+      setTimeout(() => {
+        setSelectedReceipt(invoiceData.receipt);
+        setShowReceiptModal(true);
+      }, 100);
+
+      toast({
+        title: "Thành công",
+        description: "Hóa đơn điện tử đã được phát hành thành công",
+      });
+
+      // Refresh data
+      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
+
+      return;
+    }
+
+    // Legacy handling for old format
     if (!orderForPayment) {
       console.error("❌ No order for payment found");
       toast({
@@ -3847,12 +3638,6 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
                   ? products.find((p: any) => p.id === item.productId)
                   : null;
                 return product?.taxRate ? parseFloat(product.taxRate) : 10;
-              })(),
-              afterTaxPrice: (() => {
-                const product = Array.isArray(products)
-                  ? products.find((p: any) => p.id === item.productId)
-                  : null;
-                return product?.afterTaxPrice || null;
               })(),
             })) || []
           }
