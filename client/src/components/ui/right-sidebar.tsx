@@ -109,9 +109,9 @@ export function RightSidebar() {
   // Filter menu items based on business type
   const menuItems = baseMenuItems.filter((item) => {
     // Hide tables (Bán theo bàn) for retail and laundry business types
-    // if (item.href === "/tables" && (storeSettings?.businessType === "retail" || storeSettings?.businessType === "laundry")) {
-    //   return false;
-    // }
+    if (item.href === "/tables" && (storeSettings?.businessType === "retail" || storeSettings?.businessType === "laundry")) {
+      return false;
+    }
     return true;
   });
 
