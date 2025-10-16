@@ -457,6 +457,9 @@ export function CustomerFormModal({ isOpen, onClose, customer, initialPhone }: C
                         <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-28">
                           Trạng thái
                         </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-28">
+                          Đã trả đồ
+                        </th>
                         <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                           Ghi chú
                         </th>
@@ -490,6 +493,11 @@ export function CustomerFormModal({ isOpen, onClose, customer, initialPhone }: C
                           <td className="px-3 py-2 text-center">
                             <Badge className={getStatusBadge(order.status)}>
                               {order.status}
+                            </Badge>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <Badge className={order.isPaid ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
+                              {order.isPaid ? "Đã trả" : "Chưa trả"}
                             </Badge>
                           </td>
                           <td className="px-3 py-2 text-sm text-gray-600 truncate max-w-xs">

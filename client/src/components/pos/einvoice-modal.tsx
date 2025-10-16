@@ -50,7 +50,6 @@ interface EInvoiceModalProps {
     taxRate?: number;
     afterTaxPrice?: string | number; // Add afterTaxPrice for detailed tax calculation
   }>;
-  template?: string;
   source?: "pos" | "table"; // Thêm prop để phân biệt nguồn gọi
   orderId?: number; // Thêm orderId để tự xử lý cập nhật trạng thái
   selectedPaymentMethod?: string; // Thêm prop để nhận phương thức thanh toán
@@ -61,25 +60,11 @@ export function EInvoiceModal({
   onClose,
   onConfirm,
   total,
-  template,
   cartItems = [],
   source = "pos", // Default là 'pos' để tương thích ngược
   orderId, // Thêm orderId prop
   selectedPaymentMethod = "", // Thêm selectedPaymentMethod prop
 }: EInvoiceModalProps) {
-  // Prevent modal from closing when processing
-  const handleModalClose = (open: boolean) => {
-    // Don't allow closing if any processing is happening
-    if (!open && (isPublishing || isProcessingPublish || isProcessingPublishLater)) {
-      console.log("⚠️ E-invoice: Preventing modal close during processing");
-      return;
-    }
-    
-    // If modal is being closed and not processing, call onClose
-    if (!open) {
-      onClose();
-    }
-  };
   // Debug log to track cart items data flow
   console.log("🔍 EInvoiceModal Props Analysis:");
   console.log("- isOpen:", isOpen);
@@ -221,10 +206,25 @@ export function EInvoiceModal({
     enabled: isOpen,
   });
 
-  // Fetch active invoice templates for dropdown
-  const { data: allInvoiceTemplates = [] } = useQuery<any[]>({
+  // Fetch active invoice templates for dropdown - use correct query key
+  const { data: invoiceTemplates = [] } = useQuery<any[]>({
     queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoice-templates/active"],
+    queryFn: async () => {
+      try {
+        const response = await apiRequest("GET", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoice-templates/active");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log("📋 Fetched active invoice templates:", data);
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error("Error fetching active invoice templates:", error);
+        return [];
+      }
+    },
     enabled: isOpen,
+    staleTime: 300000,
   });
 
   // Query all products to get tax rates
@@ -266,11 +266,6 @@ export function EInvoiceModal({
     staleTime: 300000,
   });
 
-  // Filter templates to only show ones that are in use (useCK: true)
-  const invoiceTemplates = allInvoiceTemplates.filter(
-    (template) => template.useCK === true,
-  );
-
   // Reset form only when modal opens, not when cartItems/total changes
   useEffect(() => {
     if (isOpen) {
@@ -285,25 +280,23 @@ export function EInvoiceModal({
         Array.isArray(cartItems),
       );
       console.log("🔥 total when modal opens:", total);
+      console.log("🔥 Available invoice templates:", invoiceTemplates);
 
+      // Set default template from available templates
+      const defaultTemplate = invoiceTemplates.find((t: any) => t.isDefault) || invoiceTemplates[0];
+      
       setFormData({
         invoiceProvider: "EasyInvoice", // Default provider
-        invoiceTemplate: "1C25TYY", // Default template
-        selectedTemplateId: "",
+        invoiceTemplate: defaultTemplate?.name || "1C25TYY", // Use actual template name
+        selectedTemplateId: defaultTemplate?.id?.toString() || "",
         taxCode: "0123456789", // Default tax code
         customerName: "Khách hàng lẻ", // Default customer name
         address: "",
         phoneNumber: "",
         email: "",
       });
-    } else {
-      // Reset all processing states when modal closes
-      setIsPublishing(false);
-      setIsProcessingPublish(false);
-      setIsProcessingPublishLater(false);
-      setLastActionTime(0);
     }
-  }, [isOpen]); // Only reset when modal opens/closes
+  }, [isOpen, invoiceTemplates]); // Add invoiceTemplates dependency
 
   // Separate effect for debugging cartItems changes without resetting form
   useEffect(() => {
@@ -963,15 +956,9 @@ export function EInvoiceModal({
             invoiceNumber: null, // No invoice number yet for publish later
             symbol: selectedTemplate?.symbol || null,
             templateNumber: selectedTemplate?.templateNumber || null,
-            tradeNumber: null, // No trade number yet
             notes: `E-Invoice draft saved - MST: ${formData.taxCode || "N/A"}, Template: ${selectedTemplate?.name || "N/A"}, Đợi phát hành sau`,
             paidAt: new Date().toISOString(),
           };
-
-          console.log(
-            "📝 Order update payload for publish later:",
-            orderUpdateData,
-          );
 
           const updateResponse = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${orderId}`, {
             method: "PUT",
@@ -987,10 +974,6 @@ export function EInvoiceModal({
               "✅ Order updated successfully for publish later:",
               updatedOrder,
             );
-
-            // Force refresh order data
-            queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-            queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
           } else {
             const errorText = await updateResponse.text();
             console.error(
@@ -1793,36 +1776,23 @@ export function EInvoiceModal({
   };
 
   const handleCancel = () => {
-    console.log("🚫 E-invoice: Cancel button clicked");
+    setIsPublishing(false); // Reset general publishing state
+    setIsProcessingPublish(false); // Reset specific publish button state
+    setIsProcessingPublishLater(false); // Reset specific publish later button state
+    setLastActionTime(0); // Reset debounce timer
     
-    // Reset all processing states first
-    setIsPublishing(false);
-    setIsProcessingPublish(false);
-    setIsProcessingPublishLater(false);
-    setLastActionTime(0);
-    
-    // Clear cart events
+    // Dispatch event for other components
     window.dispatchEvent(
-      new CustomEvent("clearCart", {
-        detail: {
-          source: "einvoice_modal_cancelled",
-          timestamp: new Date().toISOString(),
-        },
+      new CustomEvent("einvoiceModalClosed", {
+        detail: { refreshData: true, timestamp: new Date().toISOString() },
       }),
     );
     
-    window.dispatchEvent(
-      new CustomEvent("printCompleted", {
-        detail: { closeAllModals: true, refreshData: true },
-      }),
-    );
-    
-    // Close modal
     onClose();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleModalClose}>
+    <Dialog open={isOpen} onOpenChange={handleCancel}>
       <DialogContent className="max-w-2xl max-h-screen overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-blue-700 bg-blue-100 p-3 rounded-t-lg">
@@ -2105,7 +2075,6 @@ export function EInvoiceModal({
                 e.stopPropagation();
                 setLastActionTime(0); // Reset debounce timer
                 handleCancel();
-                onClose();
               }}
               className="flex-1"
               disabled={

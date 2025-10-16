@@ -22,8 +22,7 @@ interface ReceiptModalProps {
   cartItems?: any[];
   total?: number;
   isPreview?: boolean;
-  onConfirm?: () => void;
-  autoClose?: boolean;
+  onConfirm?: (orderData?: any) => void;
   isTitle?: boolean;
 }
 
@@ -35,7 +34,6 @@ export function ReceiptModal({
   total = 0,
   isPreview = false,
   onConfirm,
-  autoClose = false,
   isTitle = true,
 }: ReceiptModalProps) {
   // ALL HOOKS MUST BE AT THE TOP LEVEL - NEVER CONDITIONAL
@@ -51,12 +49,22 @@ export function ReceiptModal({
     isTitle,
     hasReceipt: !!receipt,
     hasCartItems: cartItems?.length > 0,
+    receiptIsPreview: receipt?.isPreview,
   });
 
-  // Calculate title directly from props instead of using state
-  let title = isTitle
-    ? `${t("common.paymentInvoice")}`
-    : `${t("common.provisionalVoucher")}`;
+  // CRITICAL: Always use prop isPreview, completely ignore receipt.isPreview
+  console.log("🔍 ReceiptModal mode:", {
+    propIsPreview: isPreview,
+    receiptIsPreview: receipt?.isPreview,
+    isTitleProp: isTitle,
+    mode: isPreview ? "PREVIEW" : "FINAL RECEIPT",
+  });
+
+  // Calculate title: isTitle=true always shows payment invoice, otherwise use isPreview
+  let title =
+    isTitle === false
+      ? `${t("pos.receiptPreview")}`
+      : `${t("common.paymentInvoice")}`;
 
   // Query store settings
   const { data: storeSettings } = useQuery({
@@ -1009,19 +1017,43 @@ export function ReceiptModal({
     console.log(
       "📄 Receipt Modal: Confirming receipt and proceeding to payment method selection",
     );
-    console.log("🎯 Receipt data being passed:", {
-      receipt,
-      cartItems,
-      total,
-      subtotal: receipt?.subtotal,
-      tax: receipt?.tax,
-      exactTotal: receipt?.exactTotal,
-      exactSubtotal: receipt?.exactSubtotal,
-      exactTax: receipt?.exactTax,
-    });
 
-    // Show payment method modal directly
-    setShowPaymentMethodModal(true);
+    // Prepare complete order data with exact values
+    const orderDataForPayment = {
+      ...receipt,
+      items: receipt?.items || cartItems.map((item: any) => ({
+        id: item.id,
+        productId: item.productId || item.id,
+        productName: item.productName || item.name,
+        sku: item.sku || `FOOD${String(item.productId || item.id).padStart(5, "0")}`,
+        quantity: item.quantity,
+        price: parseFloat(item.price || item.unitPrice || "0"),
+        unitPrice: parseFloat(item.unitPrice || item.price || "0"),
+        discount: parseFloat(item.discount || "0"),
+        taxRate: parseFloat(item.taxRate || "0"),
+        total: (parseFloat(item.price || item.unitPrice || "0") * item.quantity) - parseFloat(item.discount || "0")
+      })),
+      exactSubtotal: receipt?.exactSubtotal || parseFloat(receipt?.subtotal || "0"),
+      exactTax: receipt?.exactTax || parseFloat(receipt?.tax || "0"),
+      exactDiscount: receipt?.exactDiscount || parseFloat(receipt?.discount || "0"),
+      exactTotal: receipt?.exactTotal || parseFloat(receipt?.total || "0") || total,
+    };
+
+    console.log("🎯 Complete order data being passed:", orderDataForPayment);
+
+    // Store in window for parent component to access
+    if (typeof window !== "undefined") {
+      (window as any).orderForPayment = orderDataForPayment;
+    }
+
+    // Close preview modal first
+    onClose();
+
+    // Call onConfirm with order data if provided
+    if (onConfirm) {
+      console.log("📄 Receipt Modal: Calling onConfirm callback with order data");
+      onConfirm(orderDataForPayment);
+    }
   };
 
   // Placeholder for handlePaymentMethodSelect, assuming it's defined elsewhere or in a parent component
@@ -1042,21 +1074,6 @@ export function ReceiptModal({
       "🔴 Receipt Modal: handleClose called - mode:",
       isPreview ? "PREVIEW" : "FINAL",
     );
-
-    // ALWAYS send close event to ensure all modals are closed
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(
-        new CustomEvent("closeAllPopups", {
-          detail: {
-            source: "receipt_modal_closed",
-            showSuccessNotification: false,
-            clearCustomer: !isPreview, // Only clear customer when closing final receipt
-            closeAllModals: true, // Explicit flag to close everything
-            timestamp: new Date().toISOString(),
-          },
-        }),
-      );
-    }
 
     if (!isPreview) {
       window.dispatchEvent(
@@ -1114,17 +1131,13 @@ export function ReceiptModal({
               <div className="flex items-center justify-center">
                 <img src={logoPath} alt="EDPOS Logo" className="h-6" />
               </div>
-              <p className="text-lg mb-2 invoice_title">
-                {isTitle
-                  ? `${t("common.paymentInvoice")}`
-                  : `${t("common.provisionalVoucher")}`}
-              </p>
+              <p className="text-lg mb-2 invoice_title">{title}</p>
             </div>
 
             <div className="border-t border-b border-gray-300 py-3 mb-3">
               <div className="flex justify-between text-sm">
                 <span>{t("pos.transactionNumber")}</span>
-                <span>{receipt.transactionId}</span>
+                <span>{receipt.orderNumber || receipt.transactionId}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span>{t("pos.date")}</span>
@@ -1134,10 +1147,20 @@ export function ReceiptModal({
                 <span>{t("pos.cashier")}</span>
                 <span>{receipt.cashierName}</span>
               </div>
-              {receipt?.customerName && (
+              <div className="flex justify-between text-sm">
+                <span>{t("einvoice.customer")}:</span>
+                <span>{receipt.customerName || "Khách hàng lẻ"}</span>
+              </div>
+              {(receipt.customerPhone ||
+                receipt.phone ||
+                receipt.customer_phone) && (
                 <div className="flex justify-between text-sm">
-                  <span>{t("einvoice.customer")}:</span>
-                  <span>{receipt.customerName}</span>
+                  <span>Điện thoại:</span>
+                  <span>
+                    {receipt.customerPhone ||
+                      receipt.phone ||
+                      receipt.customer_phone}
+                  </span>
                 </div>
               )}
               {receipt?.customerTaxCode && (
@@ -1245,47 +1268,83 @@ export function ReceiptModal({
               </div>
               {(() => {
                 // Group items by tax rate and calculate tax for each group
+                const priceIncludeTax =
+                  receipt.priceIncludeTax ??
+                  storeSettings?.priceIncludesTax ??
+                  false;
+
                 const taxGroups = (receipt.items || []).reduce(
                   (groups, item) => {
                     const taxRate = parseFloat(
                       item.taxRate || item.product?.taxRate || "0",
                     );
-                    const unitPrice = parseFloat(
-                      item.unitPrice || item.price || "0",
-                    );
-                    const quantity = item.quantity || 1;
-                    const itemDiscount = parseFloat(item.discount || "0");
-                    const itemSubtotal = unitPrice * quantity;
-                    // Calculate tax for this item based on its tax rate
-                    const itemTax =
-                      (itemSubtotal - itemDiscount) *
-                      (taxRate / (100 + taxRate));
 
-                    if (!groups[taxRate]) {
-                      groups[taxRate] = 0;
+                    // Nếu có tax từ database, dùng luôn
+                    const itemTaxFromDB = parseFloat(item.tax || "0");
+
+                    if (taxRate > 0) {
+                      if (!groups[taxRate]) {
+                        groups[taxRate] = 0;
+                      }
+
+                      // Ưu tiên dùng tax đã tính từ database
+                      if (itemTaxFromDB > 0) {
+                        groups[taxRate] += itemTaxFromDB;
+                      } else {
+                        // Nếu không có, tính lại
+                        const unitPrice = parseFloat(
+                          item.unitPrice || item.price || "0",
+                        );
+                        const quantity = item.quantity || 1;
+                        const itemDiscount = parseFloat(item.discount || "0");
+                        const itemSubtotal = unitPrice * quantity;
+
+                        let itemTax = 0;
+                        if (priceIncludeTax) {
+                          // Giá đã bao gồm thuế: thuế = (giá - giảm giá) * (thuế suất / (100 + thuế suất))
+                          const priceAfterDiscount =
+                            itemSubtotal - itemDiscount;
+                          itemTax =
+                            priceAfterDiscount * (taxRate / (100 + taxRate));
+                        } else {
+                          // Giá chưa bao gồm thuế: thuế = (giá - giảm giá) * (thuế suất / 100)
+                          const priceAfterDiscount =
+                            itemSubtotal - itemDiscount;
+                          itemTax = priceAfterDiscount * (taxRate / 100);
+                        }
+                        groups[taxRate] += itemTax;
+                      }
                     }
-                    groups[taxRate] += itemTax;
 
                     return groups;
                   },
                   {} as Record<number, number>,
                 );
 
-                // Sort tax rates in descending order
+                // Sort tax rates in descending order and filter out 0% tax
                 const sortedTaxRates = Object.keys(taxGroups)
                   .map(Number)
+                  .filter((taxRate) => taxRate > 0 && taxGroups[taxRate] > 0) // Chỉ hiển thị khi có thuế > 0
                   .sort((a, b) => b - a);
 
-                return sortedTaxRates.map((taxRate) => (
-                  <div key={taxRate} className="flex justify-between text-sm">
-                    <span>
-                      {t("reports.tax")} ({taxRate}%):
-                    </span>
-                    <span>
-                      {Math.floor(taxGroups[taxRate]).toLocaleString("vi-VN")} ₫
-                    </span>
-                  </div>
-                ));
+                return (
+                  <>
+                    {sortedTaxRates.map((taxRate) => (
+                      <div
+                        key={taxRate}
+                        className="flex justify-between text-sm"
+                      >
+                        <span>Thuế ({taxRate}%):</span>
+                        <span>
+                          {Math.floor(taxGroups[taxRate]).toLocaleString(
+                            "vi-VN",
+                          )}{" "}
+                          ₫
+                        </span>
+                      </div>
+                    ))}
+                  </>
+                );
               })()}
               {(() => {
                 // Only show discount if there are item-level discounts or order-level discount
@@ -1359,11 +1418,7 @@ export function ReceiptModal({
               <div className="flex items-center justify-center">
                 <img src={logoPath} alt="EDPOS Logo" className="h-6" />
               </div>
-              <p className="text-lg mb-2 invoice_title">
-                {isTitle
-                  ? `${t("common.paymentInvoice")}`
-                  : `${t("common.provisionalVoucher")}`}
-              </p>
+              <p className="text-lg mb-2 invoice_title">{title}</p>
             </div>
 
             <div className="border-t border-b border-gray-300 py-3 mb-3">
@@ -1586,9 +1641,10 @@ export function ReceiptModal({
                   {} as Record<number, number>,
                 );
 
-                // Sort tax rates in descending order
+                // Sort tax rates in descending order and filter out 0% tax
                 const sortedTaxRates = Object.keys(taxGroups)
                   .map(Number)
+                  .filter((taxRate) => taxRate > 0) // Chỉ hiển thị thuế suất > 0%
                   .sort((a, b) => b - a);
 
                 return sortedTaxRates.map((taxRate) => (

@@ -633,7 +633,7 @@ export const posTranslations: { [key: string]: POSTranslations } = {
     addedToCartShort: "Đã thêm vào giỏ",
     hasBeenAddedToOrder: " đã được thêm vào đơn hàng",
     addedToOrderToast: " đã được thêm vào đơn hàng",
-    receiptPreview: "Xem trước hóa đơn",
+    receiptPreview: "Phiếu tạm tính",
     cancel: "Hủy",
     confirmAndSelectPayment: "Xác nhận & Chọn thanh toán",
     thankYouBusiness: "Cảm ơn bạn đã mua hàng!",

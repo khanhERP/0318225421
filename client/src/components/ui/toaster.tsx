@@ -25,11 +25,17 @@ export function Toaster() {
         let translatedDescription = description;
         if (description) {
           if (typeof description === 'string') {
+            // Check if it's a translation key (contains dot notation like "settings.productCreatedSuccess")
             if (description.includes('.')) {
-              translatedDescription = t(description as any);
+              // Try to translate - the t() function already handles dot notation
+              const translated = t(description as any);
+              // Only use translation if it's different from the key (meaning translation was found)
+              if (translated !== description) {
+                translatedDescription = translated;
+              }
             }
             // Handle "Failed to create product" errors with more context
-            if (description.includes('Failed to create product')) {
+            else if (description.includes('Failed to create product')) {
               translatedDescription = 'Không thể tạo sản phẩm. Vui lòng kiểm tra lại thông tin và thử lại.';
             }
           }

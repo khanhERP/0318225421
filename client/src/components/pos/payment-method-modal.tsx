@@ -157,6 +157,7 @@ export function PaymentMethodModal({
   const [qrLoading, setQrLoading] = useState(false);
   const [amountReceived, setAmountReceived] = useState("");
   const [showCashPayment, setShowCashPayment] = useState(false);
+  const [isShowTitle, setIsShowTitle] = useState(true); // Always true for invoice receipts
   const [currentTransactionUuid, setCurrentTransactionUuid] = useState<
     string | null
   >(null);
@@ -173,107 +174,26 @@ export function PaymentMethodModal({
   const [receiptDataForModal, setReceiptDataForModal] = useState<any>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false); // Add showPrintDialog state
 
-  // Load payment methods from settings
+  // Query payment methods from API
+  const { data: paymentMethodsData } = useQuery({
+    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/payment-methods"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/payment-methods");
+      return response.json();
+    },
+    enabled: isOpen, // Only fetch when modal is open
+  });
+
+  // Load payment methods from API
   const getPaymentMethods = () => {
-    const savedPaymentMethods = localStorage.getItem("paymentMethods");
+    const paymentMethods = paymentMethodsData || [];
 
-    const defaultPaymentMethods = [
-      {
-        id: 1,
-        nameKey: "cash",
-        type: "cash",
-        enabled: true,
-        icon: "💵",
-      },
-      {
-        id: 2,
-        nameKey: "creditCard",
-        type: "card",
-        enabled: false,
-        icon: "💳",
-      },
-      {
-        id: 3,
-        nameKey: "debitCard",
-        type: "debit",
-        enabled: false,
-        icon: "💳",
-      },
-      {
-        id: 4,
-        nameKey: "momo",
-        type: "digital",
-        enabled: false,
-        icon: "📱",
-      },
-      {
-        id: 5,
-        nameKey: "zalopay",
-        type: "digital",
-        enabled: false,
-        icon: "📱",
-      },
-      {
-        id: 6,
-        nameKey: "vnpay",
-        type: "digital",
-        enabled: false,
-        icon: "💳",
-      },
-      {
-        id: 7,
-        nameKey: "qrCode",
-        type: "qr",
-        enabled: true,
-        icon: "📱",
-      },
-      {
-        id: 8,
-        nameKey: "shopeepay",
-        type: "digital",
-        enabled: false,
-        icon: "🛒",
-      },
-      {
-        id: 9,
-        nameKey: "grabpay",
-        type: "digital",
-        enabled: false,
-        icon: "🚗",
-      },
-    ];
-
-    const paymentMethods = savedPaymentMethods
-      ? JSON.parse(savedPaymentMethods)
-      : defaultPaymentMethods;
-
-    console.log("All payment methods:", paymentMethods);
-
-    // Ensure cash payment is always available
-    const cashMethodExists = paymentMethods.find(
-      (method) => method.nameKey === "cash" && method.enabled,
-    );
-    if (!cashMethodExists) {
-      const cashMethod = paymentMethods.find(
-        (method) => method.nameKey === "cash",
-      );
-      if (cashMethod) {
-        cashMethod.enabled = true;
-      } else {
-        paymentMethods.unshift({
-          id: 1,
-          nameKey: "cash",
-          type: "cash",
-          enabled: true,
-          icon: "💵",
-        });
-      }
-    }
+    console.log("All payment methods from API:", paymentMethods);
 
     // Filter to only return enabled payment methods and map to modal format
     const enabledMethods = paymentMethods
-      .filter((method) => method.enabled === true)
-      .map((method) => ({
+      .filter((method: any) => method.enabled === true)
+      .map((method: any) => ({
         id: method.nameKey,
         name: getPaymentMethodName(method.nameKey),
         icon: getIconComponent(method.type),
@@ -343,6 +263,7 @@ export function PaymentMethodModal({
     console.log(
       `🔥 HANDLESELECT FUNCTION CALLED - Method: ${method}, Order ID: ${orderInfo.id}`,
     );
+    console.log(`🔍 onSelectMethod callback exists:`, !!onSelectMethod);
 
     // EARLY VALIDATION: Check if orderInfo exists and has an ID
     if (!orderInfo || !orderInfo.id) {
@@ -638,9 +559,6 @@ export function PaymentMethodModal({
                 );
 
                 setTimeout(() => {
-                  console.log(
-                    "Fallback QR Payment: Closing WebSocket connection",
-                  );
                   ws.close();
                 }, 2000);
               };
@@ -1020,10 +938,6 @@ export function PaymentMethodModal({
               },
             );
 
-            orderInfo.id = updatedOrder.id;
-            receipt.id = updatedOrder.id;
-            orderForPayment.id = updatedOrder.id;
-
             // ALWAYS update table status if order has a table - regardless of payment method
             if (updatedOrder.tableId) {
               console.log(
@@ -1033,9 +947,9 @@ export function PaymentMethodModal({
               try {
                 // Check if there are any other unpaid orders on this table
                 const ordersResponse = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders", {
-                  cache: "no-store",
+                  method: "GET",
                   headers: {
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Content-Type": "application/json",
                   },
                 });
 
@@ -1363,9 +1277,6 @@ export function PaymentMethodModal({
         if (statusResponse.ok) {
           const data = await statusResponse.json();
           console.log(`✅ Order status updated to paid successfully:`, data);
-          orderInfo.id = data.id;
-          receipt.id = data.id;
-          orderForPayment.id = data.id;
 
           setShowQRCode(false);
           setQrCodeUrl("");
@@ -1379,9 +1290,9 @@ export function PaymentMethodModal({
             try {
               // Check if there are any other unpaid orders on this table
               const ordersResponse = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders", {
-                cache: "no-store",
+                method: "GET",
                 headers: {
-                  "Cache-Control": "no-cache, no-store, must-revalidate",
+                  "Content-Type": "application/json",
                 },
               });
 
@@ -1650,9 +1561,6 @@ export function PaymentMethodModal({
       if (updateResponse.ok) {
         const updatedOrder = await updateResponse.json();
         console.log("✅ Multi-payment order updated:", updatedOrder);
-        orderInfo.id = updatedOrder.id;
-        receipt.id = updatedOrder.id;
-        orderForPayment.id = updatedOrder.id;
 
         // ALWAYS update table status if order has a table - regardless of payment method
         if (updatedOrder.tableId) {
@@ -1663,9 +1571,9 @@ export function PaymentMethodModal({
           try {
             // Check if there are any other unpaid orders on this table
             const ordersResponse = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders", {
-              cache: "no-store",
+              method: "GET",
               headers: {
-                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Content-Type": "application/json",
               },
             });
 
@@ -2014,9 +1922,6 @@ export function PaymentMethodModal({
             `✅ Order status updated to paid successfully:`,
             updatedOrder,
           );
-          orderInfo.id = updatedOrder.id;
-          receipt.id = updatedOrder.id;
-          orderForPayment.id = updatedOrder.id;
 
           // ALWAYS update table status if order has a table - for cash payment
           if (updatedOrder.tableId) {
@@ -2027,9 +1932,9 @@ export function PaymentMethodModal({
             try {
               // Check if there are any other unpaid orders on this table
               const ordersResponse = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders", {
-                cache: "no-store",
+                method: "GET",
                 headers: {
-                  "Cache-Control": "no-cache, no-store, must-revalidate",
+                  "Content-Type": "application/json",
                 },
               });
 
@@ -2186,52 +2091,44 @@ export function PaymentMethodModal({
     // Show success message based on action type
     if (invoiceData.publishLater) {
       console.log(
-        "⏳ E-Invoice publish later completed - will show receipt modal with isPreview=false, isTitle=true",
+        "⏳ E-Invoice publish later completed - preparing receipt data",
       );
       toast({
         title: `${t("common.success")}`,
         description: `${t("einvoice.savedForLaterPublish")}. ${t("einvoice.displayingForPrint")}`,
       });
     } else {
-      console.log(
-        "✅ E-Invoice published - will show receipt modal with isPreview=false, isTitle=true",
-      );
+      console.log("✅ E-Invoice published - preparing receipt data");
       toast({
         title: `${t("common.success")}`,
         description: `${t("einvoice.electronicinvoicehasbeensuccessfully")}`,
       });
     }
 
-    // Check if we have valid receipt data
-    if (invoiceData.receipt && typeof invoiceData.receipt === "object") {
-      console.log(
-        "📄 Valid receipt data found, setting for receipt modal with isPreview=false, isTitle=true:",
-        invoiceData.receipt,
-      );
+    // CRITICAL: Prepare complete receipt data
+    const completeReceiptData = {
+      ...invoiceData.receipt,
+      tax: orderInfo?.tax || invoiceData.receipt?.tax || 0,
+      discount: receipt?.discount || orderInfo?.discount || 0,
+      isInvoice: true,
+      isPreview: false, // Final receipt, not preview
+      paymentMethod: selectedPaymentMethod,
+    };
 
-      // Ensure receipt has all necessary data including tax and discount
-      const completeReceiptData = {
-        ...invoiceData.receipt,
-        tax: orderInfo?.tax || invoiceData.receipt.tax,
-        discount: receipt?.discount || orderInfo?.discount || 0,
-        isInvoice: true, // Mark as invoice for receipt modal
-        paymentMethod: selectedPaymentMethod, // Include payment method
-      };
+    console.log("📄 Complete receipt data prepared:", completeReceiptData);
 
-      // Set receipt data for modal
-      setReceiptDataForModal(completeReceiptData);
-      setShowReceiptModal(true); // Show receipt modal
-    } else {
-      // If no receipt data, pass to parent via callback if available
-      if (onReceiptReady) {
-        console.log("📤 Passing receipt data to parent component");
-        onReceiptReady({
-          ...invoiceData.receipt,
-          isInvoice: true,
-        });
-      }
-    }
-    // Reset payment method selection
+    // Close all modals and notify parent
+    onClose(); // Close payment modal
+
+    // Call parent callback with receipt data and payment completion
+    onSelectMethod("paymentCompleted", {
+      success: true,
+      receipt: completeReceiptData,
+      shouldShowReceipt: true,
+      publishLater: invoiceData.publishLater,
+    });
+
+    // Reset state
     setSelectedPaymentMethod("");
   };
 
@@ -2240,6 +2137,8 @@ export function PaymentMethodModal({
 
     setShowEInvoice(false);
     setSelectedPaymentMethod("");
+    setReceiptPreview(false);
+    setPreviewReceipt(null);
     onClose(); // Always close the entire payment modal when E-invoice is closed
   };
 
@@ -3173,17 +3072,31 @@ export function PaymentMethodModal({
                 "📧 E-Invoice confirmed from Payment Method Modal:",
                 invoiceData,
               );
-              invoiceData.receipt = receipt;
+
+              // Ensure receipt data has isPreview = false
+              const finalReceiptData = {
+                ...(invoiceData.receipt || receipt),
+                isPreview: false, // CRITICAL: Force false for final receipt
+                isInvoice: true,
+              };
+
+              invoiceData.receipt = finalReceiptData;
+
               // Always call handleEInvoiceComplete to ensure proper processing
               handleEInvoiceComplete(invoiceData);
+
+              // Close E-Invoice modal first
+              setShowEInvoice(false);
+              setShowReceiptModal(true);
 
               // Then notify parent component with payment completion to show receipt
               onSelectMethod("paymentCompleted", {
                 success: true,
                 publishLater: invoiceData.publishLater,
-                receipt: invoiceData.receipt || receiptDataForModal,
+                receipt: finalReceiptData,
                 shouldShowReceipt: true,
                 showReceiptModal: true,
+                isPreview: false, // CRITICAL: Explicitly false
                 source: "payment_method_modal_einvoice",
               });
             }}
@@ -3263,7 +3176,7 @@ export function PaymentMethodModal({
                 };
               });
             })()}
-            orderId={receipt.id || orderInfo.id || orderForPayment.id}
+            orderId={receipt?.id || orderInfo?.id || orderForPayment?.id}
           />
         )}
 
@@ -3279,7 +3192,7 @@ export function PaymentMethodModal({
         })}
       </Dialog>
 
-      {/* CRITICAL: Render Receipt Modal and PrintDialog outside Dialog to prevent conflicts */}
+      {/* Receipt Modal - CRITICAL: Always show with isPreview=false after payment */}
       {showReceiptModal && receiptDataForModal && (
         <ReceiptModal
           isOpen={showReceiptModal}
@@ -3291,24 +3204,6 @@ export function PaymentMethodModal({
             onClose();
           }}
           receipt={receiptDataForModal}
-          onPrint={() => {
-            // When print is triggered from ReceiptModal, we want to open the PrintDialog
-            setShowPrintDialog(true);
-          }}
-        />
-      )}
-
-      {/* Print Dialog */}
-      {showPrintDialog && receiptDataForModal && (
-        <PrintDialog
-          isOpen={showPrintDialog}
-          onClose={() => {
-            console.log("🔒 Payment Modal: Print dialog closed");
-            setShowPrintDialog(false);
-            // Reset receipt data after print dialog is closed
-            setReceiptDataForModal(null);
-          }}
-          receiptData={receiptDataForModal}
         />
       )}
     </>

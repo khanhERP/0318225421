@@ -97,6 +97,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
   const [previewReceipt, setPreviewReceipt] = useState<any>(null);
   const [orderForPayment, setOrderForPayment] = useState<any>(null);
   const [activeFloor, setActiveFloor] = useState("1");
+  const [isTitle, setIsTitle] = useState(false);
   const [splitOrderOpen, setSplitOrderOpen] = useState(false); // State for split order modal
 
   // Listen for print completion event
@@ -111,6 +112,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
       setOrderDetailsOpen(false);
       setPaymentMethodsOpen(false);
       setShowPaymentMethodModal(false);
+      setShowEInvoiceModal(false);
       setShowReceiptModal(false);
       setShowReceiptPreview(false);
       setPreviewReceipt(null);
@@ -134,7 +136,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
         handlePrintCompleted as EventListener,
       );
     };
-  }, [queryClient, showEInvoiceModal]);
+  }, [queryClient]);
 
   const {
     data: tables,
@@ -280,14 +282,6 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
   useEffect(() => {
     const handlePaymentCompleted = (event: CustomEvent) => {
       console.log("🛡️ Table Grid: Payment completed event received");
-
-      // Don't close modals during E-invoice flow
-      if (event.detail?.fromEInvoice) {
-        console.log(
-          "🛡️ Table Grid: Payment from E-invoice, keeping modals open",
-        );
-        return;
-      }
 
       // Only invalidate - don't force refetch, let cache handle it
       if (!event.detail?.skipAllRefetch) {
@@ -519,14 +513,14 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
           },
         );
 
-        try {
-          wsRef.current.send(JSON.stringify(cartData));
-        } catch (error) {
-          console.error(
-            "📡 Table Grid: Error broadcasting cart update:",
-            error,
-          );
-        }
+        // try {
+        //   wsRef.current.send(JSON.stringify(cartData));
+        // } catch (error) {
+        //   console.error(
+        //     "📡 Table Grid: Error broadcasting cart update:",
+        //     error,
+        //   );
+        // }
       } else {
         console.log("📡 Table Grid: WebSocket not available for broadcasting");
       }
@@ -701,7 +695,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
             }
           } else {
             console.log(
-              `⏳ Table ${completedOrder.tableId} still has ${otherActiveOrders.length} active orders, keeping occupied status`,
+              `te� Table ${completedOrder.tableId} still has ${otherActiveOrders.length} active orders, keeping occupied status`,
             );
           }
         } catch (error) {
@@ -1965,11 +1959,15 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
             : "Đơn hàng đã được thanh toán thành công",
         });
 
-        // Show receipt if provided
+        // CRITICAL: Show receipt modal if receipt data is provided
         if (paymentData.receipt && paymentData.shouldShowReceipt !== false) {
-          console.log("📄 Table Grid: Showing final receipt modal");
+          console.log(
+            "📄 Table Grid: Showing final receipt modal with data:",
+            paymentData.receipt,
+          );
           setSelectedReceipt(paymentData.receipt);
-          setShowReceiptModal(true);
+          setIsTitle(true);
+          setShowReceiptModal(true); // CRITICAL: Enable receipt modal display
         }
 
         console.log(
@@ -2275,72 +2273,6 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
 
   // Handle E-invoice confirmation and complete payment
   const handleEInvoiceConfirm = async (invoiceData: any) => {
-    console.log(
-      "🔵 Table Grid: handleEInvoiceConfirm called with:",
-      invoiceData,
-    );
-
-    // Check if this is from "Phát hành sau" (publish later)
-    if (invoiceData?.publishLater) {
-      console.log("📋 Table Grid: Publish later - showing receipt directly");
-
-      // Close E-invoice modal first
-      setShowEInvoiceModal(false);
-      setOrderForEInvoice(null);
-
-      // Show receipt modal with the data from invoiceData
-      if (invoiceData.receipt) {
-        console.log(
-          "📄 Setting receipt data and opening modal:",
-          invoiceData.receipt,
-        );
-
-        // Use setTimeout to ensure modal state is clean before opening
-        setTimeout(() => {
-          setSelectedReceipt(invoiceData.receipt);
-          setShowReceiptModal(true);
-        }, 100);
-
-        toast({
-          title: "Thành công",
-          description: "Hóa đơn đã được lưu để phát hành sau",
-        });
-      }
-
-      // Refresh data
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
-
-      return;
-    }
-
-    // Check if this is from direct publish (Phát hành)
-    if (invoiceData?.success && invoiceData?.receipt) {
-      console.log("📋 Table Grid: Direct publish - showing receipt");
-
-      // Close E-invoice modal first
-      setShowEInvoiceModal(false);
-      setOrderForEInvoice(null);
-
-      // Show receipt modal with delay to ensure clean state
-      setTimeout(() => {
-        setSelectedReceipt(invoiceData.receipt);
-        setShowReceiptModal(true);
-      }, 100);
-
-      toast({
-        title: "Thành công",
-        description: "Hóa đơn điện tử đã được phát hành thành công",
-      });
-
-      // Refresh data
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
-
-      return;
-    }
-
-    // Legacy handling for old format
     if (!orderForPayment) {
       console.error("❌ No order for payment found");
       toast({
@@ -2372,7 +2304,36 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
       let subtotal = 0;
       let totalTax = 0;
 
-      const currentOrderItems = orderForPayment?.orderItems || orderItems || [];
+      // CRITICAL: Get the correct order ID from orderForPayment
+      const currentOrderId = orderForPayment?.id;
+      console.log(
+        "🔍 Table: Getting order items for order ID:",
+        currentOrderId,
+      );
+
+      // Fetch order items for the specific order being paid
+      let currentOrderItems = [];
+      if (currentOrderId) {
+        try {
+          const response = await apiRequest(
+            "GET",
+            `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${currentOrderId}`,
+          );
+          currentOrderItems = await response.json();
+          console.log(
+            "✅ Table: Fetched order items for E-invoice receipt:",
+            currentOrderItems.length,
+          );
+        } catch (error) {
+          console.error(
+            "❌ Table: Error fetching order items for E-invoice:",
+            error,
+          );
+          currentOrderItems = orderForPayment?.orderItems || [];
+        }
+      } else {
+        currentOrderItems = orderForPayment?.orderItems || [];
+      }
 
       if (Array.isArray(currentOrderItems) && Array.isArray(products)) {
         currentOrderItems.forEach((item: any) => {
@@ -2444,8 +2405,6 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
 
       // Clear order for payment and show receipt
       setOrderForPayment(null);
-      setSelectedReceipt(receiptData);
-      setShowReceiptModal(true);
     } catch (error) {
       console.error("❌ Error completing payment from table:", error);
       toast({
@@ -2671,7 +2630,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
 
         if (failedPrints.length > 0) {
           toast({
-            title: "Một số máy in gặp lỗi",
+            title: "Một s  máy in gặp lỗi",
             description: failedPrints
               .map((r) => `• ${r.printerName}: ${r.message}`)
               .join("\n"),
@@ -3607,6 +3566,11 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
             const completeOrderData = {
               ...selectedOrder,
               orderItems: previewReceipt.orderItems || orderItems || [],
+              items:
+                previewReceipt.items ||
+                previewReceipt.orderItems ||
+                orderItems ||
+                [],
               exactSubtotal: previewReceipt.exactSubtotal,
               exactTax: previewReceipt.exactTax,
               exactTotal: previewReceipt.exactTotal,
@@ -3620,9 +3584,15 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
             );
             setOrderForPayment(completeOrderData);
 
-            // Close preview and show payment method modal - exactly like POS
+            // Close preview first
             setShowReceiptPreview(false);
-            setShowPaymentMethodModal(true);
+            setPreviewReceipt(null);
+
+            // Then show payment method modal after a short delay to ensure state updates
+            setTimeout(() => {
+              console.log("📄 Table: Opening payment method modal");
+              setShowPaymentMethodModal(true);
+            }, 100);
           }}
           isPreview={showReceiptPreview}
           receipt={previewReceipt}
@@ -3638,6 +3608,12 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
                   ? products.find((p: any) => p.id === item.productId)
                   : null;
                 return product?.taxRate ? parseFloat(product.taxRate) : 10;
+              })(),
+              afterTaxPrice: (() => {
+                const product = Array.isArray(products)
+                  ? products.find((p: any) => p.id === item.productId)
+                  : null;
+                return product?.afterTaxPrice || null;
               })(),
             })) || []
           }
@@ -3832,7 +3808,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
           receipt={selectedReceipt}
           isPreview={!!orderForPayment} // Show as preview if there's an order waiting for payment
           onConfirm={orderForPayment ? handleReceiptConfirm : undefined}
-          isTitle={false}
+          isTitle={isTitle}
         />
       )}
 
@@ -3862,8 +3838,7 @@ export function TableGrid({ onTableSelect, selectedTableId }: TableGridProps) {
                   <span className="font-medium">
                     {(() => {
                       return Math.floor(
-                        Number(selectedOrder.total || "0") +
-                          Number(selectedOrder.discount || "0"),
+                        Number(selectedOrder.total || "0"),
                       ).toLocaleString("vi-VN");
                     })()}{" "}
                     ₫

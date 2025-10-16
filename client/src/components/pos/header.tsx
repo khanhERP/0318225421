@@ -568,7 +568,8 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
                   >
                     <button
                       className={`w-full flex items-center px-4 py-2 text-left hover:bg-green-50 transition-colors ${
-                        location === "/settings" && window.location.search === "?tab=categories" ||
+                        (location === "/settings" &&
+                          window.location.search === "?tab=categories") ||
                         location === "/suppliers" ||
                         location === "/employees"
                           ? "bg-green-50 text-green-600"
@@ -701,7 +702,8 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
                   <Link href="/settings">
                     <button
                       className={`w-full flex items-center px-4 py-2 text-left hover:bg-green-50 transition-colors ${
-                        location === "/settings" && window.location.search !== "?tab=categories"
+                        location === "/settings" &&
+                        window.location.search !== "?tab=categories"
                           ? "bg-green-50 text-green-600"
                           : "text-gray-700"
                       }`}
