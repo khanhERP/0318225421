@@ -36,9 +36,23 @@ function Router({ onLogout }: { onLogout: () => void }) {
   const RedirectToSales = () => {
     const [, setLocation] = useLocation();
 
-    // Fetch store settings to determine business type
+    // Assuming you have a function to get your auth token
+    const getAuthToken = () => localStorage.getItem("authToken");
     const { data: storeSettings } = useQuery<StoreSettings>({
       queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings"],
+      queryFn: async () => {
+        const token = getAuthToken();
+        const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`, // Set the token in the Authorization header
+          },
+        });
+        if (!response.ok) {
+          throw new Error("Network response was not ok");
+        }
+        return response.json();
+      },
     });
 
     useEffect(() => {
