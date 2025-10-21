@@ -29,10 +29,10 @@ export function PinAuth({ onAuthSuccess }: PinAuthProps) {
 
   // Fetch store settings để lấy PIN
   const { data: storeData } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings"],
     queryFn: async () => {
       try {
-        const response = await apiRequest("GET", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings");
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings");
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
@@ -70,27 +70,44 @@ export function PinAuth({ onAuthSuccess }: PinAuthProps) {
 
     try {
       console.log("Submitting PIN:", pin);
-      console.log("storeData:", storeData);
-      // Kiểm tra PIN với dữ liệu từ store settings
-      if (storeData?.pinCode && pin === storeData.pinCode) {
+      
+      // Gọi API đăng nhập bằng PIN
+      const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/auth/login-pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ pinCode: pin }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        // Lưu token vào localStorage
+        localStorage.setItem("authToken", result.data.token);
+        
+        // Lưu thông tin store vào localStorage
+        localStorage.setItem("storeInfo", JSON.stringify(result.data.store));
+        
         // Lưu trạng thái đăng nhập vào sessionStorage
         sessionStorage.setItem("pinAuthenticated", "true");
 
         toast({
           title: "Đăng nhập thành công",
-          description: "Chào mừng bạn đến với hệ thống POS",
+          description: `Chào mừng đến với ${result.data.store.storeName || "hệ thống POS"}`,
         });
 
         onAuthSuccess();
       } else {
         toast({
           title: "Mã PIN không đúng",
-          description: "Vui lòng kiểm tra lại mã PIN",
+          description: result.message || "Vui lòng kiểm tra lại mã PIN",
           variant: "destructive",
         });
         setPin("");
       }
     } catch (error) {
+      console.error("PIN login error:", error);
       toast({
         title: "Lỗi hệ thống",
         description: "Có lỗi xảy ra khi xác thực",

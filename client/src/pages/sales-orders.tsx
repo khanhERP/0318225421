@@ -36,6 +36,7 @@ import { PrintDialog } from "@/components/pos/print-dialog";
 import { ReceiptModal } from "@/components/pos/receipt-modal";
 import { PaymentMethodModal } from "@/components/pos/payment-method-modal"; // Import PaymentMethodModal
 import { toast } from "@/hooks/use-toast";
+import { NumericFormat } from "react-number-format"; // Import NumericFormat
 
 interface Invoice {
   id: number;
@@ -159,26 +160,26 @@ export default function SalesOrders() {
       setPrintReceiptData(null);
 
       // Refresh data
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"] });
     };
 
     const handleEInvoiceModalClosed = async (event: CustomEvent) => {
       console.log("📧 Sales Orders: E-invoice modal closed, refreshing data");
 
       // Clear cache completely and force fresh fetch
-      queryClient.removeQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-      queryClient.removeQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items"] });
-      queryClient.removeQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/invoices"] });
 
       // Force immediate refetch with fresh data
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] }),
-        queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
-        queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/invoices"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/invoices"] }),
       ]);
 
       console.log("✅ Sales Orders: Data refreshed successfully from database");
@@ -207,32 +208,47 @@ export default function SalesOrders() {
 
   // Auto-refresh when new orders are created
   useEffect(() => {
-    const handleNewOrder = () => {
+    const handleNewOrder = async () => {
       console.log("📱 Sales Orders: New order detected, refreshing data...");
       // Force immediate refresh with all date ranges
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices/date-range"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
+      
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/invoices"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/transactions"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
+      ]);
     };
 
-    const handleOrderUpdate = () => {
+    const handleOrderUpdate = async () => {
       console.log("🔄 Sales Orders: Order updated, refreshing data...");
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices/date-range"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
+      
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/invoices"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/transactions"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
+      ]);
     };
 
-    const handleRefreshOrders = () => {
+    const handleRefreshOrders = async () => {
       console.log("🔄 Sales Orders: Manual refresh triggered...");
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/invoices/date-range"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
+      
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/invoices"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/transactions"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
+      ]);
     };
 
     // Listen for order creation and update events
@@ -242,6 +258,7 @@ export default function SalesOrders() {
     window.addEventListener("refreshOrders", handleRefreshOrders);
     window.addEventListener("invoiceCreated", handleNewOrder);
     window.addEventListener("receiptCreated", handleNewOrder);
+    window.addEventListener("forceRefresh", handleRefreshOrders);
 
     return () => {
       window.removeEventListener("newOrderCreated", handleNewOrder);
@@ -250,6 +267,7 @@ export default function SalesOrders() {
       window.removeEventListener("refreshOrders", handleRefreshOrders);
       window.removeEventListener("invoiceCreated", handleNewOrder);
       window.removeEventListener("receiptCreated", handleNewOrder);
+      window.removeEventListener("forceRefresh", handleRefreshOrders);
     };
   }, [queryClient]);
   // Get URL parameters
@@ -298,7 +316,7 @@ export default function SalesOrders() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await apiRequest("GET", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings");
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -313,10 +331,10 @@ export default function SalesOrders() {
 
   // Query customers for datalist
   const { data: customers = [] } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/customers"],
     queryFn: async () => {
       try {
-        const response = await apiRequest("GET", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers");
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/customers");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -331,68 +349,87 @@ export default function SalesOrders() {
     gcTime: 0,
   });
 
-  // Query orders by date range - load all orders regardless of salesChannel
+  // Query orders using /api/orders/list with storeCode filter
   const {
-    data: orders = [],
+    data: ordersResponse,
     isLoading: ordersLoading,
     error: ordersError,
   } = useQuery({
     queryKey: [
-      "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range",
+      "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list",
       startDate,
       endDate,
+      customerSearch,
+      orderNumberSearch,
+      customerCodeSearch,
+      salesChannelFilter,
+      orderStatusFilter,
+      einvoiceStatusFilter,
       currentPage,
       itemsPerPage,
     ],
     queryFn: async () => {
       try {
-        let url;
-        if (startDate && endDate) {
-          // If both dates are provided, use date range endpoint
-          url = `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range/${startDate}/${endDate}?page=${currentPage}&limit=${itemsPerPage}`;
-        } else {
-          // If no dates provided, fetch all orders
-          url = `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders?page=${currentPage}&limit=${itemsPerPage}`;
+        const params = new URLSearchParams();
+
+        if (startDate) params.append("startDate", startDate);
+        if (endDate) params.append("endDate", endDate);
+        if (customerSearch) params.append("customerName", customerSearch);
+        if (orderNumberSearch) params.append("orderNumber", orderNumberSearch);
+        if (customerCodeSearch)
+          params.append("customerCode", customerCodeSearch);
+        if (salesChannelFilter && salesChannelFilter !== "all") {
+          params.append("salesChannel", salesChannelFilter);
+        }
+        if (orderStatusFilter && orderStatusFilter !== "all") {
+          params.append("status", orderStatusFilter);
+        }
+        if (einvoiceStatusFilter && einvoiceStatusFilter !== "all") {
+          params.append("einvoiceStatus", einvoiceStatusFilter);
+        }
+        params.append("page", currentPage.toString());
+        if (itemsPerPage) {
+          params.append("limit", itemsPerPage.toString());
         }
 
+        const url = `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list?${params.toString()}`;
         const response = await apiRequest("GET", url);
+
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
+
         const data = await response.json();
-        console.log("Sales Orders - All orders loaded:", {
+        console.log("Sales Orders - Orders loaded with storeCode filter:", {
           url: url,
-          total: data?.length || 0,
-          tableOrders:
-            data?.filter((o: any) => o.salesChannel === "table").length || 0,
-          posOrders:
-            data?.filter((o: any) => o.salesChannel === "pos").length || 0,
-          onlineOrders:
-            data?.filter((o: any) => o.salesChannel === "online").length || 0,
-          deliveryOrders:
-            data?.filter((o: any) => o.salesChannel === "delivery").length || 0,
+          total: data?.orders?.length || 0,
+          hasStoreCodeFilter: true,
         });
-        return Array.isArray(data) ? data : [];
+
+        return data;
       } catch (error) {
         console.error("Error fetching orders:", error);
-        return [];
+        return { orders: [], pagination: {} };
       }
     },
     retry: 1,
     retryDelay: 500,
-    staleTime: 0, // No cache - always fresh
-    gcTime: 0, // Don't keep in memory
+    staleTime: 0,
+    gcTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
-    refetchInterval: false,
+    refetchInterval: 2000, // Poll every 2 seconds for real-time updates
+    refetchIntervalInBackground: true, // Continue polling in background
   });
+
+  const orders = ordersResponse?.orders || [];
 
   // Query all products to get tax rates
   const { data: products = [] } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products"],
     queryFn: async () => {
       try {
-        const response = await apiRequest("GET", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products");
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -407,12 +444,20 @@ export default function SalesOrders() {
     gcTime: 0,
   });
 
+  // Debounce customer search to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // Customer search will trigger API refetch via queryKey dependency
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [customerSearch]);
+
   // Query tables to map tableId to table number
   const { data: tables = [] } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"],
     queryFn: async () => {
       try {
-        const response = await apiRequest("GET", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables");
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -454,7 +499,7 @@ export default function SalesOrders() {
     isLoading: orderItemsLoading,
     error: orderItemsError,
   } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", selectedInvoice?.id],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", selectedInvoice?.id],
     queryFn: async () => {
       if (!selectedInvoice?.id) {
         console.log("❌ No selected invoice ID");
@@ -466,7 +511,7 @@ export default function SalesOrders() {
       try {
         const response = await apiRequest(
           "GET",
-          `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${selectedInvoice.id}`,
+          `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items/${selectedInvoice.id}`,
         );
 
         if (!response.ok) {
@@ -520,7 +565,7 @@ export default function SalesOrders() {
 
       const response = await apiRequest(
         "PUT",
-        `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${updatedOrder.id}`,
+        `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/${updatedOrder.id}`,
         updatePayload,
       );
 
@@ -535,20 +580,20 @@ export default function SalesOrders() {
       console.log("✅ Order updated successfully:", data);
 
       // Clear cache completely
-      queryClient.removeQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
       queryClient.removeQueries({
-        queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", updatedOrder.id],
+        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", updatedOrder.id],
       });
 
       // Force fresh fetch from server
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
         queryClient.invalidateQueries({
-          queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", updatedOrder.id],
+          queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", updatedOrder.id],
         }),
-        queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
         queryClient.refetchQueries({
-          queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", updatedOrder.id],
+          queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", updatedOrder.id],
         }),
       ]);
 
@@ -585,7 +630,7 @@ export default function SalesOrders() {
           // For orders, update status to 'cancelled'
           const response = await apiRequest(
             "PUT",
-            `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${orderId}/status`,
+            `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/${orderId}/status`,
             {
               status: "cancelled",
             },
@@ -617,7 +662,7 @@ export default function SalesOrders() {
       setShowBulkCancelDialog(false);
       setSelectedOrderIds(new Set());
 
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
 
       // Update selected order if it was cancelled
       if (selectedInvoice) {
@@ -654,7 +699,7 @@ export default function SalesOrders() {
     mutationFn: async (invoiceData: any) => {
       const response = await apiRequest(
         "POST",
-        "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/einvoice/publish",
+        "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/einvoice/publish",
         invoiceData,
       );
       return response.json();
@@ -686,7 +731,7 @@ export default function SalesOrders() {
 
           const updateResponse = await apiRequest(
             "PUT",
-            `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${selectedInvoice.id}`,
+            `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/${selectedInvoice.id}`,
             updateData,
           );
           console.log(
@@ -724,7 +769,7 @@ export default function SalesOrders() {
           setPrintReceiptData(receiptData);
           setShowPrintDialog(true);
 
-          queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
+          queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
 
           setShowPublishDialog(false);
           setSelectedInvoice(null);
@@ -763,7 +808,7 @@ export default function SalesOrders() {
       // Changed to accept orderId
       const response = await apiRequest(
         "PUT",
-        `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${orderId}/status`,
+        `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/${orderId}/status`,
         {
           status: "cancelled",
         },
@@ -801,17 +846,17 @@ export default function SalesOrders() {
       setShowCancelDialog(false);
 
       // Clear cache completely and force fresh fetch
-      queryClient.removeQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-      queryClient.removeQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range"] });
 
       // Force immediate refetch with fresh data
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range"] }),
-        queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
         queryClient.refetchQueries({
           queryKey: [
-            "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range",
+            "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range",
             startDate,
             endDate,
             currentPage,
@@ -1044,71 +1089,6 @@ export default function SalesOrders() {
 
   const filteredInvoices = Array.isArray(combinedData)
     ? combinedData
-        .filter((item: any) => {
-          try {
-            if (!item) return false;
-
-            const customerMatch =
-              !customerSearch ||
-              (item.customerName &&
-                item.customerName
-                  .toLowerCase()
-                  .includes(customerSearch.toLowerCase())) ||
-              (item.customerPhone &&
-                item.customerPhone
-                  .toLowerCase()
-                  .includes(customerSearch.toLowerCase()));
-            const orderMatch =
-              !orderNumberSearch ||
-              (item.displayNumber &&
-                item.displayNumber
-                  .toLowerCase()
-                  .includes(orderNumberSearch.toLowerCase()));
-            // Product/item search - check if any order item matches the search
-            const productMatch =
-              !customerCodeSearch ||
-              (async () => {
-                // This will be replaced with actual orderItems check
-                return true;
-              })();
-
-            // Sales channel filter
-            const salesChannelMatch =
-              salesChannelFilter === "all" ||
-              item.salesChannel === salesChannelFilter;
-
-            // Order status filter
-            const orderStatusMatch =
-              orderStatusFilter === "all" ||
-              (orderStatusFilter === "paid" &&
-                (item.status === "paid" || item.displayStatus === 1)) ||
-              (orderStatusFilter === "pending" &&
-                (item.status === "pending" || item.displayStatus === 2)) ||
-              (orderStatusFilter === "cancelled" &&
-                (item.status === "cancelled" || item.displayStatus === 3));
-
-            // E-invoice status filter
-            const einvoiceStatusMatch =
-              einvoiceStatusFilter === "all" ||
-              (einvoiceStatusFilter === "0" && item.einvoiceStatus === 0) ||
-              (einvoiceStatusFilter === "1" && item.einvoiceStatus === 1) ||
-              (einvoiceStatusFilter === "2" && item.einvoiceStatus === 2) ||
-              (einvoiceStatusFilter === "3" && item.einvoiceStatus === 3) ||
-              (einvoiceStatusFilter === "10" && item.einvoiceStatus === 10);
-
-            return (
-              customerMatch &&
-              orderMatch &&
-              productMatch &&
-              salesChannelMatch &&
-              orderStatusMatch &&
-              einvoiceStatusMatch
-            );
-          } catch (error) {
-            console.error("Error filtering item:", item, error);
-            return false;
-          }
-        })
         .sort((a: any, b: any) => {
           // Apply custom sorting if a field is selected
           if (sortField) {
@@ -1161,7 +1141,7 @@ export default function SalesOrders() {
                 bValue = b.employeeId || 0;
                 break;
               case "employeeName":
-                aValue = "Phạm Vân Duy";
+                aValue = "Phetm Vân Duy";
                 bValue = "Phạm Vân Duy";
                 break;
               case "symbol":
@@ -1367,11 +1347,11 @@ export default function SalesOrders() {
 
     // Add to the orderItems query data temporarily for display
     queryClient.setQueryData(
-      ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", selectedInvoice.id],
+      ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", selectedInvoice.id],
       (oldData: any) => {
         const currentItems = Array.isArray(oldData) ? oldData : [];
         return [...currentItems, newEmptyItem];
-      }
+      },
     );
 
     toast({
@@ -1418,14 +1398,14 @@ export default function SalesOrders() {
           }
           continue; // Skip to next item
         }
-        
+
         if (changes._isNew || id < 0) {
           // ✨ NEW ITEM - Will be INSERTED into database
           console.log(`➕ Processing NEW item for INSERT (ID: ${id})`);
-          
+
           // Get data from cache (may be incomplete for new items)
           const fullItemData = orderItems.find((item: any) => item.id === id);
-          
+
           // Merge all available data - prioritize changes from editedOrderItems
           const completeItemData = {
             ...(fullItemData || {}),
@@ -1433,29 +1413,47 @@ export default function SalesOrders() {
             // Ensure required fields are set
             productId: changes.productId || fullItemData?.productId || 0,
             productName: changes.productName || fullItemData?.productName || "",
-            sku: changes.sku || fullItemData?.sku || fullItemData?.productSku || "",
-            quantity: changes.quantity !== undefined ? changes.quantity : (fullItemData?.quantity || 1),
-            unitPrice: changes.unitPrice !== undefined ? changes.unitPrice : (fullItemData?.unitPrice || "0"),
+            sku:
+              changes.sku ||
+              fullItemData?.sku ||
+              fullItemData?.productSku ||
+              "",
+            quantity:
+              changes.quantity !== undefined
+                ? changes.quantity
+                : fullItemData?.quantity || 1,
+            unitPrice:
+              changes.unitPrice !== undefined
+                ? changes.unitPrice
+                : fullItemData?.unitPrice || "0",
             total: changes.total || fullItemData?.total || "0",
-            discount: changes.discount !== undefined ? changes.discount : (fullItemData?.discount || "0"),
-            tax: changes.tax !== undefined ? changes.tax : (fullItemData?.tax || "0"),
-            priceBeforeTax: changes.priceBeforeTax || fullItemData?.priceBeforeTax || "0",
+            discount:
+              changes.discount !== undefined
+                ? changes.discount
+                : fullItemData?.discount || "0",
+            tax:
+              changes.tax !== undefined
+                ? changes.tax
+                : fullItemData?.tax || "0",
+            priceBeforeTax:
+              changes.priceBeforeTax || fullItemData?.priceBeforeTax || "0",
           };
-          
+
           // Validate required fields before INSERT
           if (!completeItemData.productId || completeItemData.productId <= 0) {
             console.warn(`⚠️ Skipping new item ${id} - missing productId`);
             continue;
           }
-          
+
           if (!completeItemData.productName) {
             console.warn(`⚠️ Skipping new item ${id} - missing productName`);
             continue;
           }
-          
-          console.log(`✅ Will INSERT new item: ${completeItemData.productName} (Product ID: ${completeItemData.productId})`);
+
+          console.log(
+            `✅ Will INSERT new item: ${completeItemData.productName} (Product ID: ${completeItemData.productId})`,
+          );
           itemsToCreate.push(completeItemData);
-          
         } else {
           // 🔄 EXISTING ITEM - Will be UPDATED in database
           console.log(`🔄 Processing EXISTING item for UPDATE (ID: ${id})`);
@@ -1472,7 +1470,7 @@ export default function SalesOrders() {
         console.log(`🗑️ Deleting order item ${item.id}`);
         const response = await apiRequest(
           "DELETE",
-          `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${item.id}`,
+          `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items/${item.id}`,
         );
         if (!response.ok) {
           throw new Error(`Failed to delete order item ${item.id}`);
@@ -1485,7 +1483,7 @@ export default function SalesOrders() {
           productId: item.productId,
           productName: item.productName,
           quantity: item.quantity,
-          unitPrice: item.unitPrice
+          unitPrice: item.unitPrice,
         });
 
         // Double-check validation before INSERT
@@ -1500,7 +1498,9 @@ export default function SalesOrders() {
         }
 
         const product = products.find((p: any) => p.id === item.productId);
-        const taxRate = product?.taxRate ? parseFloat(product.taxRate) / 100 : 0;
+        const taxRate = product?.taxRate
+          ? parseFloat(product.taxRate) / 100
+          : 0;
         const unitPrice = parseFloat(item.unitPrice || "0");
         const quantity = parseInt(item.quantity || "1");
 
@@ -1520,7 +1520,10 @@ export default function SalesOrders() {
         let itemTax = 0;
         let priceBeforeTax = 0;
 
-        const priceIncludeTax = editableInvoice.priceIncludeTax ?? storeSettings?.priceIncludesTax ?? false;
+        const priceIncludeTax =
+          editableInvoice.priceIncludeTax ??
+          storeSettings?.priceIncludesTax ??
+          false;
 
         if (priceIncludeTax && taxRate > 0) {
           const discountPerUnit = itemDiscountAmount / quantity;
@@ -1550,7 +1553,11 @@ export default function SalesOrders() {
 
         console.log(`📝 Creating order item with payload:`, payload);
 
-        const response = await apiRequest("POST", `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${editableInvoice.id}`, payload);
+        const response = await apiRequest(
+          "POST",
+          `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items/${editableInvoice.id}`,
+          payload,
+        );
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -1564,7 +1571,9 @@ export default function SalesOrders() {
 
       // Step 4: UPDATE existing items in database
       for (const item of itemsToUpdate) {
-        console.log(`📝 [UPDATE] Updating existing order item ID ${item.id} in database`);
+        console.log(
+          `📝 [UPDATE] Updating existing order item ID ${item.id} in database`,
+        );
         const originalItem = orderItems.find((oi) => oi.id === item.id);
 
         // Build complete payload with all calculated fields
@@ -1626,7 +1635,10 @@ export default function SalesOrders() {
         let itemTax = 0;
         let priceBeforeTax = 0;
 
-        const priceIncludeTax = editableInvoice.priceIncludeTax ?? storeSettings?.priceIncludesTax ?? false;
+        const priceIncludeTax =
+          editableInvoice.priceIncludeTax ??
+          storeSettings?.priceIncludesTax ??
+          false;
 
         if (priceIncludeTax && taxRate > 0) {
           const giaGomThue = itemSubtotal;
@@ -1649,7 +1661,7 @@ export default function SalesOrders() {
         // Update the item
         const response = await apiRequest(
           "PATCH",
-          `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${item.id}`,
+          `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items/${item.id}`,
           payload,
         );
 
@@ -1664,7 +1676,7 @@ export default function SalesOrders() {
       // Step 5: Recalculate order totals from fresh data
       const allCurrentItemsResponse = await apiRequest(
         "GET",
-        `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${editableInvoice.id}`,
+        `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items/${editableInvoice.id}`,
       );
       const allCurrentItems = await allCurrentItemsResponse.json();
 
@@ -1706,6 +1718,7 @@ export default function SalesOrders() {
       const exactTotal = exactSubtotal + exactTax - orderDiscount;
 
       // Step 6: Update order with new totals and all editable fields
+      // Use the SAME calculation logic as displayTotals to ensure consistency
       const orderData: Partial<Order> = {
         id: editableInvoice.id,
         customerName: editableInvoice.customerName,
@@ -1717,9 +1730,9 @@ export default function SalesOrders() {
         notes: editableInvoice.notes,
         status: editableInvoice.status,
         paymentStatus: editableInvoice.paymentStatus,
-        subtotal: Math.floor(exactSubtotal).toString(),
-        tax: Math.floor(exactTax).toString(),
-        total: Math.floor(exactTotal).toString(),
+        subtotal: displayTotals.subtotal.toString(),
+        tax: displayTotals.tax.toString(),
+        total: displayTotals.total.toString(),
         discount: orderDiscount.toString(),
         priceIncludeTax: editableInvoice.priceIncludeTax,
       };
@@ -1738,27 +1751,27 @@ export default function SalesOrders() {
       await updateOrderMutation.mutateAsync(orderData as Order);
 
       // Clear and refresh all related queries
-      queryClient.removeQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-      queryClient.removeQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items"] });
       queryClient.removeQueries({
-        queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range"],
+        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range"],
       });
 
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
         queryClient.invalidateQueries({
-          queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", editableInvoice.id],
+          queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", editableInvoice.id],
         }),
         queryClient.invalidateQueries({
-          queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range"],
+          queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range"],
         }),
-        queryClient.refetchQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
         queryClient.refetchQueries({
-          queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", editableInvoice.id],
+          queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", editableInvoice.id],
         }),
         queryClient.refetchQueries({
           queryKey: [
-            "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range",
+            "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range",
             startDate,
             endDate,
             currentPage,
@@ -1795,7 +1808,7 @@ export default function SalesOrders() {
     setEditedOrderItems({}); // Clear local edits
     // Invalidate order items to reset them if any changes were made but not saved
     queryClient.invalidateQueries({
-      queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items", selectedInvoice?.id],
+      queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", selectedInvoice?.id],
     });
   };
 
@@ -1838,6 +1851,65 @@ export default function SalesOrders() {
     };
   }>({});
 
+  // Recalculate order totals whenever editedOrderItems or orderItems change
+  useEffect(() => {
+    if (!editableInvoice || !isEditing) return;
+
+    let totalSubtotal = 0;
+    let totalTax = 0;
+
+    // Get all visible items (not deleted)
+    const visibleItems = orderItems.filter(
+      (item: any) => !editedOrderItems[item.id]?._deleted,
+    );
+
+    // Calculate totals from visible items
+    visibleItems.forEach((item: any) => {
+      const edited = editedOrderItems[item.id] || {};
+      const currentItemUnitPrice = parseFloat(
+        edited.unitPrice !== undefined ? edited.unitPrice : item.unitPrice || "0",
+      );
+      const currentItemQuantity = parseFloat(
+        edited.quantity !== undefined ? edited.quantity : item.quantity || "0",
+      );
+      const currentItemSubtotal = currentItemUnitPrice * currentItemQuantity;
+      const currentItemTax = parseFloat(
+        edited.tax !== undefined ? edited.tax : item.tax || "0",
+      );
+
+      totalSubtotal += currentItemSubtotal;
+      totalTax += currentItemTax;
+    });
+
+    const orderDiscount = parseFloat(editableInvoice.discount || "0");
+    const totalAmount = totalSubtotal + totalTax - orderDiscount;
+
+    // Update editableInvoice with new totals
+    setEditableInvoice((prev) => {
+      if (!prev) return prev;
+      
+      // Only update if values actually changed to avoid infinite loops
+      const newSubtotal = Math.floor(totalSubtotal).toString();
+      const newTax = Math.floor(totalTax).toString();
+      const newTotal = Math.floor(totalAmount).toString();
+      
+      if (
+        prev.subtotal === newSubtotal &&
+        prev.tax === newTax &&
+        prev.total === newTotal
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        subtotal: newSubtotal,
+        tax: newTax,
+        total: newTotal,
+      };
+    });
+  }, [editedOrderItems, orderItems, isEditing]);
+
   const updateOrderItemField = (itemId: number, field: string, value: any) => {
     setEditedOrderItems((prev) => {
       const currentItem = prev[itemId] || {};
@@ -1856,15 +1928,21 @@ export default function SalesOrders() {
         currentItem.productId !== undefined
           ? currentItem.productId
           : originalItem?.productId || 0;
-      let sku = currentItem.sku !== undefined ? currentItem.sku : originalItem?.sku || "";
-      let productName = currentItem.productName !== undefined ? currentItem.productName : originalItem?.productName || "";
+      let sku =
+        currentItem.sku !== undefined
+          ? currentItem.sku
+          : originalItem?.sku || "";
+      let productName =
+        currentItem.productName !== undefined
+          ? currentItem.productName
+          : originalItem?.productName || "";
 
       // Track if product changed (to recalculate tax with new taxRate)
       let productChanged = false;
 
       // Update the changed field
       if (field === "quantity") {
-        quantity = parseInt(value) || 1;
+        quantity = parseFloat(value) || 1; // Allow decimal quantity
       } else if (field === "unitPrice") {
         unitPrice = parseFloat(value) || 0;
       } else if (field === "productId") {
@@ -1903,7 +1981,9 @@ export default function SalesOrders() {
       const itemSubtotal = quantity * unitPrice;
 
       // Calculate discount allocation
-      const orderDiscount = parseFloat(editableInvoice?.discount || selectedInvoice?.discount || "0");
+      const orderDiscount = parseFloat(
+        editableInvoice?.discount || selectedInvoice?.discount || "0",
+      );
       let itemDiscountAmount = 0;
 
       if (orderDiscount > 0) {
@@ -1913,28 +1993,37 @@ export default function SalesOrders() {
         );
 
         // Calculate total before discount for ALL items (including this updated one)
-        const totalBeforeDiscount = visibleItems.reduce((sum: number, item: any) => {
-          const editedItem = prev[item.id] || {};
-          let itPrice = parseFloat(
-            editedItem.unitPrice !== undefined ? editedItem.unitPrice : item.unitPrice || "0"
-          );
-          let itQty = parseInt(
-            editedItem.quantity !== undefined ? editedItem.quantity : item.quantity || "0"
-          );
+        const totalBeforeDiscount = visibleItems.reduce(
+          (sum: number, item: any) => {
+            const editedItem = prev[item.id] || {};
+            let itPrice = parseFloat(
+              editedItem.unitPrice !== undefined
+                ? editedItem.unitPrice
+                : item.unitPrice || "0",
+            );
+            let itQty = parseInt(
+              editedItem.quantity !== undefined
+                ? editedItem.quantity
+                : item.quantity || "0",
+            );
 
-          // Use new values for the current item being updated
-          if (item.id === itemId) {
-            itPrice = unitPrice;
-            itQty = quantity;
-          }
+            // Use new values for the current item being updated
+            if (item.id === itemId) {
+              itPrice = unitPrice;
+              itQty = quantity;
+            }
 
-          return sum + itPrice * itQty;
-        }, 0);
+            return sum + itPrice * itQty;
+          },
+          0,
+        );
 
         // Calculate proportional discount for this item
         if (totalBeforeDiscount > 0) {
           // Check if this is the last item
-          const currentIndex = visibleItems.findIndex((item: any) => item.id === itemId);
+          const currentIndex = visibleItems.findIndex(
+            (item: any) => item.id === itemId,
+          );
           const isLastItem = currentIndex === visibleItems.length - 1;
 
           if (isLastItem) {
@@ -1944,18 +2033,26 @@ export default function SalesOrders() {
               const item = visibleItems[i];
               const editedItem = prev[item.id] || {};
               const itPrice = parseFloat(
-                editedItem.unitPrice !== undefined ? editedItem.unitPrice : item.unitPrice || "0"
+                editedItem.unitPrice !== undefined
+                  ? editedItem.unitPrice
+                  : item.unitPrice || "0",
               );
               const itQty = parseInt(
-                editedItem.quantity !== undefined ? editedItem.quantity : item.quantity || "0"
+                editedItem.quantity !== undefined
+                  ? editedItem.quantity
+                  : item.quantity || "0",
               );
               const itSubtotal = itPrice * itQty;
-              previousDiscounts += Math.floor((orderDiscount * itSubtotal) / totalBeforeDiscount);
+              previousDiscounts += Math.floor(
+                (orderDiscount * itSubtotal) / totalBeforeDiscount,
+              );
             }
             itemDiscountAmount = Math.max(0, orderDiscount - previousDiscounts);
           } else {
             // Proportional allocation
-            itemDiscountAmount = Math.floor((orderDiscount * itemSubtotal) / totalBeforeDiscount);
+            itemDiscountAmount = Math.floor(
+              (orderDiscount * itemSubtotal) / totalBeforeDiscount,
+            );
           }
         }
       }
@@ -1963,7 +2060,11 @@ export default function SalesOrders() {
       // Calculate tax - ALWAYS get product info to ensure we have latest taxRate
       const product = products.find((p: any) => p.id === productId);
       const taxRate = product?.taxRate ? parseFloat(product.taxRate) / 100 : 0;
-      const priceIncludeTax = editableInvoice?.priceIncludeTax ?? selectedInvoice?.priceIncludeTax ?? storeSettings?.priceIncludesTax ?? false;
+      const priceIncludeTax =
+        editableInvoice?.priceIncludeTax ??
+        selectedInvoice?.priceIncludeTax ??
+        storeSettings?.priceIncludesTax ??
+        false;
 
       let itemTax = 0;
       let priceBeforeTax = 0;
@@ -1987,23 +2088,26 @@ export default function SalesOrders() {
 
       const calculatedTotal = priceBeforeTax + itemTax;
 
-      console.log(`🔢 Tính toán thuế cho item ${itemId} ${productChanged ? '(SẢN PHẨM MỚI)' : ''}:`, {
-        productId,
-        productName,
-        sku,
-        quantity,
-        unitPrice,
-        itemSubtotal,
-        taxRate: (taxRate * 100) + '%',
-        priceIncludeTax,
-        itemDiscountAmount,
-        priceBeforeTax,
-        itemTax: Math.round(itemTax),
-        calculatedTotal
-      });
+      console.log(
+        `🔢 Tính toán thuế cho item ${itemId} ${productChanged ? "(SẢN PHẨM MỚI)" : ""}:`,
+        {
+          productId,
+          productName,
+          sku,
+          quantity,
+          unitPrice,
+          itemSubtotal,
+          taxRate: taxRate * 100 + "%",
+          priceIncludeTax,
+          itemDiscountAmount,
+          priceBeforeTax,
+          itemTax: Math.round(itemTax),
+          calculatedTotal,
+        },
+      );
 
       // ALWAYS return updated calculated fields to ensure UI reflects latest values
-      return {
+      const updatedEditedItems = {
         ...prev,
         [itemId]: {
           ...currentItem,
@@ -2020,6 +2124,8 @@ export default function SalesOrders() {
           taxRate: (taxRate * 100).toString(),
         },
       };
+
+      return updatedEditedItems;
     });
   };
 
@@ -2153,34 +2259,53 @@ export default function SalesOrders() {
       );
 
       visibleItems.forEach((item: any) => {
-        const product = products.find((p: any) => p.id === item.productId);
-        const taxRate = product?.taxRate
-          ? parseFloat(product.taxRate) / 100
-          : 0;
-
-        // Use edited values if available, otherwise use original values
         const editedItem = editedOrderItems[item.id] || {};
-        const unitPrice = parseFloat(
-          editedItem.unitPrice !== undefined
-            ? editedItem.unitPrice
-            : item.unitPrice || "0",
-        );
-        const quantity = parseInt(
-          editedItem.quantity !== undefined
-            ? editedItem.quantity
-            : item.quantity || "0",
-        );
-
-        const itemSubtotal = unitPrice * quantity;
-
-        if (priceIncludeTax && taxRate > 0) {
-          const priceBeforeTax = itemSubtotal / (1 + taxRate);
-          const itemTax = itemSubtotal - priceBeforeTax;
-          calculatedSubtotal += priceBeforeTax;
-          calculatedTax += itemTax;
+        
+        // Use tax from editedOrderItems if available (already calculated)
+        if (editedItem.tax !== undefined) {
+          calculatedTax += parseFloat(editedItem.tax);
+          
+          // Calculate subtotal from unitPrice and quantity
+          const unitPrice = parseFloat(
+            editedItem.unitPrice !== undefined
+              ? editedItem.unitPrice
+              : item.unitPrice || "0",
+          );
+          const quantity = parseFloat(
+            editedItem.quantity !== undefined
+              ? editedItem.quantity
+              : item.quantity || "0",
+          );
+          calculatedSubtotal += unitPrice * quantity;
         } else {
-          calculatedSubtotal += itemSubtotal;
-          calculatedTax += itemSubtotal * taxRate;
+          // Fallback to original calculation if tax not in editedOrderItems
+          const product = products.find((p: any) => p.id === item.productId);
+          const taxRate = product?.taxRate
+            ? parseFloat(product.taxRate) / 100
+            : 0;
+
+          const unitPrice = parseFloat(
+            editedItem.unitPrice !== undefined
+              ? editedItem.unitPrice
+              : item.unitPrice || "0",
+          );
+          const quantity = parseFloat(
+            editedItem.quantity !== undefined
+              ? editedItem.quantity
+              : item.quantity || "0",
+          );
+
+          const itemSubtotal = unitPrice * quantity;
+
+          if (priceIncludeTax && taxRate > 0) {
+            const priceBeforeTax = itemSubtotal / (1 + taxRate);
+            const itemTax = itemSubtotal - priceBeforeTax;
+            calculatedSubtotal += priceBeforeTax;
+            calculatedTax += itemTax;
+          } else {
+            calculatedSubtotal += itemSubtotal;
+            calculatedTax += itemSubtotal * taxRate;
+          }
         }
       });
 
@@ -2471,7 +2596,7 @@ export default function SalesOrders() {
     try {
       const updateResponse = await apiRequest(
         "PUT",
-        `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/${order.id}`,
+        `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/${order.id}`,
         {
           paymentStatus: "paid",
           status: "paid",
@@ -2483,8 +2608,8 @@ export default function SalesOrders() {
         console.log("✅ Order payment status updated successfully");
 
         // Refresh orders list
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/tables"] });
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"] });
 
         toast({
           title: "Thanh toán thành công",
@@ -2498,7 +2623,7 @@ export default function SalesOrders() {
           // Fetch fresh order items
           const itemsResponse = await apiRequest(
             "GET",
-            `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${order.id}`,
+            `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items/${order.id}`,
           );
           const items = await itemsResponse.json();
 
@@ -2570,10 +2695,10 @@ export default function SalesOrders() {
 
       // Refresh orders list after a delay to avoid interfering with receipt modal
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
         queryClient.invalidateQueries({
           queryKey: [
-            "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders/date-range",
+            "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range",
             startDate,
             endDate,
             currentPage,
@@ -2590,7 +2715,7 @@ export default function SalesOrders() {
       console.log("📄 Sales Orders: Preparing receipt for order:", order.id);
 
       // Fetch order items with tax information
-      const response = await apiRequest("GET", `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${order.id}`);
+      const response = await apiRequest("GET", `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items/${order.id}`);
       const items = await response.json();
 
       // Enrich items with product information including tax rates
@@ -2746,22 +2871,24 @@ export default function SalesOrders() {
                     className="w-full"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Hình thức bán
-                  </label>
-                  <select
-                    value={salesChannelFilter}
-                    onChange={(e) => setSalesChannelFilter(e.target.value)}
-                    className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="all">Tất cả</option>
-                    <option value="table">Ăn tại chỗ</option>
-                    <option value="pos">Bán tại quầy</option>
-                    <option value="online">Bán online</option>
-                    <option value="delivery">Giao hàng</option>
-                  </select>
-                </div>
+                {storeSettings?.businessType !== "laundry" && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Hình thức bán
+                    </label>
+                    <select
+                      value={salesChannelFilter}
+                      onChange={(e) => setSalesChannelFilter(e.target.value)}
+                      className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="all">Tất cả</option>
+                      <option value="table">Ăn tại chỗ</option>
+                      <option value="pos">Bán tại quầy</option>
+                      <option value="online">Bán online</option>
+                      <option value="delivery">Giao hàng</option>
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     Trạng thái đơn hàng
@@ -2840,7 +2967,7 @@ export default function SalesOrders() {
                   <Button
                     onClick={() => {
                       queryClient.invalidateQueries({
-                        queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"],
+                        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"],
                       });
                     }}
                   >
@@ -3267,16 +3394,12 @@ export default function SalesOrders() {
                                   </td>
                                   <td className="px-3 py-3 text-right">
                                     <div className="text-sm">
-                                      {formatCurrency(
-                                        parseFloat(item.tax || "0"),
-                                      )}
+                                      {formatCurrency(tax)}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3 text-right">
                                     <div className="text-sm font-medium">
-                                      {formatCurrency(
-                                        parseFloat(item.total || "0"),
-                                      )}
+                                      {formatCurrency(total)}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3">
@@ -3889,7 +4012,7 @@ export default function SalesOrders() {
                                                         queryClient.invalidateQueries(
                                                           {
                                                             queryKey: [
-                                                              "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items",
+                                                              "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items",
                                                               selectedInvoice?.id,
                                                             ],
                                                           },
@@ -4001,22 +4124,38 @@ export default function SalesOrders() {
                                                               item: any,
                                                               index: number,
                                                             ) => {
-                                                              const product =
-                                                                products.find(
-                                                                  (p: any) =>
-                                                                    p.id ===
-                                                                    item.productId,
-                                                                );
-                                                              const priceIncludeTax =
-                                                                selectedInvoice?.priceIncludeTax ??
-                                                                storeSettings?.priceIncludesTax ??
-                                                                false;
-
                                                               // Get edited values or use original
                                                               const editedItem =
                                                                 editedOrderItems[
                                                                   item.id
                                                                 ] || {};
+                                                              
+                                                              // For new items, prioritize edited values
+                                                              const isNewItem = editedItem._isNew || item._isNew;
+                                                              
+                                                              // Get product info - prioritize edited productId
+                                                              const productId = editedItem.productId !== undefined 
+                                                                ? editedItem.productId 
+                                                                : item.productId || 0;
+                                                              
+                                                              const product = products.find(
+                                                                (p: any) => p.id === productId,
+                                                              );
+                                                              
+                                                              const priceIncludeTax =
+                                                                selectedInvoice?.priceIncludeTax ??
+                                                                storeSettings?.priceIncludesTax ??
+                                                                false;
+
+                                                              // Get all field values - prioritize edited values
+                                                              const sku = editedItem.sku !== undefined
+                                                                ? editedItem.sku
+                                                                : item.sku || product?.sku || "";
+                                                              
+                                                              const productName = editedItem.productName !== undefined
+                                                                ? editedItem.productName
+                                                                : item.productName || "";
+                                                              
                                                               const unitPrice =
                                                                 parseFloat(
                                                                   editedItem.unitPrice !==
@@ -4026,7 +4165,7 @@ export default function SalesOrders() {
                                                                         "0",
                                                                 );
                                                               const quantity =
-                                                                parseInt(
+                                                                parseFloat(
                                                                   editedItem.quantity !==
                                                                     undefined
                                                                     ? editedItem.quantity
@@ -4076,7 +4215,8 @@ export default function SalesOrders() {
                                                                                 "0",
                                                                         );
                                                                       const itQty =
-                                                                        parseInt(
+                                                                        parseFloat(
+                                                                          // Use parseFloat for quantity
                                                                           editedIt.quantity !==
                                                                             undefined
                                                                             ? editedIt.quantity
@@ -4133,7 +4273,8 @@ export default function SalesOrders() {
                                                                                       "0",
                                                                               );
                                                                             const itQty =
-                                                                              parseInt(
+                                                                              parseFloat(
+                                                                                // Use parseFloat for quantity
                                                                                 editedIt.quantity !==
                                                                                   undefined
                                                                                   ? editedIt.quantity
@@ -4223,22 +4364,7 @@ export default function SalesOrders() {
                                                                       <div className="relative">
                                                                         <Input
                                                                           list={`product-sku-list-${item.id}`}
-                                                                          value={
-                                                                            editedOrderItems[
-                                                                              item
-                                                                                .id
-                                                                            ]
-                                                                              ?.sku !==
-                                                                            undefined
-                                                                              ? editedOrderItems[
-                                                                                  item
-                                                                                    .id
-                                                                                ]
-                                                                                  .sku
-                                                                              : item.sku ||
-                                                                                product?.sku ||
-                                                                                ""
-                                                                          }
+                                                                          value={sku}
                                                                           disabled={
                                                                             selectedInvoice.displayStatus ===
                                                                             1
@@ -4355,21 +4481,7 @@ export default function SalesOrders() {
                                                                       <div className="relative">
                                                                         <Input
                                                                           list={`product-name-list-${item.id}`}
-                                                                          value={
-                                                                            editedOrderItems[
-                                                                              item
-                                                                                .id
-                                                                            ]
-                                                                              ?.productName !==
-                                                                            undefined
-                                                                              ? editedOrderItems[
-                                                                                  item
-                                                                                    .id
-                                                                                ]
-                                                                                  .productName
-                                                                              : item.productName ||
-                                                                                ""
-                                                                          }
+                                                                          value={productName}
                                                                           disabled={
                                                                             selectedInvoice.displayStatus ===
                                                                             1
@@ -4487,43 +4599,52 @@ export default function SalesOrders() {
                                                                   </td>
                                                                   <td className="text-center py-2 px-3 border-r text-xs w-[100px]">
                                                                     {isEditing ? (
-                                                                      <Input
-                                                                        type="number"
-                                                                        min="1"
-                                                                        value={
-                                                                          quantity
-                                                                        }
-                                                                        data-field={`orderitem-quantity-${index}`}
-                                                                        onChange={(
-                                                                          e,
+                                                                      <NumericFormat
+                                                                        value={quantity}
+                                                                        onValueChange={(
+                                                                          values,
                                                                         ) => {
-                                                                          const newQty =
-                                                                            parseInt(
-                                                                              e
-                                                                                .target
-                                                                                .value,
-                                                                            ) ||
-                                                                            1;
-                                                                          updateOrderItemField(
-                                                                            item.id,
-                                                                            "quantity",
-                                                                            newQty,
-                                                                          );
+                                                                          const {
+                                                                            floatValue,
+                                                                          } =
+                                                                            values;
+                                                                          if (
+                                                                            floatValue !==
+                                                                              undefined &&
+                                                                            floatValue >
+                                                                              0
+                                                                          ) {
+                                                                            updateOrderItemField(
+                                                                              item.id,
+                                                                              "quantity",
+                                                                              floatValue,
+                                                                            );
+                                                                          }
                                                                         }}
-                                                                        disabled={
-                                                                          selectedInvoice.displayStatus ===
-                                                                          1
-                                                                        }
                                                                         onBlur={(
                                                                           e,
                                                                         ) => {
+                                                                          const rawValue =
+                                                                            e.target.value
+                                                                              .replace(
+                                                                                /\./g,
+                                                                                "",
+                                                                              )
+                                                                              .replace(
+                                                                                ",",
+                                                                                ".",
+                                                                              );
+                                                                          const value =
+                                                                            parseFloat(
+                                                                              rawValue,
+                                                                            );
                                                                           if (
-                                                                            parseInt(
-                                                                              e
-                                                                                .target
-                                                                                .value,
-                                                                            ) <
-                                                                            1
+                                                                            !value ||
+                                                                            value <=
+                                                                              0 ||
+                                                                            isNaN(
+                                                                              value,
+                                                                            )
                                                                           ) {
                                                                             updateOrderItemField(
                                                                               item.id,
@@ -4541,10 +4662,35 @@ export default function SalesOrders() {
                                                                             "quantity",
                                                                           )
                                                                         }
-                                                                        className="w-20 text-right h-8"
+                                                                        data-field={`orderitem-quantity-${index}`}
+                                                                        customInput={
+                                                                          Input
+                                                                        }
+                                                                        decimalScale={
+                                                                          4
+                                                                        }
+                                                                        fixedDecimalScale={
+                                                                          false
+                                                                        }
+                                                                        allowNegative={
+                                                                          false
+                                                                        }
+                                                                        decimalSeparator=","
+                                                                        thousandSeparator="."
+                                                                        disabled={
+                                                                          selectedInvoice.displayStatus ===
+                                                                          1
+                                                                        }
+                                                                        className="w-full h-8 text-xs text-right"
                                                                       />
                                                                     ) : (
-                                                                      quantity
+                                                                      quantity.toLocaleString(
+                                                                        "vi-VN",
+                                                                        {
+                                                                          minimumFractionDigits: 0,
+                                                                          maximumFractionDigits: 4,
+                                                                        },
+                                                                      )
                                                                     )}
                                                                   </td>
                                                                   <td className="text-right py-2 px-3 border-r text-xs w-[120px]">
@@ -4600,31 +4746,12 @@ export default function SalesOrders() {
                                                                     )}
                                                                   </td>
                                                                   <td className="text-right py-2 px-3 border-r text-xs w-[120px]">
-                                                                    {(() => {
-                                                                      // Use edited total if available, otherwise calculate from current values
-                                                                      const editedItem =
-                                                                        editedOrderItems[
-                                                                          item.id
-                                                                        ] || {};
-                                                                      if (
-                                                                        editedItem.total !==
-                                                                        undefined
-                                                                      ) {
-                                                                        return Math.floor(
-                                                                          parseFloat(
-                                                                            editedItem.total,
-                                                                          ),
-                                                                        ).toLocaleString(
-                                                                          "vi-VN",
-                                                                        );
-                                                                      }
-                                                                      return Math.floor(
-                                                                        unitPrice *
-                                                                          quantity,
-                                                                      ).toLocaleString(
-                                                                        "vi-VN",
-                                                                      );
-                                                                    })()}
+                                                                    {Math.floor(
+                                                                      unitPrice *
+                                                                        quantity,
+                                                                    ).toLocaleString(
+                                                                      "vi-VN",
+                                                                    )}
                                                                   </td>
                                                                   <td className="text-red-600 text-right py-2 px-3 border-r text-xs w-[100px]">
                                                                     {Math.floor(
@@ -4637,24 +4764,52 @@ export default function SalesOrders() {
                                                                     {(() => {
                                                                       // ALWAYS use edited tax if available from state
                                                                       const editedItem =
-                                                                        editedOrderItems[item.id] || {};
+                                                                        editedOrderItems[
+                                                                          item
+                                                                            .id
+                                                                        ] || {};
                                                                       if (
-                                                                        editedItem.tax !== undefined
+                                                                        editedItem.tax !==
+                                                                        undefined
                                                                       ) {
                                                                         return Math.floor(
-                                                                          parseFloat(editedItem.tax),
-                                                                        ).toLocaleString("vi-VN");
+                                                                          parseFloat(
+                                                                            editedItem.tax,
+                                                                          ),
+                                                                        ).toLocaleString(
+                                                                          "vi-VN",
+                                                                        );
                                                                       }
                                                                       // Fallback to calculated itemTax
-                                                                      return Math.floor(itemTax).toLocaleString("vi-VN");
+                                                                      return Math.floor(
+                                                                        itemTax,
+                                                                      ).toLocaleString(
+                                                                        "vi-VN",
+                                                                      );
                                                                     })()}
                                                                   </td>
-                                                                  <td className="text-right py-2 px-3 border-r font-medium text-xs w-[120px]">
-                                                                    {Math.floor(
-                                                                      itemTotal,
-                                                                    ).toLocaleString(
-                                                                      "vi-VN",
-                                                                    )}
+                                                                  <td className="text-right py-2 px-3 font-medium text-blue-600 text-xs w-[120px]">
+                                                                    {(() => {
+                                                                      const editedItem =
+                                                                        editedOrderItems[
+                                                                          item
+                                                                            .id
+                                                                        ] || {};
+
+                                                                      // Tổng cộng = Thành tiền - Chiết khấu
+                                                                      const thanhTien =
+                                                                        unitPrice *
+                                                                        quantity;
+                                                                      const tongCong =
+                                                                        thanhTien -
+                                                                        itemDiscountAmount;
+
+                                                                      return Math.floor(
+                                                                        tongCong,
+                                                                      ).toLocaleString(
+                                                                        "vi-VN",
+                                                                      );
+                                                                    })()}
                                                                   </td>
                                                                   <td className="text-center py-2 px-3 text-xs w-[80px]">
                                                                     {isEditing &&
@@ -4820,7 +4975,8 @@ export default function SalesOrders() {
                                                                                 "0",
                                                                         );
                                                                       const quantity =
-                                                                        parseInt(
+                                                                        parseFloat(
+                                                                          // Use parseFloat for quantity
                                                                           editedItem.quantity !==
                                                                             undefined
                                                                             ? editedItem.quantity
@@ -4866,7 +5022,8 @@ export default function SalesOrders() {
                                                                               "0",
                                                                       );
                                                                     const quantity =
-                                                                      parseInt(
+                                                                      parseFloat(
+                                                                        // Use parseFloat for quantity
                                                                         editedItem.quantity !==
                                                                           undefined
                                                                           ? editedItem.quantity
@@ -5176,7 +5333,7 @@ export default function SalesOrders() {
                                                               const itemsResponse =
                                                                 await apiRequest(
                                                                   "GET",
-                                                                  `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/order-items/${selectedInvoice.id}`,
+                                                                  `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items/${selectedInvoice.id}`,
                                                                 );
                                                               const items =
                                                                 await itemsResponse.json();
@@ -5248,7 +5405,7 @@ export default function SalesOrders() {
                                                               );
                                                             } catch (error) {
                                                               console.error(
-                                                                "❌ Error preparing payment:",
+                                                                "  Error preparing payment:",
                                                                 error,
                                                               );
                                                               toast({
@@ -5640,7 +5797,7 @@ export default function SalesOrders() {
             setOrderForPayment(null);
 
             // Refresh data after closing
-            // queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
+            // queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
           }}
           onSelectMethod={handlePaymentComplete}
           total={
@@ -5710,7 +5867,7 @@ export default function SalesOrders() {
             setShowReceiptModal(false);
             setSelectedReceipt(null);
 
-            queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
+            queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
           }}
           receipt={selectedReceipt}
           isPreview={false}

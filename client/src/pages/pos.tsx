@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { POSHeader } from "@/components/pos/header";
 import { RightSidebar } from "@/components/ui/right-sidebar";
 import { CategorySidebar } from "@/components/pos/category-sidebar";
@@ -16,10 +16,12 @@ interface POSPageProps {
 export default function POS({ onLogout }: POSPageProps) {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showProductManagerModal, setShowProductManagerModal] = useState(false);
+  const [productManagerSearchSKU, setProductManagerSearchSKU] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | "all">(
     "all",
   );
   const [searchQuery, setSearchQuery] = useState("");
+
   const [lastCartItems, setLastCartItems] = useState<any[]>([]);
   const queryClient = useQueryClient();
 
@@ -53,7 +55,7 @@ export default function POS({ onLogout }: POSPageProps) {
         const isCustomDomain = !host.includes("replit.dev");
 
         // For custom domains, ensure proper WebSocket URL
-        const wsUrl = `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/ws`;
+        const wsUrl = `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/ws`;
 
         console.log(
           `📡 POS: Connecting to WebSocket at ${wsUrl}, Custom domain: ${isCustomDomain}`,
@@ -90,10 +92,10 @@ export default function POS({ onLogout }: POSPageProps) {
 
               // Clear cache and force refresh
               queryClient.clear();
-              queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
-              queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories"] });
+              queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products"] });
+              queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories"] });
               queryClient.invalidateQueries({
-                queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings"],
+                queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings"],
               });
 
               // Dispatch custom events for components
@@ -138,9 +140,9 @@ export default function POS({ onLogout }: POSPageProps) {
 
       // Force data refresh for any e-invoice related events
       queryClient.clear();
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings"] });
 
       // Dispatch refresh event for components
       window.dispatchEvent(
@@ -275,6 +277,24 @@ export default function POS({ onLogout }: POSPageProps) {
     }
   };
 
+  // Add handler function to open product manager modal
+  const handleOpenProductManager = useCallback(() => {
+    setShowProductManagerModal(true);
+    setProductManagerSearchSKU("");
+  }, []);
+
+
+  // Dummy handlers for CategorySidebar and ShoppingCart to satisfy props before they are fully implemented
+  const handleCategorySelect = (category: number | "all") => {
+    console.log("Selected category:", category);
+    setSelectedCategory(category);
+  };
+
+  const handleAddToCart = (product: any) => {
+    console.log("Adding to cart:", product);
+    addToCart(product);
+  };
+
   try {
     return (
       <div className="min-h-screen bg-green-50 grocery-bg">
@@ -288,11 +308,11 @@ export default function POS({ onLogout }: POSPageProps) {
           {/* Category Sidebar */}
           <CategorySidebar
             selectedCategory={selectedCategory}
-            onCategorySelect={setSelectedCategory}
+            onCategorySelect={handleCategorySelect}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            onOpenProductManager={() => setShowProductManagerModal(true)}
-            onAddToCart={(product) => addToCart(product)}
+            onOpenProductManager={handleOpenProductManager} // Use the new handler
+            onAddToCart={handleAddToCart}
           />
 
           {/* Product Grid */}
@@ -351,7 +371,7 @@ export default function POS({ onLogout }: POSPageProps) {
               try {
                 const protocol =
                   window.location.protocol === "https:" ? "wss:" : "ws:";
-                const wsUrl = `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/ws`;
+                const wsUrl = `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/ws`;
                 const ws = new WebSocket(wsUrl);
 
                 ws.onopen = () => {
@@ -376,7 +396,12 @@ export default function POS({ onLogout }: POSPageProps) {
 
         <ProductManagerModal
           isOpen={showProductManagerModal}
-          onClose={() => setShowProductManagerModal(false)}
+          onClose={() => {
+            console.log("📦 Closing Product Manager Modal");
+            setShowProductManagerModal(false);
+            setProductManagerSearchSKU("");
+          }}
+          initialSearchSKU={productManagerSearchSKU}
         />
       </div>
     );

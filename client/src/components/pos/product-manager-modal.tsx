@@ -9,6 +9,7 @@ import {
   Trash2,
   Link,
   FileImage,
+  Pencil, // Import Pencil icon
 } from "lucide-react";
 import {
   Dialog,
@@ -116,12 +117,12 @@ export function ProductManagerModal({
     isLoading,
     refetch,
   } = useQuery<Product[]>({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products"],
     enabled: isOpen,
   });
 
   const { data: categories = [] } = useQuery<Category[]>({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories"],
     enabled: isOpen,
   });
 
@@ -141,7 +142,7 @@ export function ProductManagerModal({
       }
 
       console.log("Sending product data:", finalData);
-      const response = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products", {
+      const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(finalData),
@@ -155,15 +156,15 @@ export function ProductManagerModal({
       return response.json();
     },
     onSuccess: (newProduct) => {
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/active"] });
-      
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products/active"] });
+
       toast({
         title: "✅ Tạo sản phẩm thành công",
         description: `Sản phẩm "${newProduct.name}" đã được thêm vào hệ thống`,
         duration: 3000,
       });
-      
+
       // Small delay to show toast before closing form
       setTimeout(() => {
         setShowAddForm(false);
@@ -221,34 +222,34 @@ export function ProductManagerModal({
         }
       }
 
-      const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/${id}`, {
+      const response = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(finalData),
       });
-      
+
       console.log("🔄 UPDATE MUTATION - Response status:", response.status);
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ message: "Unknown error" }));
         console.error("🔄 UPDATE MUTATION - Error:", errorData);
         throw new Error(errorData.message || "Failed to update product");
       }
-      
+
       const result = await response.json();
       console.log("🔄 UPDATE MUTATION - Success result:", result);
       return result;
     },
     onSuccess: (updatedProduct) => {
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/active"] });
-      
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products/active"] });
+
       toast({
         title: "✅ Cập nhật thành công",
         description: `Sản phẩm "${updatedProduct.name}" đã được cập nhật`,
         duration: 3000,
       });
-      
+
       // Small delay to show toast before closing form
       setTimeout(() => {
         setEditingProduct(null);
@@ -270,15 +271,15 @@ export function ProductManagerModal({
 
   const deleteProductMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/${id}`, {
+      const response = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products/${id}`, {
         method: "DELETE",
       });
       if (!response.ok) throw new Error("Failed to delete product");
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products/active"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products/active"] });
       toast({
         title: "Success",
         description: "Product deleted successfully",
@@ -444,7 +445,7 @@ export function ProductManagerModal({
       zone: String(data.zone || "A"), // Add zone field to ensure it's saved
       unit: data.unit || "Cái", // Unit field - ensure it's saved
     };
-    
+
     console.log("📦 Transformed data with unit:", {
       productName: transformedData.name,
       unit: transformedData.unit,
@@ -497,7 +498,7 @@ export function ProductManagerModal({
     }
   };
 
-  const handleEdit = (product: Product) => {
+  const handleEditProduct = (product: Product) => {
     setEditingProduct(product);
 
     // IMPORTANT: taxRateName is the source of truth for dropdown selection
@@ -779,8 +780,15 @@ export function ProductManagerModal({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleModalClose}>
-      <DialogContent className="max-w-4xl w-full max-h-screen overflow-y-auto">
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          handleModalClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-4xl w-full max-h-screen overflow-y-auto z-[9999]">
         <DialogHeader>
           <DialogTitle>{t("tables.productManagement")}</DialogTitle>
         </DialogHeader>
@@ -790,21 +798,6 @@ export function ProductManagerModal({
             <>
               <div className="flex flex-col space-y-4 mb-6">
                 <div className="flex space-x-4">
-                  <Button
-                    onClick={() => setShowAddForm(true)}
-                    className="bg-green-600 hover:bg-green-700 text-white font-medium transition-colors duration-200"
-                  >
-                    <Plus className="mr-2" size={16} />
-                    {t("tables.addNewProduct")}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="border-orange-500 text-orange-700 hover:bg-orange-100 hover:border-orange-600"
-                    onClick={() => setShowBulkImport(true)}
-                  >
-                    <Upload className="mr-2" size={16} />
-                    {t("tables.bulkImport")}
-                  </Button>
                   <Button
                     variant="outline"
                     className="border-green-500 text-green-700 hover:bg-green-100 hover:border-green-600"
@@ -941,19 +934,12 @@ export function ProductManagerModal({
                             <div className="flex space-x-2">
                               <Button
                                 size="sm"
-                                variant="ghost"
-                                onClick={() => handleEdit(product)}
+                                variant="outline"
+                                onClick={() => handleEditProduct(product)}
                                 className="text-blue-600 hover:text-blue-800"
                               >
-                                <Edit size={16} />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleDelete(product.id)}
-                                className="text-red-500 hover:text-red-700"
-                              >
-                                <Trash2 size={16} />
+                                <Pencil size={16} className="mr-1" />
+                                {t("common.view")}
                               </Button>
                             </div>
                           </td>
@@ -1246,14 +1232,14 @@ export function ProductManagerModal({
                       name="unit"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Đơn vị tính</FormLabel>
+                          <FormLabel>{t("tables.unit") || "Đơn vị tính"}</FormLabel>
                           <Select
                             onValueChange={field.onChange}
                             value={field.value || "Cái"}
                           >
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Chọn đơn vị" />
+                                <SelectValue placeholder={t("tables.selectUnit") || "Chọn đơn vị"} />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -1555,51 +1541,8 @@ export function ProductManagerModal({
                       type="button"
                       variant="outline"
                       onClick={resetForm}
-                      disabled={
-                        createProductMutation.isPending ||
-                        updateProductMutation.isPending
-                      }
                     >
                       {t("common.cancel")}
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={
-                        createProductMutation.isPending ||
-                        updateProductMutation.isPending
-                      }
-                      onClick={(e) => {
-                        console.log("🔘 Submit button clicked!");
-                        console.log("Form values:", form.getValues());
-                        console.log("Form errors:", form.formState.errors);
-                        console.log("Is form valid?", form.formState.isValid);
-                        
-                        // Log detailed errors
-                        const errors = form.formState.errors;
-                        if (Object.keys(errors).length > 0) {
-                          console.log("❌ Validation errors found:");
-                          Object.keys(errors).forEach(key => {
-                            console.log(`  - ${key}:`, errors[key]?.message);
-                          });
-                        }
-                      }}
-                      className="bg-green-600 hover:bg-green-700 text-white font-medium transition-colors duration-200 min-w-[120px]"
-                    >
-                      {createProductMutation.isPending ||
-                      updateProductMutation.isPending ? (
-                        <div className="flex items-center space-x-2">
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <span>
-                            {editingProduct ? "Đang cập nhật..." : "Đang tạo..."}
-                          </span>
-                        </div>
-                      ) : (
-                        <span>
-                          {editingProduct
-                            ? t("tables.updateProduct")
-                            : t("common.comboValues.createProduct")}
-                        </span>
-                      )}
                     </Button>
                   </div>
                 </form>

@@ -180,6 +180,16 @@ export default function PurchaseFormPage({
 
   const isEditMode = Boolean(id) && !viewOnly;
 
+  // Fetch user info and store settings for storeCode
+  const { data: userInfo } = useQuery({
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/auth/verify"],
+    retry: false,
+  });
+
+  const { data: storeSettings } = useQuery({
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings"],
+  });
+
   // Form setup
   const form = useForm<z.infer<typeof insertPurchaseReceiptSchema>>({
     resolver: zodResolver(insertPurchaseReceiptSchema),
@@ -226,13 +236,13 @@ export default function PurchaseFormPage({
 
   // Fetch suppliers
   const { data: suppliers = [] } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/suppliers"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/suppliers"],
     select: (data: any) => data || [],
   });
 
   // Fetch employees for assignment
   const { data: employees = [] } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/employees"],
     select: (data: any[]) =>
       (data || []).map((emp: any) => ({
         id: emp.id,
@@ -245,13 +255,13 @@ export default function PurchaseFormPage({
 
   // Fetch categories for new product form
   const { data: categories = [] } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/categories"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories"],
     select: (data: any) => data || [],
   });
 
   // Fetch payment methods
   const { data: paymentMethods = [] } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/payment-methods"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/payment-methods"],
     select: (data: any[]) =>
       (data || [])
         .filter((method: any) => method.enabled === true) // Only show enabled payment methods
@@ -266,7 +276,7 @@ export default function PurchaseFormPage({
 
   // Fetch products for selection
   const { data: allProducts = [] } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products"],
     select: (data: any[]) =>
       (data || []).map((product: any) => ({
         ...product,
@@ -286,7 +296,7 @@ export default function PurchaseFormPage({
 
   // Fetch existing purchase order for edit mode
   const { data: existingOrder, isLoading: isLoadingOrder } = useQuery({
-    queryKey: [`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-orders/${id}`],
+    queryKey: [`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/purchase-orders/${id}`],
     enabled: Boolean(id),
     select: (data: any) => {
       console.log("📊 Purchase order API response:", data);
@@ -296,7 +306,7 @@ export default function PurchaseFormPage({
 
   // Fetch existing documents for edit mode
   const { data: existingDocuments } = useQuery({
-    queryKey: [`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-orders/${id}/documents`],
+    queryKey: [`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/purchase-orders/${id}/documents`],
     enabled: Boolean(id),
     select: (data: any) => data || [],
   });
@@ -307,14 +317,14 @@ export default function PurchaseFormPage({
     error: nextPOError,
     isLoading: isLoadingPONumber,
   } = useQuery({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-orders/next-po-number"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/purchase-orders/next-po-number"],
     enabled: !isEditMode,
     queryFn: async () => {
       try {
         console.log("🔍 Fetching next PO number...");
         const response = await apiRequest(
           "GET",
-          "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-orders/next-po-number",
+          "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/purchase-orders/next-po-number",
         );
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -553,7 +563,7 @@ export default function PurchaseFormPage({
   // Create new product mutation
   const createProductMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products", data);
+      const response = await apiRequest("POST", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products", data);
       return response.json();
     },
     onSuccess: (newProduct) => {
@@ -564,7 +574,7 @@ export default function PurchaseFormPage({
       });
 
       // Update products query cache
-      queryClient.setQueryData(["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"], (old: any[]) => {
+      queryClient.setQueryData(["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products"], (old: any[]) => {
         return [
           ...(old || []),
           { ...newProduct, unitPrice: Number(newProduct.price) || 0 },
@@ -572,7 +582,7 @@ export default function PurchaseFormPage({
       });
 
       // Invalidate queries for cache consistency
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products"] });
 
       // Add new product to selected items automatically
       addProduct({
@@ -1163,6 +1173,9 @@ export default function PurchaseFormPage({
         0,
       );
 
+      // Get storeCode from logged-in user
+      const storeCode = userInfo?.storeCode || storeSettings?.storeCode || "STORE001";
+
       // Prepare submission data
       const submissionData = {
         receiptNumber: finalReceiptNumber,
@@ -1185,6 +1198,7 @@ export default function PurchaseFormPage({
           ? editPaymentMethods[0].amount
           : null,
         notes: formValues.notes?.trim() || null,
+        storeCode: storeCode, // Add storeCode from logged-in user
         items: validItems.map((item) => {
           // Lấy CHÍNH XÁC giá trị từ UI - không tính toán lại
           const discountPercent = parseFloat(
@@ -1211,12 +1225,12 @@ export default function PurchaseFormPage({
 
       // Submit data
       const response = isEditMode
-        ? await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts/${id}`, {
+        ? await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/purchase-receipts/${id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(submissionData),
           })
-        : await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts", {
+        : await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/purchase-receipts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(submissionData),
@@ -1317,7 +1331,7 @@ export default function PurchaseFormPage({
 
             // Send file data as JSON with original filename preserved
             const uploadResponse = await fetch(
-              `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts/${result.id}/documents`,
+              `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/purchase-receipts/${result.id}/documents`,
               {
                 method: "POST",
                 headers: {
@@ -1381,8 +1395,8 @@ export default function PurchaseFormPage({
       });
 
       // Refresh queries and navigate
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/purchase-receipts"] });
-      queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/purchase-receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/suppliers"] });
 
       setTimeout(() => {
         navigate("/purchases");

@@ -63,22 +63,22 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
   const [showInvoiceManagement, setShowInvoiceManagement] = useState(false);
   const [showPrinterConfig, setShowPrinterConfig] = useState(false);
 
-  // Fetch store settings
+  // Fetch store settings (will automatically use user's storeCode from token)
   const { data: storeSettings } = useQuery<StoreSettings>({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings"],
   });
 
   // Fetch employees
   const { data: employees } = useQuery<Employee[]>({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/employees"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/employees"],
   });
 
   // Fetch today's attendance records
   const todayDate = new Date().toISOString().split("T")[0];
   const { data: todayAttendance } = useQuery<AttendanceRecord[]>({
-    queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance", todayDate],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/attendance", todayDate],
     queryFn: async () => {
-      const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/attendance?date=${todayDate}`);
+      const response = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/attendance?date=${todayDate}`);
       if (!response.ok) {
         throw new Error("Failed to fetch attendance records");
       }
@@ -179,14 +179,30 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
     });
   };
 
-  const handleLogout = () => {
-    // Xóa trạng thái đăng nhập khỏi sessionStorage
+  const handleLogout = async () => {
+    try {
+      // Gọi API logout để xóa cookie authToken từ server
+      await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/auth/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    } catch (error) {
+      console.error("Lỗi khi đăng xuất:", error);
+    }
+    
+    // Xóa tất cả thông tin đăng nhập
     sessionStorage.removeItem("pinAuthenticated");
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("storeInfo");
+    
     // Gọi callback onLogout nếu có
     if (onLogout) {
       onLogout();
     }
-    // Reload trang để quay về màn hình đăng nhập
+    
+    // Reload trang để quay về màn hình đăng nhập PIN
     window.location.reload();
   };
 
@@ -209,6 +225,7 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
             <div className="text-sm opacity-75 text-right font-extrabold text-[#22c55e]">
               {t("pos.posLocation")}: {storeSettings?.defaultFloor || "1"}
               {t("pos.floor")}-{storeSettings?.defaultZone || "A"}
+              {storeSettings?.storeCode && ` (${storeSettings.storeCode})`}
             </div>
           </div>
         </div>
@@ -699,20 +716,22 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
                   </div>
 
                   {/* Cài đặt */}
-                  <Link href="/settings">
-                    <button
-                      className={`w-full flex items-center px-4 py-2 text-left hover:bg-green-50 transition-colors ${
-                        location === "/settings" &&
-                        window.location.search !== "?tab=categories"
-                          ? "bg-green-50 text-green-600"
-                          : "text-gray-700"
-                      }`}
-                      onClick={() => setPosMenuOpen(false)}
-                    >
-                      <SettingsIcon className="w-4 h-4 mr-3" />
-                      {t("settings.title")}
-                    </button>
-                  </Link>
+                  {storeSettings?.businessType !== "laundry" && (
+                    <Link href="/settings">
+                      <button
+                        className={`w-full flex items-center px-4 py-2 text-left hover:bg-green-50 transition-colors ${
+                          location === "/settings" &&
+                          window.location.search !== "?tab=categories"
+                            ? "bg-green-50 text-green-600"
+                            : "text-gray-700"
+                        }`}
+                        onClick={() => setPosMenuOpen(false)}
+                      >
+                        <SettingsIcon className="w-4 h-4 mr-3" />
+                        {t("settings.title")}
+                      </button>
+                    </Link>
+                  )}
 
                   <div className="border-t border-gray-200 my-2"></div>
 

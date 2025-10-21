@@ -38,7 +38,7 @@ function Router({ onLogout }: { onLogout: () => void }) {
 
     // Fetch store settings to determine business type
     const { data: storeSettings } = useQuery<StoreSettings>({
-      queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings"],
+      queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings"],
     });
 
     useEffect(() => {
@@ -139,11 +139,31 @@ function App() {
   };
 
   const handleLogout = () => {
+    // Xóa tất cả thông tin đăng nhập
+    sessionStorage.removeItem("pinAuthenticated");
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("storeInfo");
     setIsAuthenticated(false);
   };
 
   // Check if current path is customer display to bypass authentication
   const isCustomerDisplay = window.location.pathname === "/customer-display";
+
+  // Check for existing authentication on mount
+  useEffect(() => {
+    const pinAuth = sessionStorage.getItem("pinAuthenticated");
+    const token = localStorage.getItem("authToken");
+    
+    if (pinAuth === "true" && token) {
+      setIsAuthenticated(true);
+    } else {
+      // Nếu thiếu một trong hai, xóa hết và yêu cầu đăng nhập lại
+      sessionStorage.removeItem("pinAuthenticated");
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("storeInfo");
+      setIsAuthenticated(false);
+    }
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

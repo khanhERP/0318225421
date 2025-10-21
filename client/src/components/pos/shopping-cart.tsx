@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NumericFormat } from "react-number-format";
 import { useTranslation } from "@/lib/i18n";
 import { PaymentMethodModal } from "./payment-method-modal";
 import { ReceiptModal } from "./receipt-modal";
@@ -97,9 +98,21 @@ export function ShoppingCart({
   const { data: storeSettings } = useQuery({
     queryKey: ["store-settings"],
     queryFn: async () => {
-      const response = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/store-settings");
+      const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings");
       if (!response.ok) {
         throw new Error("Failed to fetch store settings");
+      }
+      return response.json();
+    },
+  });
+
+  // Fetch authenticated user info to get storeCode
+  const { data: userInfo } = useQuery({
+    queryKey: ["user-info"],
+    queryFn: async () => {
+      const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/auth/me");
+      if (!response.ok) {
+        throw new Error("Failed to fetch user info");
       }
       return response.json();
     },
@@ -191,7 +204,7 @@ export function ShoppingCart({
       let itemDiscountAmount = 0;
       if (orderDiscount > 0) {
         const totalBeforeDiscount = cart.reduce((total, cartItem) => {
-          return total + parseFloat(cartItem.price) * cartItem.quantity;
+          return parseFloat(cartItem.price) * cartItem.quantity;
         }, 0);
 
         const currentIndex = cart.findIndex(
@@ -375,7 +388,7 @@ export function ShoppingCart({
   const { data: products } = useQuery<any[]>({
     queryKey: ["products"],
     queryFn: async () => {
-      const response = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/products");
+      const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products");
       if (!response.ok) {
         throw new Error("Failed to fetch products");
       }
@@ -404,7 +417,7 @@ export function ShoppingCart({
   const fetchCustomers = async (searchTerm: string) => {
     try {
       setIsSearching(true);
-      const response = await fetch(`https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/customers?search=${searchTerm}`);
+      const response = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/customers?search=${searchTerm}`);
       if (!response.ok) {
         throw new Error("Failed to fetch customers");
       }
@@ -479,7 +492,7 @@ export function ShoppingCart({
   useEffect(() => {
     console.log("📡 Shopping Cart: Initializing single WebSocket connection");
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/ws`;
+    const wsUrl = `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/ws`;
 
     let reconnectTimer: NodeJS.Timeout | null = null;
     let shouldReconnect = true;
@@ -755,7 +768,7 @@ export function ShoppingCart({
     setPreviewReceipt(null);
     setOrderForPayment(null);
     // DON'T clear selected customer on cancel - keep it for retry
-    // setSelectedCustomer(null); 
+    // setSelectedCustomer(null);
     // setCustomerSearchTerm("");
     // Don't clear customer for the current order on cancel
   };
@@ -786,7 +799,7 @@ export function ShoppingCart({
       setSelectedCustomer(null); // Clear selected customer on successful payment
       setCustomerSearchTerm(""); // Clear search term
       setOrderCustomers({}); // Clear all order customers
-      
+
       // Clear discount for all orders
       setOrderDiscounts({});
       setDiscountAmount("0");
@@ -801,7 +814,7 @@ export function ShoppingCart({
       // Send WebSocket signal for refresh
       try {
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsUrl = `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/ws`;
+        const wsUrl = `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/ws`;
         const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
@@ -857,6 +870,10 @@ export function ShoppingCart({
       return;
     }
 
+    // Get storeCode from authenticated user
+    const storeCode =
+      userInfo?.storeCode || storeSettings?.storeCode || "STORE001";
+
     // Use the EXACT same calculation logic as checkout
     const calculatedSubtotal = subtotal;
     const calculatedTax = tax;
@@ -874,6 +891,9 @@ export function ShoppingCart({
       discount: finalDiscount,
       total: finalTotal,
       customer: selectedCustomer.name,
+      customerPhone: selectedCustomer.phone,
+      customerTaxCode: selectedCustomer.customerTaxCode,
+      storeCode: storeCode,
     });
 
     // Prepare cart items for order
@@ -892,7 +912,7 @@ export function ShoppingCart({
 
       if (orderDiscount > 0) {
         const totalBeforeDiscount = cart.reduce((total, cartItem) => {
-          return total + parseFloat(cartItem.price) * cartItem.quantity;
+          return parseFloat(cartItem.price) * cartItem.quantity;
         }, 0);
 
         const currentIndex = cart.findIndex(
@@ -964,7 +984,7 @@ export function ShoppingCart({
       tableId: null,
       customerId: selectedCustomer.id,
       customerName: selectedCustomer.name,
-      customerPhone: selectedCustomer.phone || null,
+      customerPhone: selectedCustomer.phone || null, // Số điện thoại khách hàng
       customerTaxCode: selectedCustomer.customerTaxCode || null,
       customerAddress: selectedCustomer.address || null,
       customerEmail: selectedCustomer.email || null,
@@ -979,8 +999,11 @@ export function ShoppingCart({
       salesChannel: "pos",
       priceIncludeTax: priceIncludesTax,
       einvoiceStatus: 0,
-      notes: `Đặt hàng tại POS - Khách hàng: ${selectedCustomer.name}`,
+      notes: `Đặt hàng tại POS - Khách hàng: ${selectedCustomer.name}${selectedCustomer.phone ? ` - SĐT: ${selectedCustomer.phone}` : ""}${selectedCustomer.customerTaxCode ? ` - MST: ${selectedCustomer.customerTaxCode}` : ""}`,
+      storeCode: storeCode, // Add storeCode to order data
     };
+
+    console.log("📝 Order data being sent:", orderData);
 
     try {
       console.log("📤 Sending place order request:", {
@@ -988,7 +1011,7 @@ export function ShoppingCart({
         items: cartItemsForOrder,
       });
 
-      const response = await fetch("https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders", {
+      const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1015,6 +1038,7 @@ export function ShoppingCart({
       onClearCart();
       setSelectedCustomer(null);
       setCustomerSearchTerm("");
+      setDiscountAmount("");
       if (activeOrderId) {
         setOrderCustomers((prev) => {
           const updated = { ...prev };
@@ -1023,8 +1047,9 @@ export function ShoppingCart({
         });
       }
 
+      clearCart(); // Use the memoized clearCart function
       // Refresh orders list
-      await queryClient.invalidateQueries({ queryKey: ["https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/api/orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
     } catch (error) {
       console.error("❌ Error placing order:", error);
       toast({
@@ -1046,6 +1071,10 @@ export function ShoppingCart({
       return;
     }
 
+    // Get storeCode from authenticated user
+    const storeCode =
+      userInfo?.storeCode || storeSettings?.storeCode || "STORE001";
+
     // SỬ DỤNG ĐÚNG GIÁ TRỊ ĐÃ HIỂN THỊ - KHÔNG TÍNH LẠI
     const displayedSubtotal = subtotal;
     const displayedTax = tax;
@@ -1057,6 +1086,7 @@ export function ShoppingCart({
       tax: displayedTax,
       discount: displayedDiscount,
       total: displayedTotal,
+      storeCode: storeCode,
     });
 
     // Chuẩn bị items với đúng thông tin đã tính toán và hiển thị
@@ -1066,11 +1096,11 @@ export function ShoppingCart({
       const taxRate = parseFloat(item.taxRate || "0") / 100;
       const orderDiscount = displayedDiscount;
 
-      // Tính discount cho item này (giống logic hiển thị)
+      // Calculate discount for this item (giống logic hiển thị)
       let itemDiscountAmount = 0;
       if (orderDiscount > 0) {
         const totalBeforeDiscount = cart.reduce((total, cartItem) => {
-          return total + parseFloat(cartItem.price) * cartItem.quantity;
+          return parseFloat(cartItem.price) * cartItem.quantity;
         }, 0);
 
         const currentIndex = cart.findIndex(
@@ -1104,7 +1134,7 @@ export function ShoppingCart({
 
       const discountPerUnit = quantity > 0 ? itemDiscountAmount / quantity : 0;
 
-      // Tính tax và total (giống logic hiển thị)
+      // Calculate tax and total (giống logic hiển thị)
       let itemPriceBeforeTax = 0;
       let itemTax = 0;
       let totalAfterDiscount = 0;
@@ -1274,7 +1304,7 @@ export function ShoppingCart({
     setSelectedCustomer(null); // Clear selected customer
     setCustomerSearchTerm(""); // Clear search term
     setOrderCustomers({}); // Clear all order customers
-    
+
     // Clear all discounts
     setOrderDiscounts({});
     setDiscountAmount("0");
@@ -1651,7 +1681,7 @@ export function ShoppingCart({
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth={2}
-                      d="M13 7l5 5m0 0l-5 5m5-5H6"
+                      d="M13 7l5 5m0 0l-5 5m5-7H6"
                     />
                   </svg>
                 </button>
@@ -2105,35 +2135,45 @@ export function ShoppingCart({
                     >
                       <Minus size={10} />
                     </Button>
-                    <Input
-                      type="number"
-                      min="1"
-                      max={item.trackInventory !== false ? item.stock : 999999}
+                    <NumericFormat
                       value={item.quantity}
-                      onChange={(e) => {
-                        const newQuantity = parseInt(e.target.value) || 1;
-                        if (item.trackInventory !== false) {
-                          // Sản phẩm có check tồn kho - giới hạn theo stock
-                          const maxQuantity = item.stock || 0;
-                          if (newQuantity >= 1 && newQuantity <= maxQuantity) {
-                            const productId =
-                              typeof item.id === "string"
-                                ? parseInt(item.id)
-                                : item.id;
-                            onUpdateQuantity(productId, newQuantity);
-                          }
-                        } else {
-                          // Sản phẩm không check tồn kho - cho phép nhập tự do
-                          if (newQuantity >= 1 && newQuantity <= 999999) {
-                            const productId =
-                              typeof item.id === "string"
-                                ? parseInt(item.id)
-                                : item.id;
-                            onUpdateQuantity(productId, newQuantity);
+                      onValueChange={(values) => {
+                        const { floatValue } = values;
+                        const productId =
+                          typeof item.id === "string"
+                            ? parseInt(item.id)
+                            : item.id;
+
+                        if (floatValue && floatValue > 0) {
+                          // Allow any quantity without inventory check
+                          if (floatValue <= 999999) {
+                            onUpdateQuantity(productId, floatValue);
                           }
                         }
                       }}
-                      className="w-12 h-6 text-center text-xs p-1 border rounded"
+                      onBlur={(e) => {
+                        const productId =
+                          typeof item.id === "string"
+                            ? parseInt(item.id)
+                            : item.id;
+
+                        const value = parseFloat(
+                          e.target.value.replace(/\./g, "").replace(",", "."),
+                        );
+                        if (!value || value <= 0 || isNaN(value)) {
+                          onUpdateQuantity(productId, 1);
+                        }
+                      }}
+                      onFocus={(e) => {
+                        e.target.select();
+                      }}
+                      customInput={Input}
+                      decimalScale={2}
+                      fixedDecimalScale={false}
+                      allowNegative={false}
+                      decimalSeparator=","
+                      thousandSeparator="."
+                      className="w-16 h-6 text-center text-xs p-1 border rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
                     />
                     <Button
                       size="sm"
@@ -2609,7 +2649,7 @@ export function ShoppingCart({
                 // Fallback WebSocket connection if main one is not available
                 const protocol =
                   window.location.protocol === "https:" ? "wss:" : "ws:";
-                const wsUrl = `https://bad07204-3e0d-445f-a72e-497c63c9083a-00-3i4fcyhnilzoc.pike.replit.dev/ws`;
+                const wsUrl = `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/ws`;
                 const fallbackWs = new WebSocket(wsUrl);
 
                 fallbackWs.onopen = () => {
