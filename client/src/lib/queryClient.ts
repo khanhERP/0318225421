@@ -1,5 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { defaultFetcher } from "./fetcher";
+import { defaultFetcher } from "./utils";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -94,7 +94,6 @@ export const queryClient = new QueryClient({
       refetchOnReconnect: true,
       networkMode: "online",
     },
-  },
     mutations: {
       retry: false,
       onError: (error) => {
