@@ -26,7 +26,7 @@ export async function defaultFetcher({ queryKey }) {
   if (res.status === 401) {
     console.warn("Token hết hạn hoặc không hợp lệ");
     localStorage.removeItem("token");
-    window.location.href = "/login";
+    window.location.href = "/";
     return;
   }
 
