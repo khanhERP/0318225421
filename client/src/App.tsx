@@ -1,30 +1,28 @@
-import { useState, useEffect } from "react";
-import { Switch, Route, useLocation } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { PinAuth } from "@/components/auth/pin-auth";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { PinAuth } from "@/components/auth/pin-auth";
-import POSPage from "@/pages/pos";
-import TablesPage from "@/pages/tables";
+import AttendancePage from "@/pages/attendance";
+import CustomerDisplay from "@/pages/customer-display";
 import EmployeesPage from "@/pages/employees";
 import InventoryPage from "@/pages/inventory";
+import PaymentMethodsPage from "@/pages/payment-methods";
+import POSPage from "@/pages/pos";
+import PurchaseFormPage from "@/pages/purchase-form";
+import PurchasesPage from "@/pages/purchases";
 import ReportsPage from "@/pages/reports";
+import SalesOrders from "@/pages/sales-orders";
 import SettingsPage from "@/pages/settings";
 import SuppliersPage from "@/pages/suppliers";
-import PurchasesPage from "@/pages/purchases";
-import PurchaseFormPage from "@/pages/purchase-form";
-import PurchaseViewPage from "./pages/purchase-view";
-import AttendancePage from "@/pages/attendance";
+import TablesPage from "@/pages/tables";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { Route, Switch, useLocation } from "wouter";
+import { queryClient } from "./lib/queryClient";
 import AttendanceQRPage from "./pages/attendance-qr";
-import CustomerDisplay from "@/pages/customer-display";
-import SalesOrders from "@/pages/sales-orders";
 import CashBookPage from "./pages/cash-book";
-import NotFoundPage from "./pages/not-found";
-import PaymentMethodsPage from "@/pages/payment-methods";
 import CustomersPage from "./pages/customers";
-import { useQuery } from "@tanstack/react-query";
-import { Navigate } from "wouter/use-location"; // Assuming Navigate is available or similar functionality
+import NotFoundPage from "./pages/not-found";
+import PurchaseViewPage from "./pages/purchase-view";
 
 // Define StoreSettings interface if not already defined elsewhere
 interface StoreSettings {
