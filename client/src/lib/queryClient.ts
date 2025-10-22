@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { defaultFetcher } from "./utils";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
