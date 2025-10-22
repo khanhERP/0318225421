@@ -340,7 +340,6 @@ export function ReceiptModal({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Origin": "https://0108670987-001.edpos.vn"
         },
         body: JSON.stringify({
           printers,
@@ -718,10 +717,11 @@ export function ReceiptModal({
 
           body {
             font-family: 'Noto Sans KR', 'Arial Unicode MS', sans-serif;
-            font-size: 16px;
+            font-size: 18px;
             line-height: 1.4;
             width: 100%;
             max-width: 576px;
+            font-weight: bold;
             margin: 0 auto;
             padding: 0;
             background: #ffffff;
@@ -1375,7 +1375,7 @@ export function ReceiptModal({
                           verticalAlign: "top",
                         }}
                       >
-                        {quantity}
+                        {Math.floor(parseFloat(quantity.toString()))}
                       </td>
                       <td
                         style={{
@@ -1529,21 +1529,48 @@ export function ReceiptModal({
               </tbody>
             </table>
 
-            {/* QR Code - Optional - HIDDEN */}
-            <div className="text-center my-4" style={{ display: "none" }}>
+            {/* QR Code - Bank Transfer */}
+            <div className="text-center my-4">
               <div
                 style={{
-                  width: "100px",
-                  height: "100px",
+                  width: "200px",
+                  height: "200px",
                   margin: "0 auto",
-                  border: "2px solid #000",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                {/* QR Code placeholder - you can add actual QR code library here */}
-                <span style={{ fontSize: "10px" }}>QR CODE</span>
+                <img
+                  src={(() => {
+                    // Generate VietQR URL with bank account info from store settings
+                    const bankId = storeSettings?.bankId || "970424"; // Shinhan Bank as default
+                    const accountNo =
+                      storeSettings?.bankAccountNo || "700037614418";
+                    const accountName =
+                      "PARK CHEON KYU" ||
+                      storeSettings?.bankAccountName ||
+                      storeSettings?.storeName ||
+                      "WASH FRIEND THE ZEI";
+                    const amount = Math.floor(parseFloat(receipt.total || "0"));
+                    const description = `THANH TOAN ${receipt.orderNumber || `HD${receipt.id}`}`;
+
+                    // VietQR format - using VietQR API
+                    const qrUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.jpg?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(accountName)}`;
+
+                    return qrUrl;
+                  })()}
+                  alt="QR Code thanh toán"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                  }}
+                  onError={(e) => {
+                    // Fallback if image fails to load
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
               </div>
             </div>
 
@@ -1559,6 +1586,38 @@ export function ReceiptModal({
               >
                 Xin cảm ơn Quý khách và Hẹn gặp lại !
               </p>
+              <div
+                style={{ borderTop: "1px dashed #000", margin: "8px 0" }}
+              ></div>
+              <div
+                style={{
+                  fontSize: "12px",
+                  margin: "8px 0",
+                  fontWeight: "normal",
+                  lineHeight: "1.6",
+                }}
+              >
+                <p style={{ margin: "4px 0" }}>
+                  Quý khách nhận được hàng vui lòng kiểm tra đồ giặt, sau 24 giờ
+                  kể từ khi giao hàng cửa hàng không chịu trách nhiệm các vấn đề
+                  phát sinh sau đó. Các vấn đề phát sinh sau khi dịch vụ tại cửa
+                  hàng sẽ được giải quyết dựa trên 「Tiêu chuẩn giải quyết khiếu
+                  nại khách hàng
+                </p>
+                <p style={{ margin: "4px 0", fontStyle: "italic" }}>
+                  If you receive the goods, please check the laundry, after 24
+                  hours of delivery, the store is not responsible for problems
+                  arising afterwards. For problems that occur after using the
+                  service at this store, we will compensate you according to the
+                  compensation ratio of 「Consumer Dispute Resolution Standards.
+                </p>
+                <p style={{ margin: "4px 0" }}>
+                  세탁물 수령후 세탁확인 바랍니다. 수령 후 24시간이후에 문제
+                  제기시 매장에서 책임지지 않습니다. 본 매장에서 서비스를
+                  이용하신 후 발생한 문제에 대해서는 「소비자분쟁해결기준」
+                  배상비율에 따라 배상해드립니다.
+                </p>
+              </div>
               <div
                 style={{ borderTop: "1px dashed #000", margin: "8px 0" }}
               ></div>

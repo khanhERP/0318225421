@@ -4,8 +4,11 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
   ko: {
     loading: "로딩 중...",
     save: "저장",
+    notReturned: "반환되지 않음",
+    viewDetails: "자세히 보기",
     icon: "아이콘",
     paymentMethodLabel: "결제 방법",
+    customerCodeSearchPlaceholder: "이름 또는 제품 코드로 검색",
     completed: "완료됨",
     cancel: "취소",
     invoice: "송장",
@@ -71,6 +74,10 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     tableOrder: "테이블 주문",
     dineIn: "매장 식사",
     discount: "할인",
+    discountAmount: "할인 금액",
+    discountType: "할인 유형",
+    discountCurrency: "금액 할인",
+    discountPercent: "% 할인",
     OrderDetails: "주문 상세 정보",
     orderCode: "주문 코드",
     orderDate: "주문 날짜",
@@ -252,6 +259,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
 
     // Payment method modal
     selectPaymentMethod: "결제 방법 선택",
+    selectPaymentMethod: "결제 방법 선택",
     totalAmount: "총 금액",
     cashPayment: "현금 결제",
     qrBanking: "QR 뱅킹",
@@ -293,6 +301,11 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     paymentMethodGeneric: "결제 방법",
     paid: "결제 완료",
     changeAmount: "거스름돈",
+
+    // Customer info section
+    customerInfo: "고객 정보",
+    customerInfoTitle: "고객 정보",
+    customerInfoDesc: "고객 검색 또는 신규 등록",
 
     // Subtotal
     subtotalLabel: "계:",
@@ -363,7 +376,8 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     phoneNumberPlaceholder: "전화번호",
     explanationPlaceholder: "자세한 설명...",
     confirmDelete: "삭제 확인",
-    confirmDeleteVoucher: "증서 '{voucherNumber}'을(를) 삭제하시겠습니까?",
+    confirmDeleteVoucher:
+      "증서 '{voucherNumber}'을(를) 삭제하시겠습니까?",
     cannotUndo: "이 작업은 되돌릴 수 없습니다.",
     skip: "건너뛰기",
     agree: "동의",
@@ -435,6 +449,8 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     // E-invoice status
     einvoiceStatusLabel: "전자세C계산서 상태:",
     invoiceStatusLabel: "송장 상태:",
+    einvoiceStatusFilter: "전자 인보이스 상태",
+    allEinvoiceStatus: "모두",
     einvoiceStatus: {
       notPublished: "발행되지 않음",
       published: "발행됨",
@@ -548,6 +564,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
       addFirstEmployee: "첫 번째 직원을 추가하여 시작하세요",
       noEmployeesFound: "직원을 찾을 수 없습니다",
       employeeSearchPlaceholder: "이름, ID 또는 전화번호로 검색",
+      customerCodeSearchPlaceholder: "이름 또는 제품 코드로 검색",
       cannotDeleteEmployee: "직원을 삭제할 수 없습니다",
       employeeHasAttendance:
         "이 직원은 시스템에 출근 기록이 있습니다. 데이터 무결성을 위해 삭제할 수 없습니다.",
@@ -658,8 +675,11 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
   en: {
     save: "Save",
     cancel: "Cancel",
+    notReturned: "Not Returned",
+    viewDetails: "View Details",
     saving: "Saving...",
     icon: "Icon",
+    customerCodeSearchPlaceholder: "Search by name or product code",
     paymentMethodLabel: "Payment Method",
     delete: "Delete",
     completed: "Completed",
@@ -919,6 +939,11 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     paid: "Paid",
     changeAmount: "Change",
 
+    // Customer info section
+    customerInfo: "Customer Information",
+    customerInfoTitle: "Customer Information",
+    customerInfoDesc: "Search or create new customer",
+
     // Subtotal
     subtotalLabel: "Subtotal:",
 
@@ -1058,6 +1083,8 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     // E-invoice status
     einvoiceStatusLabel: "E-Invoice Status:",
     invoiceStatusLabel: "Invoice Status:",
+    einvoiceStatusFilter: "E-Invoice Status",
+    allEinvoiceStatus: "All",
     einvoiceStatus: {
       notPublished: "Not Published",
       published: "Published",
@@ -1152,6 +1179,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
       addFirstEmployee: "Add your first employee to get started",
       noEmployeesFound: "No employees found",
       employeeSearchPlaceholder: "Search by name, ID, or phone",
+      customerCodeSearchPlaceholder: "Search by name or product code",
       cannotDeleteEmployee: "Cannot delete employee",
       employeeHasAttendance:
         "This employee has attendance records in the system. Cannot delete to maintain data integrity.",
@@ -1215,7 +1243,10 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
   vi: {
     save: "Lưu",
     cancel: "Hủy",
+    notReturned: "Chưa trả",
+    viewDetails: "Xem chi tiết",
     icon: "Biểu tượng",
+    customerCodeSearchPlaceholder: "Tìm kiếm theo tên hoặc mã sản phẩm",
     delete: "Xóa",
     saving: "Đang lưu...",
     paymentMethodLabel: "Phương thức thanh toán",
@@ -1304,6 +1335,10 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     totalPayment: "Tổng tiền thanh toán",
     subtotalAmount: "Thành tiền trước thuế",
     discount: "Giảm giá",
+    discountAmount: "Số tiền giảm giá",
+    discountType: "Loại giảm giá",
+    discountCurrency: "Giảm theo tiền",
+    discountPercent: "Giảm theo %",
     totalTax: "Thuế GTGT",
     customerPaid: "Khách hàng trả",
     cashPayment: "Thanh toán tiền mặt",
@@ -1398,6 +1433,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
 
     // Payment method modal
     selectPaymentMethod: "Chọn phương thức thanh toán",
+    selectPaymentMethod: "Chọn phương thức thanh toán",
     totalAmount: "Tổng tiền",
     cashPayment: "Thanh toán tiền mặt",
     qrBanking: "QR Banking",
@@ -1439,6 +1475,11 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     paymentMethodGeneric: "Phương thức thanh toán",
     paid: "Đã thanh toán",
     changeAmount: "Tiền thối",
+
+    // Customer info section
+    customerInfo: "Thông tin khách hàng",
+    customerInfoTitle: "Thông tin khách hàng",
+    customerInfoDesc: "Tìm kiếm hoặc tạo mới khách hàng",
 
     // Subtotal
     subtotalLabel: "Tổng phụ:",
@@ -1574,6 +1615,8 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     // E-invoice status
     einvoiceStatusLabel: "Trạng thái hóa đơn điện tử:",
     invoiceStatusLabel: "Trạng thái HĐ:",
+    einvoiceStatusFilter: "Trạng thái hóa đơn điện tử",
+    allEinvoiceStatus: "Tất cả",
     einvoiceStatus: {
       notPublished: "Chưa phát hành",
       published: "Đã phát hành",
@@ -1681,6 +1724,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
       addFirstEmployee: "Thêm nhân viên đầu tiên để bắt đầu",
       noEmployeesFound: "Không tìm thấy nhân viên nào phù hợp",
       employeeSearchPlaceholder: "Tìm kiếm theo tên, ID hoặc số điện thoại",
+      customerCodeSearchPlaceholder: "Tìm theo tên hoặc mã mặt hàng",
       cannotDeleteEmployee: "Không thể xóa nhân viên",
       employeeHasAttendance:
         "Nhân viên này đã có dữ liệu chấm công trong hệ thống. Không thể xóa để đảm bảo tính toàn vẹn dữ liệu.",

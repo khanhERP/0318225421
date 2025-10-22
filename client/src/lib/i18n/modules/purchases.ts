@@ -262,6 +262,15 @@ export const purchasesTranslations = {
     deleteSuccess: "개의 구매 입고 전표가 성공적으로 삭제되었습니다",
     deleteFailed: "구매 입고 전표 삭제에 실패했습니다",
 
+    // Additional translations
+    paid: "결제 완료",
+    paidDescription: "구매 주문이 결제되었는지 표시",
+    totalPayment: "총 결제 금액",
+    searchProductPlaceholder: "제품 코드/이름 입력 또는 클릭하여 선택",
+    totalSummary: "합계",
+    updateReceipt: "입고 전표 업데이트",
+    saveReceipt: "입고 전표 저장",
+
     // File attachments for view page
     attachedFilesCount: "첨부 파일",
     noAttachedFiles: "첨부 파일 없음",
@@ -552,6 +561,15 @@ export const purchasesTranslations = {
     confirmDeleteMessage: "purchase receipts?",
     deleteSuccess: "purchase receipts deleted successfully",
     deleteFailed: "Failed to delete purchase receipts",
+
+    // Additional translations
+    paid: "Paid",
+    paidDescription: "Mark if purchase order has been paid",
+    totalPayment: "Total Payment",
+    searchProductPlaceholder: "Enter product code/name or click to select",
+    totalSummary: "TOTAL",
+    updateReceipt: "Update Receipt",
+    saveReceipt: "Save Receipt",
 
     // File attachments for view page
     attachedFilesCount: "Attached Files",
@@ -844,6 +862,15 @@ export const purchasesTranslations = {
     confirmDeleteMessage: "phiếu nhập hàng?",
     deleteSuccess: "phiếu nhập hàng đã được xóa thành công",
     deleteFailed: "Không thể xóa phiếu nhập hàng",
+
+    // Additional translations
+    paid: "Đã thanh toán",
+    paidDescription: "Đánh dấu nếu phiếu nhập đã được thanh toán",
+    totalPayment: "Tổng thanh toán",
+    searchProductPlaceholder: "Nhập mã/tên SP hoặc click để chọn",
+    totalSummary: "TỔNG CỘNG",
+    updateReceipt: "Cập nhật phiếu nhập",
+    saveReceipt: "Lưu phiếu nhập",
 
     // File attachments for view page
     attachedFilesCount: "Đính kèm tệp",

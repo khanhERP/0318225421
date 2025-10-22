@@ -3,6 +3,7 @@ import type { CustomersTranslations } from "../types";
 export const customersTranslations: { [key: string]: CustomersTranslations } = {
   ko: {
     title: "고객 관리",
+    createNewCustomer: "신규 고객 추가",
     description: "고객 정보를 관리합니다",
     customerManagement: "고객 관리",
     addCustomer: "고객 추가",
@@ -146,6 +147,7 @@ export const customersTranslations: { [key: string]: CustomersTranslations } = {
   },
   en: {
     title: "Customer Management",
+    createNewCustomer: "Create New Customer",
     description: "Manage customer information",
     customerManagement: "Customer Management",
     addCustomer: "Add Customer",
@@ -289,6 +291,7 @@ export const customersTranslations: { [key: string]: CustomersTranslations } = {
     thresholdUpdateError: "An error occurred while updating membership threshold",
   },
   vi: {
+    createNewCustomer: "Tạo khách hàng mới",
     title: "Quản lý khách hàng",
     description: "Quản lý thông tin khách hàng",
     customerManagement: "Quản lý khách hàng",

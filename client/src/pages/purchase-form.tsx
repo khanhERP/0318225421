@@ -1907,9 +1907,9 @@ export default function PurchaseFormPage({
                               }, 0);
 
                               // Lấy method hiện tại hoặc mặc định
-                              const currentMethod = editPaymentMethods[0] || { 
-                                method: 'cash', 
-                                amount: Math.round(itemsTotal).toString() 
+                              const currentMethod = editPaymentMethods[0] || {
+                                method: 'cash',
+                                amount: Math.round(itemsTotal).toString()
                               };
 
                               // Auto-update payment amount khi items thay đổi
@@ -1926,7 +1926,7 @@ export default function PurchaseFormPage({
                                         <Select
                                           value={currentMethod.method || "cash"}
                                           onValueChange={(value) => {
-                                            const updated = [{ 
+                                            const updated = [{
                                               method: value,
                                               amount: Math.round(itemsTotal).toString()
                                             }];
@@ -2345,7 +2345,7 @@ export default function PurchaseFormPage({
                                               }
                                             }
                                           }}
-                                          placeholder="Nhập mã/tên SP hoặc click để chọn"
+                                          placeholder={t("purchases.searchProductPlaceholder") || "Nhập mã/tên SP hoặc click để chọn"}
                                           className="w-28 text-center text-sm h-8 border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
                                           disabled={viewOnly}
                                           data-testid={`input-sku-${index}`}

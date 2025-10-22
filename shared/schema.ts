@@ -828,6 +828,17 @@ export type OrderItem = typeof orderItems.$inferSelect;
 export type StoreSettings = typeof storeSettings.$inferSelect;
 export type Supplier = typeof suppliers.$inferSelect;
 
+// Add priceListId to user token payload type
+export type UserTokenPayload = {
+  userId: number;
+  userName: string;
+  storeCode: string;
+  storeName: string;
+  priceListId?: number | null;
+  isAdmin: boolean;
+  typeUser: number;
+};
+
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;

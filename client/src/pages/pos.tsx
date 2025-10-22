@@ -283,7 +283,6 @@ export default function POS({ onLogout }: POSPageProps) {
     setProductManagerSearchSKU("");
   }, []);
 
-
   // Dummy handlers for CategorySidebar and ShoppingCart to satisfy props before they are fully implemented
   const handleCategorySelect = (category: number | "all") => {
     console.log("Selected category:", category);
@@ -297,45 +296,51 @@ export default function POS({ onLogout }: POSPageProps) {
 
   try {
     return (
-      <div className="min-h-screen bg-green-50 grocery-bg">
+      <div className="min-h-screen bg-green-50 grocery-bg mt-6">
         {/* Header */}
         <POSHeader onLogout={onLogout} />
 
         {/* Right Sidebar */}
         <RightSidebar />
 
-        <div className="main-content flex h-screen pt-16">
-          {/* Category Sidebar */}
-          <CategorySidebar
-            selectedCategory={selectedCategory}
-            onCategorySelect={handleCategorySelect}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onOpenProductManager={handleOpenProductManager} // Use the new handler
-            onAddToCart={handleAddToCart}
-          />
+        <div className="main-content flex flex-col lg:flex-row pt-16 min-h-screen">
+          {/* Category Sidebar - Responsive width */}
+          <div className="w-full lg:w-64 flex-shrink-0 border-b lg:border-b-0 lg:border-r">
+            <CategorySidebar
+              selectedCategory={selectedCategory}
+              onCategorySelect={handleCategorySelect}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              onOpenProductManager={handleOpenProductManager}
+              onAddToCart={handleAddToCart}
+            />
+          </div>
 
-          {/* Product Grid */}
-          <ProductGrid
-            selectedCategory={selectedCategory}
-            searchQuery={searchQuery}
-            onAddToCart={(product) => addToCart(product)}
-          />
+          {/* Product Grid - Flexible center area */}
+          <div className="flex-1 min-w-0 overflow-auto">
+            <ProductGrid
+              selectedCategory={selectedCategory}
+              searchQuery={searchQuery}
+              onAddToCart={(product) => addToCart(product)}
+            />
+          </div>
 
-          {/* Shopping Cart */}
-          <ShoppingCart
-            cart={cart}
-            onUpdateQuantity={updateQuantity}
-            onRemoveItem={removeFromCart}
-            onClearCart={clearCart}
-            onCheckout={handleCheckout}
-            isProcessing={isProcessingCheckout}
-            orders={orders}
-            activeOrderId={activeOrderId}
-            onCreateNewOrder={createNewOrder}
-            onSwitchOrder={switchOrder}
-            onRemoveOrder={removeOrder}
-          />
+          {/* Shopping Cart - Responsive width */}
+          <div className="w-full lg:w-96 xl:w-[28rem] flex-shrink-0 border-t lg:border-t-0 lg:border-l">
+            <ShoppingCart
+              cart={cart}
+              onUpdateQuantity={updateQuantity}
+              onRemoveItem={removeFromCart}
+              onClearCart={clearCart}
+              onCheckout={handleCheckout}
+              isProcessing={isProcessingCheckout}
+              orders={orders}
+              activeOrderId={activeOrderId}
+              onCreateNewOrder={createNewOrder}
+              onSwitchOrder={switchOrder}
+              onRemoveOrder={removeOrder}
+            />
+          </div>
         </div>
 
         {/* Modals */}

@@ -121,10 +121,20 @@ export function ShoppingCart({
   // Get priceIncludesTax setting from store settings
   const priceIncludesTax = storeSettings?.priceIncludesTax === true;
 
-  // State to manage discounts for each order
+  // State to manage discounts for each order (amount, type, percent)
   const [orderDiscounts, setOrderDiscounts] = useState<{
     [orderId: string]: string;
   }>({});
+
+  // Initialize discount type as "amount" by default
+  useEffect(() => {
+    if (activeOrderId && !orderDiscounts[activeOrderId + "_type"]) {
+      setOrderDiscounts((prev) => ({
+        ...prev,
+        [activeOrderId + "_type"]: "amount",
+      }));
+    }
+  }, [activeOrderId]);
 
   // Calculate discount for the current active order
   const currentOrderDiscount = activeOrderId
@@ -698,28 +708,52 @@ export function ShoppingCart({
     return () => clearTimeout(timer);
   }, [cart, subtotal, tax, total, broadcastCartUpdate]);
 
-  const getPaymentMethods = () => {
-    // Only return cash and bank transfer payment methods
-    const paymentMethods = [
-      {
-        id: 1,
-        name: "Tiền mặt",
-        nameKey: "cash",
-        type: "cash",
-        enabled: true,
-        icon: "💵",
-      },
-      {
-        id: 2,
-        name: "Chuyển khoản",
-        nameKey: "bankTransfer",
-        type: "transfer",
-        enabled: true,
-        icon: "🏦",
-      },
-    ];
+  // Query payment methods from API
+  const { data: paymentMethodsData } = useQuery({
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/payment-methods"],
+    queryFn: async () => {
+      const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/payment-methods");
+      if (!response.ok) throw new Error("Failed to fetch payment methods");
+      return response.json();
+    },
+  });
 
-    return paymentMethods;
+  // Helper function to get payment method name
+  const getPaymentMethodName = (nameKey: string) => {
+    const names: { [key: string]: string } = {
+      cash: "Tiền mặt",
+      creditCard: "Thẻ tín dụng",
+      debitCard: "Thẻ ghi nợ",
+      momo: "MoMo",
+      zalopay: "ZaloPay",
+      vnpay: "VNPay",
+      qrCode: "QR Code",
+      shopeepay: "ShopeePay",
+      grabpay: "GrabPay",
+      bankTransfer: "Chuyển khoản",
+    };
+    return names[nameKey] || nameKey;
+  };
+
+  const getPaymentMethods = () => {
+    const paymentMethods = paymentMethodsData || [];
+
+    console.log("All payment methods from API:", paymentMethods);
+
+    // Filter to only return enabled payment methods
+    const enabledMethods = paymentMethods
+      .filter((method: any) => method.enabled === true)
+      .map((method: any) => ({
+        id: method.id,
+        name: getPaymentMethodName(method.nameKey),
+        nameKey: method.nameKey,
+        type: method.type,
+        enabled: method.enabled,
+        icon: method.icon,
+      }));
+
+    console.log("Enabled payment methods:", enabledMethods);
+    return enabledMethods;
   };
 
   // Handler for when receipt preview is confirmed - move to payment method selection
@@ -894,6 +928,7 @@ export function ShoppingCart({
       customerPhone: selectedCustomer.phone,
       customerTaxCode: selectedCustomer.customerTaxCode,
       storeCode: storeCode,
+      paymentMethod: paymentMethod, // Log payment method
     });
 
     // Prepare cart items for order
@@ -984,7 +1019,7 @@ export function ShoppingCart({
       tableId: null,
       customerId: selectedCustomer.id,
       customerName: selectedCustomer.name,
-      customerPhone: selectedCustomer.phone || null, // Số điện thoại khách hàng
+      customerPhone: selectedCustomer.phone || null,
       customerTaxCode: selectedCustomer.customerTaxCode || null,
       customerAddress: selectedCustomer.address || null,
       customerEmail: selectedCustomer.email || null,
@@ -995,12 +1030,12 @@ export function ShoppingCart({
       tax: calculatedTax.toString(),
       discount: finalDiscount.toString(),
       total: finalTotal.toString(),
-      paymentMethod: null, // Chưa có phương thức thanh toán
+      paymentMethod: paymentMethod, // Lưu phương thức thanh toán đã chọn
       salesChannel: "pos",
       priceIncludeTax: priceIncludesTax,
       einvoiceStatus: 0,
-      notes: `Đặt hàng tại POS - Khách hàng: ${selectedCustomer.name}${selectedCustomer.phone ? ` - SĐT: ${selectedCustomer.phone}` : ""}${selectedCustomer.customerTaxCode ? ` - MST: ${selectedCustomer.customerTaxCode}` : ""}`,
-      storeCode: storeCode, // Add storeCode to order data
+      notes: `Đặt hàng tại POS - Khách hàng: ${selectedCustomer.name}${selectedCustomer.phone ? ` - SĐT: ${selectedCustomer.phone}` : ""}${selectedCustomer.customerTaxCode ? ` - MST: ${selectedCustomer.customerTaxCode}` : ""} - Phương thức: ${getPaymentMethodName(paymentMethod)}`,
+      storeCode: storeCode,
     };
 
     console.log("📝 Order data being sent:", orderData);
@@ -1029,25 +1064,49 @@ export function ShoppingCart({
 
       console.log("✅ Order placed successfully:", result);
 
-      toast({
-        title: "Đặt hàng thành công",
-        description: `Đơn hàng ${result.orderNumber} đã được tạo - Trạng thái: Đặt hàng chưa thanh toán`,
-      });
+      // Hiển thị phiếu tạm tính
+      const receiptPreview = {
+        id: result.id,
+        orderNumber: result.orderNumber,
+        customerId: selectedCustomer.id,
+        customerName: selectedCustomer.name,
+        customerPhone: selectedCustomer.phone || null,
+        customerTaxCode: selectedCustomer.customerTaxCode || null,
+        customerAddress: selectedCustomer.address || null,
+        customerEmail: selectedCustomer.email || null,
+        items: cartItemsForOrder.map((item) => ({
+          ...item,
+          id: item.productId, // Use productId for consistency in receipt
+        })),
+        subtotal: calculatedSubtotal.toString(),
+        tax: calculatedTax.toString(),
+        discount: finalDiscount.toString(),
+        total: finalTotal.toString(),
+        exactSubtotal: calculatedSubtotal,
+        exactTax: calculatedTax,
+        exactDiscount: finalDiscount,
+        exactTotal: finalTotal,
+        paymentMethod: paymentMethod,
+        paymentMethodName: getPaymentMethodName(paymentMethod),
+        status: "pending",
+        paymentStatus: "pending",
+        orderedAt: new Date().toISOString(),
+        timestamp: new Date().toISOString(),
+      };
 
-      // Clear cart and customer info
-      onClearCart();
-      setSelectedCustomer(null);
-      setCustomerSearchTerm("");
-      setDiscountAmount("");
-      if (activeOrderId) {
-        setOrderCustomers((prev) => {
-          const updated = { ...prev };
-          delete updated[activeOrderId];
-          return updated;
-        });
+      // Show receipt preview with isTitle = false (phiếu tạm tính)
+      setSelectedReceipt(receiptPreview);
+      setShowReceiptModal(true);
+      // Set a flag to indicate this is a preview (not final receipt)
+      if (typeof window !== "undefined") {
+        (window as any).isReceiptPreview = true;
       }
 
-      clearCart(); // Use the memoized clearCart function
+      toast({
+        title: "Đặt hàng thành công",
+        description: `Đơn hàng ${result.orderNumber} đã được tạo - Phương thức: ${getPaymentMethodName(paymentMethod)}`,
+      });
+
       // Refresh orders list
       await queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
     } catch (error) {
@@ -1071,6 +1130,16 @@ export function ShoppingCart({
       return;
     }
 
+    // Check if customer is selected for laundry business
+    if (storeSettings?.businessType === "laundry" && !selectedCustomer) {
+      toast({
+        title: "Chưa chọn khách hàng",
+        description: "Vui lòng chọn khách hàng trước khi thanh toán",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Get storeCode from authenticated user
     const storeCode =
       userInfo?.storeCode || storeSettings?.storeCode || "STORE001";
@@ -1087,6 +1156,7 @@ export function ShoppingCart({
       discount: displayedDiscount,
       total: displayedTotal,
       storeCode: storeCode,
+      businessType: storeSettings?.businessType,
     });
 
     // Chuẩn bị items với đúng thông tin đã tính toán và hiển thị
@@ -1173,7 +1243,102 @@ export function ShoppingCart({
       };
     });
 
-    // Receipt preview - sử dụng ĐÚNG giá trị hiển thị
+    // Check if laundry business - process payment directly
+    if (storeSettings?.businessType === "laundry") {
+      console.log("🧺 LAUNDRY BUSINESS - Processing direct payment");
+
+      try {
+        // Create order data
+        const orderData = {
+          orderNumber: `ORD-${Date.now()}`,
+          tableId: null,
+          customerId: selectedCustomer?.id || null,
+          customerName: selectedCustomer?.name || "Khách hàng lẻ",
+          customerPhone: selectedCustomer?.phone || null,
+          customerTaxCode: selectedCustomer?.customerTaxCode || null,
+          customerAddress: selectedCustomer?.address || null,
+          customerEmail: selectedCustomer?.email || null,
+          status: "paid",
+          paymentStatus: "paid",
+          customerCount: 1,
+          subtotal: Math.floor(displayedSubtotal).toString(),
+          tax: displayedTax.toString(),
+          discount: displayedDiscount.toString(),
+          total: displayedTotal.toString(),
+          paymentMethod: paymentMethod,
+          salesChannel: "pos",
+          priceIncludeTax: priceIncludesTax,
+          einvoiceStatus: 0,
+          notes: `Thanh toán tại POS - Khách hàng: ${selectedCustomer?.name || "Khách lẻ"}${selectedCustomer?.phone ? ` - SĐT: ${selectedCustomer.phone}` : ""} - Phương thức: ${getPaymentMethodName(paymentMethod)}`,
+          storeCode: storeCode,
+          paidAt: new Date().toISOString(),
+        };
+
+        console.log("📤 Creating order with data:", orderData);
+
+        const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            order: orderData,
+            items: cartItemsForReceipt,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to create order");
+        }
+
+        const result = await response.json();
+
+        console.log("✅ Order created successfully:", result);
+
+        // Prepare receipt data for display
+        const receiptData = {
+          ...result,
+          items: cartItemsForReceipt,
+          exactSubtotal: displayedSubtotal,
+          exactTax: displayedTax,
+          exactDiscount: displayedDiscount,
+          exactTotal: displayedTotal,
+          paymentMethod: paymentMethod,
+          paymentMethodName: getPaymentMethodName(paymentMethod),
+        };
+
+        // Show receipt modal with isTitle = true
+        setSelectedReceipt(receiptData);
+        setShowReceiptModal(true);
+
+        // Clear cart and related states
+        onClearCart();
+        setSelectedCustomer(null);
+        setCustomerSearchTerm("");
+        setOrderCustomers({});
+        setOrderDiscounts({});
+
+        toast({
+          title: "Thanh toán thành công",
+          description: `Đơn hàng ${result.orderNumber} đã được thanh toán`,
+        });
+
+        // Refresh orders list
+        await queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+      } catch (error) {
+        console.error("❌ Error processing payment:", error);
+        toast({
+          title: "Lỗi thanh toán",
+          description:
+            error instanceof Error
+              ? error.message
+              : "Không thể thanh toán. Vui lòng thử lại.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+
+    // For non-laundry business, show receipt preview as before
     const receiptPreview = {
       id: `temp-${Date.now()}`,
       orderNumber: `POS-${Date.now()}`,
@@ -1199,7 +1364,6 @@ export function ShoppingCart({
       timestamp: new Date().toISOString(),
     };
 
-    // Order for payment - sử dụng ĐÚNG giá trị hiển thị
     const orderForPaymentData = {
       id: `temp-${Date.now()}`,
       orderNumber: `POS-${Date.now()}`,
@@ -1491,38 +1655,48 @@ export function ShoppingCart({
   }, [activeOrderId, orderCustomers]);
 
   return (
-    <aside className="w-96 bg-white shadow-material border-l pos-border flex flex-col">
-      {/* Customer Search Input - Always visible for all business types */}
-      <div className="p-4 border-b pos-border bg-gradient-to-r from-blue-50 to-indigo-50 mt-3">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-            <svg
-              className="w-6 h-6 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+    <aside className="w-full bg-white border-l pos-border flex flex-col lg:max-h-screen max-h-[600px]">
+      {/* Purchase History Section - without label */}
+      <div className="p-2.5 border-b pos-border bg-gray-50 flex-shrink-0">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5">
+            <div className="w-7 h-7 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+              <svg
+                className="w-4 h-4 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-xs font-semibold text-gray-900 truncate">
+                {t("common.customerInfo")}
+              </h3>
+            </div>
+          </div>
+          {onCreateNewOrder && (
+            <Button
+              onClick={onCreateNewOrder}
+              size="sm"
+              className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-2 py-1 rounded-md shadow-sm h-7"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-              />
-            </svg>
-          </div>
-          <div className="flex-1">
-            <h3 className="text-base font-semibold text-gray-900">
-              Thông tin khách hàng
-            </h3>
-            <p className="text-xs text-gray-500">
-              Tìm kiếm hoặc tạo mới khách hàng
-            </p>
-          </div>
+              + {t("pos.newOrder")}
+            </Button>
+          )}
         </div>
+
+        {/* Customer Search Input */}
         <div className="relative">
           <div className="relative">
             <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -1544,9 +1718,74 @@ export function ShoppingCart({
                   setSelectedCustomer(null);
                 }
               }}
-              placeholder="Nhập số điện thoại hoặc tên khách hàng..."
-              className="w-full pl-10 pr-4 py-2 border-2 border-gray-200 focus:border-blue-500 rounded-lg transition-colors"
+              placeholder={t("orders.pressPhoneOrCustomer")}
+              className={`w-full pl-9 py-1.5 text-sm border-2 rounded-lg transition-colors ${
+                selectedCustomer
+                  ? "pr-20 border-green-500 bg-gradient-to-r from-green-50 to-emerald-50 font-semibold text-green-900"
+                  : "pr-3 border-gray-200 focus:border-blue-500"
+              }`}
             />
+            {selectedCustomer && (
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <button
+                  onClick={() => {
+                    setEditingCustomer(selectedCustomer);
+                    setShowCustomerForm(true);
+                  }}
+                  className="w-6 h-6 flex items-center justify-center bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-full transition-colors"
+                  title={t("common.viewDetails")}
+                >
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                    />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedCustomer(null);
+                    setCustomerSearchTerm("");
+                    if (activeOrderId) {
+                      setOrderCustomers((prev) => {
+                        const updated = { ...prev };
+                        delete updated[activeOrderId];
+                        return updated;
+                      });
+                    }
+                  }}
+                  className="w-6 h-6 flex items-center justify-center bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-colors"
+                  title={t("common.remove")}
+                >
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Dropdown suggestions */}
@@ -1555,11 +1794,12 @@ export function ShoppingCart({
               <div className="px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500">
                 <p className="text-xs font-medium text-white">
                   {isSearching ? (
-                    <>⏳ Đang tìm kiếm...</>
+                    <>⏳ {t("common.loading")}</>
                   ) : (
-                    <>
-                      🔍 Tìm thấy {filteredSuggestedCustomers.length} khách hàng
-                    </>
+                    t("orders.customersFound").replace(
+                      "{{count}}",
+                      filteredSuggestedCustomers.length + " ",
+                    )
                   )}
                 </p>
               </div>
@@ -1592,7 +1832,9 @@ export function ShoppingCart({
                           </div>
                         </div>
                         <div className="flex items-center gap-1 text-blue-600">
-                          <span className="text-xs font-medium">Chọn</span>
+                          <span className="text-xs font-medium">
+                            {t("common.select")}
+                          </span>
                           <svg
                             className="w-4 h-4"
                             fill="none"
@@ -1622,8 +1864,8 @@ export function ShoppingCart({
               <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-xl z-50 mt-1 p-4">
                 <p className="text-sm text-gray-500 text-center mb-3">
                   {/^\d+$/.test(customerSearchTerm)
-                    ? `Không tìm thấy khách hàng có SĐT bắt đầu bằng "${customerSearchTerm}"`
-                    : `Không tìm thấy khách hàng "${customerSearchTerm}"`}
+                    ? `${t("orders.noCustomersFoundWithPhone")} "${customerSearchTerm}"`
+                    : `${t("orders.noCustomersFoundWithName")} "${customerSearchTerm}"`}
                 </p>
                 {/^\d+$/.test(customerSearchTerm) && (
                   <Button
@@ -1635,148 +1877,15 @@ export function ShoppingCart({
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                     size="sm"
                   >
-                    + Tạo khách hàng mới với SĐT {customerSearchTerm}
+                    + {t("customers.createNewCustomer")} {customerSearchTerm}
                   </Button>
                 )}
               </div>
             )}
         </div>
-
-        {/* Selected customer display */}
-        {selectedCustomer && (
-          <div className="mt-3 p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <button
-                  onClick={() => {
-                    setEditingCustomer(selectedCustomer);
-                    setShowCustomerForm(true);
-                  }}
-                  className="text-sm font-bold text-green-900 hover:text-green-700 transition-colors inline-flex items-center gap-1 group"
-                  title="Xem chi tiết khách hàng"
-                >
-                  {selectedCustomer.name}
-                  <svg
-                    className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13 7l5 5m0 0l-5 5m5-7H6"
-                    />
-                  </svg>
-                </button>
-                <div className="flex flex-wrap items-center gap-2 mt-2">
-                  <span className="text-xs text-green-700 bg-white px-2 py-1 rounded-md flex items-center gap-1">
-                    <svg
-                      className="w-3 h-3"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                      />
-                    </svg>
-                    {selectedCustomer.phone}
-                  </span>
-                  {selectedCustomer.customerTaxCode && (
-                    <span className="text-xs text-green-600 bg-white px-2 py-1 rounded-md">
-                      MST: {selectedCustomer.customerTaxCode}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setSelectedCustomer(null);
-                  setCustomerSearchTerm("");
-                  // Clear customer for the current order
-                  if (activeOrderId) {
-                    setOrderCustomers((prev) => {
-                      const updated = { ...prev };
-                      delete updated[activeOrderId];
-                      return updated;
-                    });
-                  }
-                }}
-                className="w-7 h-7 flex items-center justify-center bg-red-100 hover:bg-red-200 text-red-600 rounded-full transition-colors flex-shrink-0"
-                title="Xóa khách hàng"
-              >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Purchase History Section */}
-      <div className="p-4 border-b pos-border bg-gray-50">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <svg
-              className="w-5 h-5 text-gray-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-              />
-            </svg>
-            <h2 className="text-lg pos-text-primary font-semibold">
-              {t("pos.purchaseHistory")}
-            </h2>
-          </div>
-          {onCreateNewOrder && (
-            <Button
-              onClick={onCreateNewOrder}
-              size="sm"
-              className="bg-blue-500 hover:bg-blue-600 text-white text-xs px-3 py-1 rounded-md shadow-sm"
-            >
-              + {t("pos.newOrder")}
-            </Button>
-          )}
-        </div>
-
-        {/* Order Tabs */}
+      <div className="p-2.5 border-b pos-border bg-gray-50 flex-shrink-0">
         {orders.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3 max-h-20 overflow-y-auto">
             {orders.map((order) => (
@@ -1860,21 +1969,23 @@ export function ShoppingCart({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-2 md:p-2.5 space-y-2 lg:max-h-[calc(100vh-480px)] max-h-[300px] min-h-[150px]">
         {cart.length === 0 ? (
-          <div className="text-center py-12">
-            <CartIcon className="mx-auto text-gray-400 mb-4" size={48} />
-            <h3 className="text-lg font-medium pos-text-secondary mb-2">
+          <div className="text-center py-8">
+            <CartIcon className="mx-auto text-gray-400 mb-3" size={40} />
+            <h3 className="text-sm font-medium pos-text-secondary mb-1">
               {t("pos.emptyCart")}
             </h3>
-            <p className="pos-text-tertiary">{t("pos.addProductsToStart")}</p>
+            <p className="text-xs pos-text-tertiary">
+              {t("pos.addProductsToStart")}
+            </p>
           </div>
         ) : (
           cart.map((item) => (
             <div key={item.id} className="bg-gray-50 rounded-lg p-2">
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0 pr-2">
-                  <h4 className="font-medium pos-text-primary text-sm truncate">
+                  <h4 className="font-medium pos-text-primary text-sm line-clamp-2 break-words leading-relaxed">
                     {item.name}
                   </h4>
                   <div className="space-y-1">
@@ -2230,55 +2341,159 @@ export function ShoppingCart({
       </div>
       {/* Cart Summary */}
       {cart.length > 0 && (
-        <div className="border-t pos-border p-4 space-y-4">
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
+        <div className="border-t pos-border p-2.5 space-y-2 flex-shrink-0 bg-white">
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center text-xs py-0.5">
               <span className="pos-text-secondary">{t("pos.totalAmount")}</span>
-              <span className="font-medium">
+              <span className="font-semibold text-gray-900">
                 {Math.round(subtotal).toLocaleString("vi-VN")} ₫
               </span>
             </div>
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between items-center text-xs py-0.5">
               <span className="pos-text-secondary">{t("pos.tax")}</span>
-              <span className="font-medium">
+              <span className="font-semibold text-gray-900">
                 {Math.round(tax).toLocaleString("vi-VN")} ₫
               </span>
             </div>
 
             {/* Discount Input */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium pos-text-primary">
-                {t("common.discount")} (₫)
-              </Label>
+            <div className="space-y-1.5 pt-1.5 border-t border-gray-100">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold pos-text-primary">
+                  {t("common.discount")}
+                </Label>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={
+                      (activeOrderId
+                        ? orderDiscounts[activeOrderId + "_type"]
+                        : "amount") !== "percent"
+                        ? "default"
+                        : "outline"
+                    }
+                    className="h-6 px-2 text-xs font-medium"
+                    onClick={() => {
+                      if (activeOrderId) {
+                        setOrderDiscounts((prev) => ({
+                          ...prev,
+                          [activeOrderId + "_type"]: "amount",
+                          [activeOrderId + "_percent"]: undefined,
+                        }));
+                      }
+                    }}
+                    title={t("common.discountCurrency")}
+                  >
+                    ₫
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={
+                      (activeOrderId
+                        ? orderDiscounts[activeOrderId + "_type"]
+                        : "amount") === "percent"
+                        ? "default"
+                        : "outline"
+                    }
+                    className="h-7 px-2.5 text-xs font-medium"
+                    onClick={() => {
+                      if (activeOrderId) {
+                        setOrderDiscounts((prev) => ({
+                          ...prev,
+                          [activeOrderId + "_type"]: "percent",
+                        }));
+                      }
+                    }}
+                    title={t("common.discountPercent")}
+                  >
+                    %
+                  </Button>
+                </div>
+              </div>
               <Input
                 type="text"
-                value={
-                  currentOrderDiscount && parseFloat(currentOrderDiscount) > 0
-                    ? parseFloat(currentOrderDiscount).toLocaleString("vi-VN")
-                    : ""
+                value={(() => {
+                  const discountType = activeOrderId
+                    ? orderDiscounts[activeOrderId + "_type"] || "amount"
+                    : "amount";
+
+                  if (discountType === "percent") {
+                    // Show percentage value
+                    const percentValue = activeOrderId
+                      ? orderDiscounts[activeOrderId + "_percent"] || ""
+                      : "";
+                    return percentValue
+                      ? parseFloat(percentValue).toLocaleString("vi-VN")
+                      : "";
+                  } else {
+                    // Show amount value
+                    return currentOrderDiscount &&
+                      parseFloat(currentOrderDiscount) > 0
+                      ? parseFloat(currentOrderDiscount).toLocaleString("vi-VN")
+                      : "";
+                  }
+                })()}
+                placeholder={
+                  (activeOrderId
+                    ? orderDiscounts[activeOrderId + "_type"] || "amount"
+                    : "amount") === "percent"
+                    ? t("common.discountPercent")
+                    : t("common.discountCurrency")
                 }
                 onChange={(e) => {
-                  const value = Math.max(
-                    0,
-                    parseFloat(e.target.value.replace(/[^\d]/g, "")) || 0,
-                  );
-                  setDiscountAmount(value.toString()); // Update local state for input display
-                  if (activeOrderId) {
-                    setOrderDiscounts((prev) => ({
-                      ...prev,
-                      [activeOrderId]: value.toString(),
-                    }));
+                  const rawValue = e.target.value.replace(/[^\d]/g, "");
+                  const inputValue = Math.max(0, parseFloat(rawValue) || 0);
+
+                  const discountType = activeOrderId
+                    ? orderDiscounts[activeOrderId + "_type"] || "amount"
+                    : "amount";
+
+                  let finalDiscountAmount = 0;
+
+                  if (discountType === "percent") {
+                    // Calculate discount from percentage - use total price WITHOUT any previous discount
+                    const percentage = Math.min(100, inputValue);
+                    
+                    // Calculate total BEFORE discount (sum of all item prices * quantities)
+                    const totalBeforeDiscount = cart.reduce((sum, item) => {
+                      return sum + (parseFloat(item.price) * item.quantity);
+                    }, 0);
+                    
+                    // Apply percentage to total before discount
+                    finalDiscountAmount = Math.round(
+                      totalBeforeDiscount * (percentage / 100),
+                    );
+
+                    // Store the percentage for display
+                    if (activeOrderId) {
+                      setOrderDiscounts((prev) => ({
+                        ...prev,
+                        [activeOrderId + "_percent"]: percentage.toString(),
+                        [activeOrderId]: finalDiscountAmount.toString(),
+                      }));
+                    }
                   } else {
-                    // If no active order, update discount amount directly
-                    setDiscountAmount(value.toString());
+                    // Use direct amount
+                    finalDiscountAmount = inputValue;
+
+                    if (activeOrderId) {
+                      setOrderDiscounts((prev) => ({
+                        ...prev,
+                        [activeOrderId]: finalDiscountAmount.toString(),
+                        [activeOrderId + "_percent"]: undefined,
+                      }));
+                    } else {
+                      setDiscountAmount(finalDiscountAmount.toString());
+                    }
                   }
 
-                  // Send discount update via WebSocket with proper cart items
+                  // Send discount update via WebSocket
                   if (
                     wsRef.current &&
                     wsRef.current.readyState === WebSocket.OPEN
                   ) {
-                    // Ensure cart items have proper structure
                     const validatedCart = cart.map((item) => ({
                       ...item,
                       name:
@@ -2299,38 +2514,54 @@ export function ShoppingCart({
                     wsRef.current.send(
                       JSON.stringify({
                         type: "cart_update",
-                        cart: validatedCart, // Send validated cart items
+                        cart: validatedCart,
                         subtotal: Math.floor(subtotal),
                         tax: Math.floor(tax),
-                        total: Math.floor(total), // Total before discount
-                        discount: value, // The new discount value
+                        total: Math.floor(total),
+                        discount: finalDiscountAmount,
                         orderNumber: activeOrderId || `ORD-${Date.now()}`,
                         timestamp: new Date().toISOString(),
-                        updateType: "discount_update", // Indicate this is a discount update
+                        updateType: "discount_update",
                       }),
                     );
 
                     console.log(
                       "📡 Shopping Cart: Discount update broadcasted:",
                       {
-                        discount: value,
+                        discount: finalDiscountAmount,
+                        discountType: discountType,
                         cartItems: validatedCart.length,
                         total: Math.floor(total),
                       },
                     );
                   }
                 }}
-                placeholder="0"
-                className="text-right"
+                className="text-right h-9"
               />
+              {(activeOrderId
+                ? orderDiscounts[activeOrderId + "_type"]
+                : "amount") === "percent" &&
+                currentOrderDiscount &&
+                parseFloat(currentOrderDiscount) > 0 && (
+                  <p className="text-xs text-gray-600 bg-blue-50 px-2 py-1 rounded">
+                    {t("common.discount")}:{" "}
+                    <span className="font-semibold">
+                      {parseFloat(currentOrderDiscount).toLocaleString("vi-VN")}{" "}
+                      ₫
+                    </span>
+                    {activeOrderId &&
+                      orderDiscounts[activeOrderId + "_percent"] &&
+                      ` (${orderDiscounts[activeOrderId + "_percent"]}%)`}
+                  </p>
+                )}
             </div>
 
-            <div className="border-t pt-2">
-              <div className="flex justify-between">
-                <span className="text-lg font-bold pos-text-primary">
+            <div className="border-t-2 border-gray-200 pt-3 mt-3">
+              <div className="flex justify-between items-center bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg">
+                <span className="text-base font-bold pos-text-primary">
                   {t("tables.total")}:
                 </span>
-                <span className="text-lg font-bold text-blue-600">
+                <span className="text-xl font-bold text-blue-600">
                   {(() => {
                     const baseTotal = Math.round(subtotal + tax);
                     const finalTotal = baseTotal;
@@ -2351,49 +2582,76 @@ export function ShoppingCart({
             </div>
           </div>
 
-          {/* Cash Payment */}
-          {paymentMethod === "cash" && (
-            <div className="space-y-2">
-              <Label className="text-sm font-medium pos-text-primary">
-                {t("tables.amountReceived")}
-              </Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={amountReceived}
-                onChange={(e) => setAmountReceived(e.target.value)}
-              />
-              <div className="flex justify-between text-sm">
-                <span className="pos-text-secondary">
-                  {t("tables.change")}:
-                </span>
-                <span className="font-bold text-green-600">
-                  {change.toLocaleString("vi-VN", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{" "}
-                  ₫
-                </span>
+          {/* Payment Methods Selection - Only show for laundry business type */}
+          {storeSettings?.businessType === "laundry" && (
+            <div className="p-2 border-t pos-border bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg">
+              <h3 className="text-xs font-bold text-gray-700 mb-1.5 flex items-center gap-1.5">
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
+                </svg>
+                {t("common.selectPaymentMethod")}
+              </h3>
+              <div className="grid grid-cols-4 gap-1">
+                {getPaymentMethods().map((method) => (
+                  <button
+                    key={method.id}
+                    onClick={() => setPaymentMethod(method.nameKey)}
+                    className={`flex items-center justify-center p-1.5 rounded-lg border-2 transition-all duration-200 h-12 ${
+                      paymentMethod === method.nameKey
+                        ? "border-green-600 bg-green-600 text-white shadow-lg scale-105"
+                        : "border-gray-300 bg-white text-gray-700 hover:border-green-400 hover:bg-green-50 hover:scale-102"
+                    }`}
+                    title={t(`common.${method.nameKey}`)}
+                  >
+                    <span className="text-xs font-semibold text-center leading-tight">
+                      {t(`common.${method.nameKey}`)}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex gap-1.5 pt-1.5">
             {storeSettings?.businessType === "laundry" && (
               <Button
                 onClick={handlePlaceOrder}
                 disabled={
                   cart.length === 0 || isProcessing || !selectedCustomer
                 }
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-2 text-sm rounded-lg shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
                 title={
                   !selectedCustomer
                     ? "Vui lòng chọn khách hàng trước khi đặt hàng"
                     : ""
                 }
               >
-                {t("pos.placeOrder")}
+                <span className="flex items-center justify-center gap-1.5">
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                  {t("pos.placeOrder")}
+                </span>
               </Button>
             )}
             <Button
@@ -2403,14 +2661,29 @@ export function ShoppingCart({
                 isProcessing ||
                 (storeSettings?.businessType === "laundry" && !selectedCustomer)
               }
-              className={`${storeSettings?.businessType !== "laundry" ? "w-full" : "flex-1"} bg-green-600 hover:bg-green-700 text-white font-medium py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed`}
+              className={`${storeSettings?.businessType !== "laundry" ? "w-full" : "flex-1"} bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-2 text-sm rounded-lg shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md`}
               title={
                 storeSettings?.businessType === "laundry" && !selectedCustomer
                   ? "Vui lòng chọn khách hàng trước khi thanh toán"
                   : ""
               }
             >
-              {isProcessing ? t("tables.placing") : t("pos.checkout")}
+              <span className="flex items-center justify-center gap-1.5">
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                {isProcessing ? t("tables.placing") : t("pos.checkout")}
+              </span>
             </Button>
           </div>
         </div>
@@ -2592,7 +2865,7 @@ export function ShoppingCart({
         />
       )}
 
-      {/* Final Receipt Modal - Shows after successful payment */}
+      {/* Final Receipt Modal - Shows after successful payment or place order */}
       {(showReceiptModal || selectedReceipt) && (
         <ReceiptModal
           isOpen={showReceiptModal}
@@ -2601,6 +2874,11 @@ export function ShoppingCart({
               "🔄 Shopping Cart: Receipt modal closing, clearing cart and sending comprehensive refresh signal",
             );
 
+            // Clear the preview flag
+            if (typeof window !== "undefined") {
+              delete (window as any).isReceiptPreview;
+            }
+
             // Close modal and clear states
             setShowReceiptModal(false);
             setSelectedReceipt(null);
@@ -2608,6 +2886,19 @@ export function ShoppingCart({
             setOrderForPayment(null);
             setPreviewReceipt(null);
             setIsProcessingPayment(false);
+
+            // Clear cart and customer info when closing receipt modal
+            onClearCart();
+            setSelectedCustomer(null);
+            setCustomerSearchTerm("");
+            setDiscountAmount("");
+            if (activeOrderId) {
+              setOrderCustomers((prev) => {
+                const updated = { ...prev };
+                delete updated[activeOrderId];
+                return updated;
+              });
+            }
 
             // Clear cart immediately
             clearCart(); // Use the memoized clearCart function
@@ -2729,6 +3020,11 @@ export function ShoppingCart({
               sku: `ITEM${String(item.id).padStart(3, "0")}`,
               taxRate: parseFloat(item.taxRate || "0"),
             }))
+          }
+          isTitle={
+            typeof window !== "undefined"
+              ? !(window as any).isReceiptPreview
+              : true
           }
         />
       )}

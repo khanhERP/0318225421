@@ -1,28 +1,30 @@
-import { PinAuth } from "@/components/auth/pin-auth";
+import { useState, useEffect } from "react";
+import { Switch, Route, useLocation } from "wouter";
+import { queryClient } from "./lib/queryClient";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import AttendancePage from "@/pages/attendance";
-import CustomerDisplay from "@/pages/customer-display";
+import { PinAuth } from "@/components/auth/pin-auth";
+import POSPage from "@/pages/pos";
+import TablesPage from "@/pages/tables";
 import EmployeesPage from "@/pages/employees";
 import InventoryPage from "@/pages/inventory";
-import PaymentMethodsPage from "@/pages/payment-methods";
-import POSPage from "@/pages/pos";
-import PurchaseFormPage from "@/pages/purchase-form";
-import PurchasesPage from "@/pages/purchases";
 import ReportsPage from "@/pages/reports";
-import SalesOrders from "@/pages/sales-orders";
 import SettingsPage from "@/pages/settings";
 import SuppliersPage from "@/pages/suppliers";
-import TablesPage from "@/pages/tables";
-import { QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
-import { Route, Switch, useLocation } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import AttendanceQRPage from "./pages/attendance-qr";
-import CashBookPage from "./pages/cash-book";
-import CustomersPage from "./pages/customers";
-import NotFoundPage from "./pages/not-found";
+import PurchasesPage from "@/pages/purchases";
+import PurchaseFormPage from "@/pages/purchase-form";
 import PurchaseViewPage from "./pages/purchase-view";
+import AttendancePage from "@/pages/attendance";
+import AttendanceQRPage from "./pages/attendance-qr";
+import CustomerDisplay from "@/pages/customer-display";
+import SalesOrders from "@/pages/sales-orders";
+import CashBookPage from "./pages/cash-book";
+import NotFoundPage from "./pages/not-found";
+import PaymentMethodsPage from "@/pages/payment-methods";
+import CustomersPage from "./pages/customers";
+import { useQuery } from "@tanstack/react-query";
+import { Navigate } from "wouter/use-location"; // Assuming Navigate is available or similar functionality
 
 // Define StoreSettings interface if not already defined elsewhere
 interface StoreSettings {
@@ -137,7 +139,10 @@ function Router({ onLogout }: { onLogout: () => void }) {
         component={() => <CashBookPage onLogout={onLogout} />}
       />
       {/* New route for customers */}
-      <Route path="/customers" component={() => <CustomersPage onLogout={onLogout} />} />
+      <Route
+        path="/customers"
+        component={() => <CustomersPage onLogout={onLogout} />}
+      />
       <Route path="*" component={NotFoundPage} />
     </Switch>
   );
@@ -165,7 +170,7 @@ function App() {
   useEffect(() => {
     const pinAuth = sessionStorage.getItem("pinAuthenticated");
     const token = localStorage.getItem("authToken");
-    
+
     if (pinAuth === "true" && token) {
       setIsAuthenticated(true);
     } else {

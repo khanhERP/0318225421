@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { POSHeader } from "@/components/pos/header";
@@ -213,7 +213,7 @@ export default function SalesOrders() {
       // Force immediate refresh with all date ranges
       queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
       queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
-      
+
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
         queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
@@ -227,7 +227,7 @@ export default function SalesOrders() {
       console.log("🔄 Sales Orders: Order updated, refreshing data...");
       queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
       queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
-      
+
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
         queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
@@ -241,7 +241,7 @@ export default function SalesOrders() {
       console.log("🔄 Sales Orders: Manual refresh triggered...");
       queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
       queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
-      
+
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
         queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
@@ -559,6 +559,9 @@ export default function SalesOrders() {
         tax: updatedOrder.tax,
         total: updatedOrder.total,
         discount: updatedOrder.discount,
+        invoiceNumber: updatedOrder.invoiceNumber, // Added invoiceNumber here
+        symbol: updatedOrder.symbol, // Added symbol here
+        einvoiceStatus: updatedOrder.einvoiceStatus, // Added einvoiceStatus here
       };
 
       console.log("📝 Update payload:", updatePayload);
@@ -1088,107 +1091,106 @@ export default function SalesOrders() {
     : [];
 
   const filteredInvoices = Array.isArray(combinedData)
-    ? combinedData
-        .sort((a: any, b: any) => {
-          // Apply custom sorting if a field is selected
-          if (sortField) {
-            let aValue: any;
-            let bValue: any;
+    ? combinedData.sort((a: any, b: any) => {
+        // Apply custom sorting if a field is selected
+        if (sortField) {
+          let aValue: any;
+          let bValue: any;
 
-            switch (sortField) {
-              case "orderNumber":
-                aValue = a.displayNumber || "";
-                bValue = b.displayNumber || "";
-                break;
-              case "createdAt":
-                aValue = new Date(a.createdAt || 0).getTime();
-                bValue = new Date(b.createdAt || 0).getTime();
-                break;
-              case "updatedAt":
-                aValue = new Date(a.updatedAt || 0).getTime();
-                bValue = new Date(b.updatedAt || 0).getTime();
-                break;
-              case "salesChannel":
-                aValue = a.salesChannel || "";
-                bValue = b.salesChannel || "";
-                break;
-              case "customerCode":
-                aValue = a.customerCode || a.customerTaxCode || "";
-                bValue = b.customerCode || b.customerTaxCode || "";
-                break;
-              case "customerName":
-                aValue = a.customerName || "";
-                bValue = b.customerName || "";
-                break;
-              case "subtotal":
-                aValue = parseFloat(a.subtotal || "0");
-                bValue = parseFloat(b.subtotal || "0");
-                break;
-              case "discount":
-                aValue = parseFloat(a.discount || "0");
-                bValue = parseFloat(b.discount || "0");
-                break;
-              case "tax":
-                aValue = parseFloat(a.tax || "0");
-                bValue = parseFloat(b.tax || "0");
-                break;
-              case "total":
-                aValue = parseFloat(a.total || "0");
-                bValue = parseFloat(b.total || "0");
-                break;
-              case "employeeCode":
-                aValue = a.employeeId || 0;
-                bValue = b.employeeId || 0;
-                break;
-              case "employeeName":
-                aValue = "Phetm Vân Duy";
-                bValue = "Phạm Vân Duy";
-                break;
-              case "symbol":
-                aValue = a.symbol || a.templateNumber || "";
-                bValue = b.symbol || b.templateNumber || "";
-                break;
-              case "invoiceNumber":
-                aValue = a.invoiceNumber || "";
-                bValue = b.invoiceNumber || "";
-                break;
-              case "notes":
-                aValue = a.notes || "";
-                bValue = b.notes || "";
-                break;
-              case "status":
-                aValue = a.displayStatus || 0;
-                bValue = b.displayStatus || 0;
-                break;
-              default:
-                aValue = "";
-                bValue = "";
-            }
-
-            // Compare values
-            if (typeof aValue === "string" && typeof bValue === "string") {
-              const comparison = aValue.localeCompare(bValue, "vi");
-              return sortOrder === "asc" ? comparison : -comparison;
-            } else {
-              const comparison = aValue - bValue;
-              return sortOrder === "asc" ? comparison : -comparison;
-            }
+          switch (sortField) {
+            case "orderNumber":
+              aValue = a.displayNumber || "";
+              bValue = b.displayNumber || "";
+              break;
+            case "createdAt":
+              aValue = new Date(a.createdAt || 0).getTime();
+              bValue = new Date(b.createdAt || 0).getTime();
+              break;
+            case "updatedAt":
+              aValue = new Date(a.updatedAt || 0).getTime();
+              bValue = new Date(b.updatedAt || 0).getTime();
+              break;
+            case "salesChannel":
+              aValue = a.salesChannel || "";
+              bValue = b.salesChannel || "";
+              break;
+            case "customerCode":
+              aValue = a.customerCode || a.customerTaxCode || "";
+              bValue = b.customerCode || b.customerTaxCode || "";
+              break;
+            case "customerName":
+              aValue = a.customerName || "";
+              bValue = b.customerName || "";
+              break;
+            case "subtotal":
+              aValue = parseFloat(a.subtotal || "0");
+              bValue = parseFloat(b.subtotal || "0");
+              break;
+            case "discount":
+              aValue = parseFloat(a.discount || "0");
+              bValue = parseFloat(b.discount || "0");
+              break;
+            case "tax":
+              aValue = parseFloat(a.tax || "0");
+              bValue = parseFloat(b.tax || "0");
+              break;
+            case "total":
+              aValue = parseFloat(a.total || "0");
+              bValue = parseFloat(b.total || "0");
+              break;
+            case "employeeCode":
+              aValue = a.employeeId || 0;
+              bValue = b.employeeId || 0;
+              break;
+            case "employeeName":
+              aValue = "";
+              bValue = "";
+              break;
+            case "symbol":
+              aValue = a.symbol || a.templateNumber || "";
+              bValue = b.symbol || b.templateNumber || "";
+              break;
+            case "invoiceNumber":
+              aValue = a.invoiceNumber || "";
+              bValue = b.invoiceNumber || "";
+              break;
+            case "notes":
+              aValue = a.notes || "";
+              bValue = b.notes || "";
+              break;
+            case "status":
+              aValue = a.displayStatus || 0;
+              bValue = b.displayStatus || 0;
+              break;
+            default:
+              aValue = "";
+              bValue = "";
           }
 
-          // Default sort by date (newest first)
-          const dateA = new Date(
-            a.orderedAt || a.createdAt || a.date || a.invoiceDate,
-          );
-          const dateB = new Date(
-            b.orderedAt || b.createdAt || b.date || b.invoiceDate,
-          );
+          // Compare values
+          if (typeof aValue === "string" && typeof bValue === "string") {
+            const comparison = aValue.localeCompare(bValue, "vi");
+            return sortOrder === "asc" ? comparison : -comparison;
+          } else {
+            const comparison = aValue - bValue;
+            return sortOrder === "asc" ? comparison : -comparison;
+          }
+        }
 
-          if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
-          if (isNaN(dateA.getTime())) return 1;
-          if (isNaN(dateB.getTime())) return -1;
+        // Default sort by date (newest first)
+        const dateA = new Date(
+          a.orderedAt || a.createdAt || a.date || a.invoiceDate,
+        );
+        const dateB = new Date(
+          b.orderedAt || b.createdAt || b.date || b.invoiceDate,
+        );
 
-          return dateB.getTime() - dateA.getTime();
-        })
+        if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
+        if (isNaN(dateA.getTime())) return 1;
+        if (isNaN(dateB.getTime())) return -1;
+
+        return dateB.getTime() - dateA.getTime();
+      })
     : [];
 
   // Handle URL parameter for order filtering and auto-expand
@@ -1735,6 +1737,9 @@ export default function SalesOrders() {
         total: displayTotals.total.toString(),
         discount: orderDiscount.toString(),
         priceIncludeTax: editableInvoice.priceIncludeTax,
+        invoiceNumber: editableInvoice.invoiceNumber,
+        symbol: editableInvoice.symbol,
+        einvoiceStatus: editableInvoice.einvoiceStatus,
       };
 
       console.log("💾 Saving order with recalculated totals:", orderData);
@@ -1848,6 +1853,7 @@ export default function SalesOrders() {
       _deleted?: boolean; // Flag for deletion
       notes?: string; // Add notes field
       tax?: string; // Add tax to edited item state
+      _isNew?: boolean; // Flag for new unsaved items
     };
   }>({});
 
@@ -1867,7 +1873,9 @@ export default function SalesOrders() {
     visibleItems.forEach((item: any) => {
       const edited = editedOrderItems[item.id] || {};
       const currentItemUnitPrice = parseFloat(
-        edited.unitPrice !== undefined ? edited.unitPrice : item.unitPrice || "0",
+        edited.unitPrice !== undefined
+          ? edited.unitPrice
+          : item.unitPrice || "0",
       );
       const currentItemQuantity = parseFloat(
         edited.quantity !== undefined ? edited.quantity : item.quantity || "0",
@@ -1887,12 +1895,12 @@ export default function SalesOrders() {
     // Update editableInvoice with new totals
     setEditableInvoice((prev) => {
       if (!prev) return prev;
-      
+
       // Only update if values actually changed to avoid infinite loops
       const newSubtotal = Math.floor(totalSubtotal).toString();
       const newTax = Math.floor(totalTax).toString();
       const newTotal = Math.floor(totalAmount).toString();
-      
+
       if (
         prev.subtotal === newSubtotal &&
         prev.tax === newTax &&
@@ -1915,7 +1923,7 @@ export default function SalesOrders() {
       const currentItem = prev[itemId] || {};
       const originalItem = orderItems.find((item: any) => item.id === itemId);
 
-      // Get current or updated values
+      // PRESERVE existing edited values - prioritize what user has already entered
       let quantity =
         currentItem.quantity !== undefined
           ? currentItem.quantity
@@ -1940,15 +1948,17 @@ export default function SalesOrders() {
       // Track if product changed (to recalculate tax with new taxRate)
       let productChanged = false;
 
-      // Update the changed field
+      // Update ONLY the field that user is editing
       if (field === "quantity") {
         quantity = parseFloat(value) || 1; // Allow decimal quantity
+        // KEEP product info unchanged - do NOT reset productId, sku, productName
       } else if (field === "unitPrice") {
         unitPrice = parseFloat(value) || 0;
+        // KEEP product info unchanged - do NOT reset productId, sku, productName
       } else if (field === "productId") {
+        // User is actively changing productId - update all related fields
         productId = value;
         productChanged = true;
-        // Get product info when productId changes
         const product = products.find((p: any) => p.id === value);
         if (product) {
           productName = product.name;
@@ -1956,8 +1966,8 @@ export default function SalesOrders() {
           unitPrice = parseFloat(product.price || "0");
         }
       } else if (field === "sku") {
+        // User is actively changing SKU - update all related fields
         sku = value;
-        // When SKU changes, find product and update all related fields
         const product = products.find((p: any) => p.sku === value);
         if (product) {
           productId = product.id;
@@ -1966,8 +1976,8 @@ export default function SalesOrders() {
           productChanged = true;
         }
       } else if (field === "productName") {
+        // User is actively changing product name - update all related fields
         productName = value;
-        // When product name changes, find product and update all related fields
         const product = products.find((p: any) => p.name === value);
         if (product) {
           productId = product.id;
@@ -2001,7 +2011,7 @@ export default function SalesOrders() {
                 ? editedItem.unitPrice
                 : item.unitPrice || "0",
             );
-            let itQty = parseInt(
+            let itQty = parseFloat(
               editedItem.quantity !== undefined
                 ? editedItem.quantity
                 : item.quantity || "0",
@@ -2037,7 +2047,7 @@ export default function SalesOrders() {
                   ? editedItem.unitPrice
                   : item.unitPrice || "0",
               );
-              const itQty = parseInt(
+              const itQty = parseFloat(
                 editedItem.quantity !== undefined
                   ? editedItem.quantity
                   : item.quantity || "0",
@@ -2222,26 +2232,46 @@ export default function SalesOrders() {
     }
   };
 
-  // Calculate totals from the filtered and sorted invoice list
+  // Calculate totals from ALL orders in filteredInvoices
   const calculateTotals = () => {
+    if (!filteredInvoices || filteredInvoices.length === 0) {
+      return { subtotal: 0, tax: 0, discount: 0, total: 0 };
+    }
+
+    // Calculate from all filtered invoices (across all pages)
     const totals = filteredInvoices.reduce(
       (acc, item) => {
-        acc.subtotal += parseFloat(item.subtotal || "0");
-        acc.tax += parseFloat(item.tax || "0");
-        acc.discount += parseFloat(item.discount || "0");
-        acc.total += parseFloat(item.total || "0");
+        const subtotal = parseFloat(item.subtotal || "0");
+        const tax = parseFloat(item.tax || "0");
+        const discount = parseFloat(item.discount || "0");
+        const total = parseFloat(item.total || "0");
+
+        acc.subtotal += subtotal;
+        acc.tax += tax;
+        acc.discount += discount;
+        acc.total += total;
+
         return acc;
       },
       { subtotal: 0, tax: 0, discount: 0, total: 0 },
     );
+    
+    console.log("📊 Calculated totals from all filtered invoices:", {
+      count: filteredInvoices.length,
+      subtotal: totals.subtotal,
+      tax: totals.tax,
+      discount: totals.discount,
+      total: totals.total
+    });
+    
     return totals;
   };
 
   // Calculate totals dynamically based on order items and edits
-  const displayTotals = (() => {
+  const displayTotals = useMemo(() => {
     if (!selectedInvoice) return { subtotal: 0, tax: 0, discount: 0, total: 0 };
 
-    // If editing, calculate from items
+    // If editing and has edited items, calculate from items
     if (isEditing && Object.keys(editedOrderItems).length > 0) {
       const priceIncludeTax =
         selectedInvoice.priceIncludeTax ??
@@ -2260,11 +2290,10 @@ export default function SalesOrders() {
 
       visibleItems.forEach((item: any) => {
         const editedItem = editedOrderItems[item.id] || {};
-        
         // Use tax from editedOrderItems if available (already calculated)
         if (editedItem.tax !== undefined) {
           calculatedTax += parseFloat(editedItem.tax);
-          
+
           // Calculate subtotal from unitPrice and quantity
           const unitPrice = parseFloat(
             editedItem.unitPrice !== undefined
@@ -2314,22 +2343,49 @@ export default function SalesOrders() {
         calculatedSubtotal + calculatedTax - orderDiscount,
       );
 
-      return {
+      console.log("📊 Calculated totals from items:", {
         subtotal: calculatedSubtotal,
         tax: calculatedTax,
         discount: orderDiscount,
         total: totalPayment,
+      });
+
+      return {
+        subtotal: Math.round(calculatedSubtotal),
+        tax: Math.round(calculatedTax),
+        discount: Math.round(orderDiscount),
+        total: Math.round(totalPayment),
+      };
+    } else {
+      // Otherwise, use the totals from the selected invoice directly
+      const dbSubtotal = parseFloat(selectedInvoice.subtotal || "0");
+      const dbTax = parseFloat(selectedInvoice.tax || "0");
+      const dbDiscount = parseFloat(selectedInvoice.discount || "0");
+      const dbTotal = parseFloat(selectedInvoice.total || "0");
+
+      console.log("📊 Using database values for totals:", {
+        subtotal: dbSubtotal,
+        tax: dbTax,
+        discount: dbDiscount,
+        total: dbTotal,
+      });
+
+      return {
+        subtotal: Math.round(dbSubtotal),
+        tax: Math.round(dbTax),
+        discount: Math.round(dbDiscount),
+        total: Math.round(dbTotal),
       };
     }
-
-    // If not editing, use exact database values from selected invoice
-    return {
-      subtotal: parseFloat(selectedInvoice.subtotal || "0"),
-      tax: parseFloat(selectedInvoice.tax || "0"),
-      discount: parseFloat(selectedInvoice.discount || "0"),
-      total: parseFloat(selectedInvoice.total || "0"),
-    };
-  })();
+  }, [
+    selectedInvoice,
+    isEditing,
+    editedOrderItems,
+    orderItems,
+    products,
+    storeSettings,
+    editableInvoice,
+  ]);
 
   const handleSelectOrder = (
     orderId: number,
@@ -2384,7 +2440,7 @@ export default function SalesOrders() {
     const ws = XLSX.utils.aoa_to_sheet([]);
     ws["!defaultFont"] = { name: "Times New Roman", sz: 11 };
 
-    XLSX.utils.sheet_add_aoa(ws, [["DANH SÁCH ĐƠN HÀNG BÁN"]], {
+    XLSX.utils.sheet_add_aoa(ws, [[t("purchases.salesOrdersList")]], {
       origin: "A1",
     });
     if (!ws["!merges"]) ws["!merges"] = [];
@@ -2393,21 +2449,21 @@ export default function SalesOrders() {
     XLSX.utils.sheet_add_aoa(ws, [[]], { origin: "A2" });
 
     const headers = [
-      "Số đơn bán",
-      "Ngày đơn bán",
-      "Bàn",
-      "Mã khách hàng",
-      "Tên khách hàng",
-      "Thành tiền",
-      "Giảm giá",
-      "Tiền thuế",
-      "Đã thanh toán",
-      "Mã nhân viên",
-      "Tên nhân viên",
-      "Ký hiệu hóa đơn",
-      "Số hóa đơn",
-      "Ghi chú",
-      "Trạng thái",
+      t("orders.orderNumberColumn"),
+      t("orders.createdDateColumn"),
+      t("orders.table"),
+      t("orders.customerCode"),
+      t("orders.customerName"),
+      t("common.subtotalAmount"),
+      t("common.discount"),
+      t("common.tax"),
+      t("common.paid"),
+      t("common.employeeCode"),
+      t("common.employeeName"),
+      t("orders.invoiceSymbol"),
+      t("orders.invoiceNumber"),
+      t("common.notes"),
+      t("common.status"),
     ];
     XLSX.utils.sheet_add_aoa(ws, [headers], { origin: "A3" });
 
@@ -2430,16 +2486,16 @@ export default function SalesOrders() {
       const total = parseFloat(item.total || "0");
       const paid = total;
       const employeeCode = item.employeeId || "NV0001";
-      const employeeName = "Phạm Vân Duy";
+      const employeeName = "";
       const symbol = item.symbol || "";
       const invoiceNumber =
         item.invoiceNumber || String(item.id).padStart(8, "0");
       const status =
         item.displayStatus === 1
-          ? "Đã hoàn thành"
+          ? t("common.completed")
           : item.displayStatus === 2
-            ? "Đang phục vụ"
-            : "Đã hủy";
+            ? t("common.serving")
+            : t("common.cancelled");
 
       return [
         orderNumber,
@@ -2818,7 +2874,7 @@ export default function SalesOrders() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    {t("reports.startDate")}
+                    {t("orders.startDate")}
                   </label>
                   <Input
                     type="date"
@@ -2828,7 +2884,7 @@ export default function SalesOrders() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    {t("reports.endDate")}
+                    {t("orders.endDate")}
                   </label>
                   <Input
                     type="date"
@@ -2849,10 +2905,10 @@ export default function SalesOrders() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Mặt hàng
+                    {t("orders.productSearch")}
                   </label>
                   <Input
-                    placeholder="Tìm theo tên hoặc mã mặt hàng"
+                    placeholder={t("common.customerCodeSearchPlaceholder")}
                     value={customerCodeSearch}
                     onChange={(e) => setCustomerCodeSearch(e.target.value)}
                     className="w-full"
@@ -2874,48 +2930,54 @@ export default function SalesOrders() {
                 {storeSettings?.businessType !== "laundry" && (
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Hình thức bán
+                      {t("orders.salesType")}
                     </label>
                     <select
                       value={salesChannelFilter}
                       onChange={(e) => setSalesChannelFilter(e.target.value)}
                       className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                     >
-                      <option value="all">Tất cả</option>
-                      <option value="table">Ăn tại chỗ</option>
-                      <option value="pos">Bán tại quầy</option>
-                      <option value="online">Bán online</option>
-                      <option value="delivery">Giao hàng</option>
+                      <option value="all">{t("common.all")}</option>
+                      <option value="table">{t("orders.eatIn")}</option>
+                      <option value="pos">{t("orders.atCounter")}</option>
+                      <option value="online">{t("orders.online")}</option>
+                      <option value="delivery">{t("orders.delivery")}</option>
                     </select>
                   </div>
                 )}
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Trạng thái đơn hàng
+                    {t("orders.orderStatusFilter")}
                   </label>
                   <select
                     value={orderStatusFilter}
                     onChange={(e) => setOrderStatusFilter(e.target.value)}
                     className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
-                    <option value="all">Tất cả</option>
-                    <option value="paid">Đã thanh toán</option>
-                    <option value="pending">Chờ xử lý</option>
-                    <option value="cancelled">Đã hủy</option>
+                    <option value="all">{t("orders.allStatus")}</option>
+                    <option value="paid">{t("orders.paidStatus")}</option>
+                    <option value="pending">{t("orders.pendingStatus")}</option>
+                    <option value="cancelled">
+                      {t("orders.cancelledStatus")}
+                    </option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    Trạng thái hóa đơn điện tử
+                    {t("common.einvoiceStatusFilter")}
                   </label>
                   <select
                     value={einvoiceStatusFilter}
                     onChange={(e) => setEinvoiceStatusFilter(e.target.value)}
                     className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
-                    <option value="all">Tất cả</option>
-                    <option value="0">Chưa phát hành</option>
-                    <option value="1">Đã phát hành</option>
+                    <option value="all">{t("common.allEinvoiceStatus")}</option>
+                    <option value="0">
+                      {t("common.einvoiceStatus.notPublished")}
+                    </option>
+                    <option value="1">
+                      {t("common.einvoiceStatus.published")}
+                    </option>
                   </select>
                 </div>
               </div>
@@ -2953,16 +3015,18 @@ export default function SalesOrders() {
               {isLoading ? (
                 <div className="text-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                  <p className="mt-2 text-gray-500">Đang tải...</p>
+                  <p className="mt-2 text-gray-500">{t("common.loading")}</p>
                 </div>
               ) : hasError ? (
                 <div className="text-center py-8">
                   <div className="text-red-500 mb-4">
                     <X className="w-8 h-8 mx-auto mb-2" />
-                    <p className="font-medium">Lỗi kết nối cơ sp dữ liệu</p>
+                    <p className="font-medium">
+                      {t("errors.databaseConnection")}
+                    </p>
                   </div>
                   <p className="text-gray-500 mb-4">
-                    Không thể tải dữ liệu đơn hàng. Vui lòng thử lại.
+                    {t("errors.failedToLoadData")}
                   </p>
                   <Button
                     onClick={() => {
@@ -2971,7 +3035,7 @@ export default function SalesOrders() {
                       });
                     }}
                   >
-                    Thử lại
+                    {t("common.retry")}
                   </Button>
                 </div>
               ) : (
@@ -2994,7 +3058,7 @@ export default function SalesOrders() {
                             onClick={() => handleSort("orderNumber")}
                           >
                             <div className="leading-tight flex items-center gap-1">
-                              Số đơn bán
+                              {t("orders.orderNumberColumn")}
                               {sortField === "orderNumber" && (
                                 <span className="text-blue-600">
                                   {sortOrder === "asc" ? "↑" : "↓"}
@@ -3025,7 +3089,7 @@ export default function SalesOrders() {
                             onClick={() => handleSort("createdAt")}
                           >
                             <div className="leading-tight flex items-center gap-1">
-                              Ngày tạo đơn
+                              {t("orders.createdDateColumn")}
                               {sortField === "createdAt" && (
                                 <span className="text-blue-600">
                                   {sortOrder === "asc" ? "↑" : "↓"}
@@ -3038,7 +3102,7 @@ export default function SalesOrders() {
                             onClick={() => handleSort("updatedAt")}
                           >
                             <div className="leading-tight flex items-center gap-1">
-                              Ngày hủy đơn/hoàn thành
+                              {t("orders.completedCancelledColumn")}
                               {sortField === "updatedAt" && (
                                 <span className="text-blue-600">
                                   {sortOrder === "asc" ? "↑" : "↓"}
@@ -3168,7 +3232,7 @@ export default function SalesOrders() {
                             onClick={() => handleSort("symbol")}
                           >
                             <div className="leading-tight flex items-center gap-1">
-                              {t("common.invoiceSymbol")}
+                              {t("orders.invoiceSymbol")}
                               {sortField === "symbol" && (
                                 <span className="text-blue-600">
                                   {sortOrder === "asc" ? "↑" : "↓"}
@@ -3181,7 +3245,7 @@ export default function SalesOrders() {
                             onClick={() => handleSort("invoiceNumber")}
                           >
                             <div className="leading-tight flex items-center gap-1">
-                              {t("common.invoiceNumber")}
+                              {t("orders.invoiceNumber")}
                               {sortField === "invoiceNumber" && (
                                 <span className="text-blue-600">
                                   {sortOrder === "asc" ? "↑" : "↓"}
@@ -3217,9 +3281,9 @@ export default function SalesOrders() {
                             >
                               <div className="flex flex-col items-center gap-2">
                                 <FileText className="w-8 h-8 text-gray-400" />
-                                <p>Không có đơn hàng nào</p>
+                                <p>{t("common.noOrders")}</p>
                                 <p className="text-xs">
-                                  Thử thay đổi bộ lọc để xem kết quả khác
+                                  {t("orders.tryChangingFilters")}
                                 </p>
                               </div>
                             </td>
@@ -3230,15 +3294,14 @@ export default function SalesOrders() {
                               item.customerCode ||
                               item.customerTaxCode ||
                               `KH000${String(item.id).padStart(3, "0")}`;
-                            const customerName =
-                              item.customerName || "Khách hàng lẻ";
+                            const customerName = item.customerName || "";
                             const discount = parseFloat(item.discount || "0");
                             const tax = parseFloat(item.tax || "0");
                             const subtotal = parseFloat(item.subtotal || "0");
                             const total = parseFloat(item.total || "0");
                             const paid = total;
-                            const employeeCode = item.employeeId || "NV0001";
-                            const employeeName = "Phạm Vân Duy";
+                            const employeeCode = item.employeeId || "";
+                            const employeeName = "";
                             const symbol = item.symbol || "";
                             const invoiceNumber =
                               item.invoiceNumber ||
@@ -3306,7 +3369,9 @@ export default function SalesOrders() {
                                             : "bg-gray-100 text-gray-600"
                                         }
                                       >
-                                        {item.isPaid ? "Đã trả" : "Chưa trả"}
+                                        {item.isPaid
+                                          ? t("common.returned")
+                                          : t("common.notReturned")}
                                       </Badge>
                                     </td>
                                   )}
@@ -3346,23 +3411,21 @@ export default function SalesOrders() {
                                     <div className="text-sm">
                                       {(() => {
                                         if (item.salesChannel === "table") {
-                                          return item.tableId
-                                            ? getTableNumber(item.tableId)
-                                            : "Bàn";
+                                          return t("orders.eatIn");
                                         } else if (
                                           item.salesChannel === "pos"
                                         ) {
-                                          return "POS";
+                                          return t("orders.atCounter");
                                         } else if (
                                           item.salesChannel === "online"
                                         ) {
-                                          return "Online";
+                                          return t("orders.online");
                                         } else if (
                                           item.salesChannel === "delivery"
                                         ) {
-                                          return "Giao hàng";
+                                          return t("orders.delivery");
                                         }
-                                        return "POS"; // default fallback
+                                        return t("orders.atCounter"); // default fallback
                                       })()}
                                     </div>
                                   </td>
@@ -3461,7 +3524,10 @@ export default function SalesOrders() {
                                                     <tbody>
                                                       <tr>
                                                         <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                          Số đơn bán:
+                                                          {t(
+                                                            "orders.orderNumberLabel",
+                                                          )}
+                                                          :
                                                         </td>
                                                         <td className="py-1 pr-6 text-blue-600 font-medium">
                                                           {isEditing &&
@@ -3479,7 +3545,10 @@ export default function SalesOrders() {
                                                                 )
                                                               }
                                                               className="w-32"
-                                                              disabled={true}
+                                                              disabled={
+                                                                selectedInvoice.displayStatus ===
+                                                                1
+                                                              }
                                                             />
                                                           ) : (
                                                             selectedInvoice.orderNumber ||
@@ -3487,7 +3556,7 @@ export default function SalesOrders() {
                                                           )}
                                                         </td>
                                                         <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                          Ngày:
+                                                          {t("common.date")}:
                                                         </td>
                                                         <td className="py-1 pr-6">
                                                           {isEditing &&
@@ -3520,7 +3589,8 @@ export default function SalesOrders() {
                                                           )}
                                                         </td>
                                                         <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                          Khách hàng:
+                                                          {t("orders.customer")}
+                                                          :
                                                         </td>
                                                         <td className="py-1 pr-6 text-blue-600 font-medium">
                                                           {isEditing &&
@@ -3751,7 +3821,10 @@ export default function SalesOrders() {
                                                           )}
                                                         </td>
                                                         <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                          Điện thoại:
+                                                          {t(
+                                                            "orders.phoneNumber",
+                                                          )}
+                                                          :
                                                         </td>
                                                         <td className="py-1 pr-6">
                                                           {isEditing &&
@@ -3783,7 +3856,7 @@ export default function SalesOrders() {
                                                           )}
                                                         </td>
                                                         <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                          Bàn:
+                                                          {t("orders.table")}:
                                                         </td>
                                                         <td className="py-1 pr-6">
                                                           {selectedInvoice.salesChannel ===
@@ -3795,7 +3868,7 @@ export default function SalesOrders() {
                                                             : "-"}
                                                         </td>
                                                         <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                          Trạng thái:
+                                                          {t("common.status")}:
                                                         </td>
                                                         <td className="py-1">
                                                           {(() => {
@@ -3816,17 +3889,14 @@ export default function SalesOrders() {
                                                         </td>
                                                       </tr>
                                                       <tr>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                          Thu ngân:
-                                                        </td>
-                                                        <td className="py-1 pr-6">
-                                                          Phạm Vân Duy
-                                                        </td>
                                                         {storeSettings?.businessType ===
                                                           "laundry" && (
                                                           <>
                                                             <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                              Đã trả đồ:
+                                                              {t(
+                                                                "common.returned",
+                                                              )}
+                                                              :
                                                             </td>
                                                             <td className="py-1 pr-6">
                                                               {isEditing &&
@@ -3858,15 +3928,22 @@ export default function SalesOrders() {
                                                                   }
                                                                 >
                                                                   {selectedInvoice?.isPaid
-                                                                    ? "Đã trả"
-                                                                    : "Chưa trả"}
+                                                                    ? t(
+                                                                        "common.returned",
+                                                                      )
+                                                                    : t(
+                                                                        "common.notReturned",
+                                                                      )}
                                                                 </Badge>
                                                               )}
                                                             </td>
                                                           </>
                                                         )}
                                                         <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                          Hình thức bán:
+                                                          {t(
+                                                            "orders.salesType",
+                                                          )}
+                                                          :
                                                         </td>
                                                         <td className="py-1 pr-6">
                                                           {(() => {
@@ -3876,27 +3953,40 @@ export default function SalesOrders() {
                                                               salesChannel ===
                                                               "table"
                                                             )
-                                                              return "Ăn tại chỗ";
+                                                              return t(
+                                                                "orders.eatIn",
+                                                              );
                                                             if (
                                                               salesChannel ===
                                                               "pos"
                                                             )
-                                                              return "Bán tại quầy";
+                                                              return t(
+                                                                "orders.atCounter",
+                                                              );
                                                             if (
                                                               salesChannel ===
                                                               "online"
                                                             )
-                                                              return "Bán online";
+                                                              return t(
+                                                                "orders.online",
+                                                              );
                                                             if (
                                                               salesChannel ===
                                                               "delivery"
                                                             )
-                                                              return "Giao hàng";
-                                                            return "Ăn tại chỗ";
+                                                              return t(
+                                                                "orders.delivery",
+                                                              );
+                                                            return t(
+                                                              "orders.atCounter",
+                                                            );
                                                           })()}
                                                         </td>
                                                         <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                          Ký hiệu hóa đơn:
+                                                          {t(
+                                                            "orders.invoiceSymbol",
+                                                          )}
+                                                          :
                                                         </td>
                                                         <td className="py-1 pr-6">
                                                           {isEditing &&
@@ -3913,69 +4003,65 @@ export default function SalesOrders() {
                                                                     .value,
                                                                 )
                                                               }
-                                                              className="w-24"
-                                                              disabled={
-                                                                selectedInvoice.displayStatus ===
-                                                                1
-                                                              }
-                                                            />
-                                                          ) : (
-                                                            selectedInvoice.symbol ||
-                                                            "-"
-                                                          )}
-                                                        </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                          Số hóa đơn:
-                                                        </td>
-                                                        <td className="py-1 pr-6">
-                                                          {isEditing &&
-                                                          editableInvoice ? (
-                                                            <Input
-                                                              value={
-                                                                editableInvoice.invoiceNumber ||
-                                                                ""
-                                                              }
-                                                              onChange={(e) =>
-                                                                updateEditableInvoiceField(
-                                                                  "invoiceNumber",
-                                                                  e.target
-                                                                    .value,
-                                                                )
-                                                              }
                                                               className="w-32"
                                                               disabled={
                                                                 selectedInvoice.displayStatus ===
                                                                 1
                                                               }
-                                                              placeholder="Nhập số hóa đơn"
                                                             />
                                                           ) : (
-                                                            <span className="font-medium text-blue-600">
-                                                              {selectedInvoice.invoiceNumber ||
+                                                            <span className="text-sm">
+                                                              {selectedInvoice.symbol ||
+                                                                selectedInvoice.templateNumber ||
                                                                 "-"}
                                                             </span>
                                                           )}
                                                         </td>
                                                         <td className="py-1 pr-4 font-medium whitespace-nowrap">
                                                           {t(
-                                                            "common.invoiceStatusLabel",
+                                                            "orders.invoiceNumber",
+                                                          )}
+                                                          :
+                                                        </td>
+                                                        <td className="py-1 pr-6">
+                                                          {isEditing &&
+                                                          editableInvoice &&
+                                                          selectedInvoice.displayStatus !==
+                                                            1 ? (
+                                                            <Input
+                                                              value={
+                                                                editableInvoice.templateNumber ||
+                                                                ""
+                                                              }
+                                                              onChange={(e) =>
+                                                                updateEditableInvoiceField(
+                                                                  "templateNumber",
+                                                                  e.target
+                                                                    .value,
+                                                                )
+                                                              }
+                                                              className="w-40"
+                                                              disabled={
+                                                                selectedInvoice.displayStatus ===
+                                                                1
+                                                              }
+                                                            />
+                                                          ) : (
+                                                            <span className="text-sm">
+                                                              {selectedInvoice.templateNumber ||
+                                                                "-"}
+                                                            </span>
                                                           )}
                                                         </td>
-                                                        <td className="py-1">
-                                                          {(() => {
-                                                            const statusLabels =
-                                                              {
-                                                                0: "Chưa phát hành",
-                                                                1: "Đã phát hành",
-                                                              };
-                                                            return (
-                                                              statusLabels[
-                                                                selectedInvoice.einvoiceStatus ||
-                                                                  0
-                                                              ] ||
-                                                              "Chưa phát hành"
-                                                            );
-                                                          })()}
+                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                          {t(
+                                                            "common.einvoiceStatusLabel",
+                                                          )}
+                                                        </td>
+                                                        <td className="py-1 pr-6">
+                                                          {getEInvoiceStatusBadge(
+                                                            selectedInvoice.einvoiceStatus,
+                                                          )}
                                                         </td>
                                                       </tr>
                                                     </tbody>
@@ -3985,13 +4071,13 @@ export default function SalesOrders() {
 
                                               <div>
                                                 <h4 className="font-medium mb-3">
-                                                  {t("common.itemList")}
+                                                  {t("orders.itemList")}
                                                 </h4>
                                                 {orderItemsLoading ? (
                                                   <div className="text-center py-8">
                                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto"></div>
                                                     <p className="mt-2 text-gray-500">
-                                                      Đang tải sản phẩm...
+                                                      {t("common.loading")}
                                                     </p>
                                                   </div>
                                                 ) : orderItemsError ? (
@@ -3999,13 +4085,15 @@ export default function SalesOrders() {
                                                     <div className="text-red-500 mb-4">
                                                       <X className="w-8 h-8 mx-auto mb-2" />
                                                       <p className="font-medium">
-                                                        Lỗi tải dữ liệu sản phẩm
+                                                        {t(
+                                                          "errors.failedToLoadItems",
+                                                        )}
                                                       </p>
                                                     </div>
                                                     <p className="text-gray-500 mb-4">
-                                                      Không thể tải danh sách
-                                                      sản phẩm. Vui lòng thử
-                                                      lại.
+                                                      {t(
+                                                        "errors.failedToLoadItemData",
+                                                      )}
                                                     </p>
                                                     <Button
                                                       onClick={() => {
@@ -4020,7 +4108,7 @@ export default function SalesOrders() {
                                                       }}
                                                       size="sm"
                                                     >
-                                                      Thử lại
+                                                      {t("common.retry")}
                                                     </Button>
                                                   </div>
                                                 ) : !orderItems ||
@@ -4028,7 +4116,7 @@ export default function SalesOrders() {
                                                   <div className="text-center py-8">
                                                     <Package className="w-12 h-12 text-gray-300 mx-auto mb-2" />
                                                     <p className="text-gray-500">
-                                                      Không có sản phẩm nào
+                                                      {t("common.noItems")}
                                                     </p>
                                                   </div>
                                                 ) : (
@@ -4036,35 +4124,47 @@ export default function SalesOrders() {
                                                     <table className="w-full text-sm min-w-[1200px]">
                                                       <thead>
                                                         <tr className="bg-gray-50 border-b">
-                                                          <th className="text-center px-3 py-2 border-r font-medium text-xs whitespace-nowrap w-[50px]">
-                                                            STT
+                                                          <th className="border-r px-2 py-2 font-medium text-xs text-left sticky left-0 bg-green-50 z-10 w-12">
+                                                            {t("common.no")}
                                                           </th>
-                                                          <th className="text-left px-3 py-2 border-r font-medium text-xs whitespace-nowrap w-[120px]">
-                                                            Mã hàng
+                                                          <th className="border-r px-2 py-2 font-medium text-xs text-left min-w-[100px]">
+                                                            {t(
+                                                              "orders.itemCode",
+                                                            )}
                                                           </th>
-                                                          <th className="text-left px-3 py-2 border-r font-medium text-xs whitespace-nowrap w-[150px]">
-                                                            Tên hàng hóa
+                                                          <th className="border-r px-2 py-2 font-medium text-xs text-left min-w-[250px]">
+                                                            {t(
+                                                              "orders.itemName",
+                                                            )}
                                                           </th>
-                                                          <th className="text-center px-3 py-2 border-r font-medium text-xs whitespace-nowrap w-[80px]">
-                                                            Đơn vị
+                                                          <th className="border-r px-2 py-2 font-medium text-xs text-center min-w-[60px]">
+                                                            {t("orders.unit")}
                                                           </th>
-                                                          <th className="text-center px-3 py-2 border-r font-medium text-xs whitespace-nowrap w-[100px]">
-                                                            Số lượng
+                                                          <th className="border-r px-2 py-2 font-medium text-xs text-center min-w-[80px]">
+                                                            {t(
+                                                              "common.quantity",
+                                                            )}
                                                           </th>
-                                                          <th className="text-right px-3 py-2 border-r font-medium text-xs whitespace-nowrap w-[120px]">
-                                                            Đơn giá
+                                                          <th className="border-r px-2 py-2 font-medium text-xs text-right min-w-[100px]">
+                                                            {t(
+                                                              "orders.unitPrice",
+                                                            )}
                                                           </th>
-                                                          <th className="text-right px-3 py-2 border-r font-medium text-xs whitespace-nowrap w-[120px]">
-                                                            Thành tiền
+                                                          <th className="border-r px-2 py-2 font-medium text-xs text-right min-w-[100px]">
+                                                            {t(
+                                                              "common.subtotalAmount",
+                                                            )}
                                                           </th>
-                                                          <th className="text-right px-3 py-2 border-r font-medium text-xs whitespace-nowrap w-[100px]">
-                                                            Chiết khấu
+                                                          <th className="border-r px-2 py-2 font-medium text-xs text-right min-w-[100px]">
+                                                            {t(
+                                                              "common.discount",
+                                                            )}
                                                           </th>
-                                                          <th className="text-right px-3 py-2 border-r font-medium text-xs whitespace-nowrap w-[100px]">
-                                                            Tiền thuế
+                                                          <th className="border-r px-2 py-2 font-medium text-xs text-right min-w-[100px]">
+                                                            {t("common.tax")}
                                                           </th>
-                                                          <th className="text-right px-3 py-2 border-r font-medium text-xs whitespace-nowrap w-[120px]">
-                                                            Tổng cộng
+                                                          <th className="border-r px-2 py-2 font-medium text-xs text-right min-w-[100px]">
+                                                            {t("common.total")}
                                                           </th>
                                                           <th className="text-center px-3 py-2 font-medium text-xs whitespace-nowrap w-[80px]">
                                                             {isEditing &&
@@ -4113,8 +4213,9 @@ export default function SalesOrders() {
                                                                   colSpan={11}
                                                                   className="text-center py-4 text-gray-500"
                                                                 >
-                                                                  Không có sản
-                                                                  phẩm nào
+                                                                  {t(
+                                                                    "common.noItems",
+                                                                  )}
                                                                 </td>
                                                               </tr>
                                                             );
@@ -4129,33 +4230,48 @@ export default function SalesOrders() {
                                                                 editedOrderItems[
                                                                   item.id
                                                                 ] || {};
-                                                              
+
                                                               // For new items, prioritize edited values
-                                                              const isNewItem = editedItem._isNew || item._isNew;
-                                                              
+                                                              const isNewItem =
+                                                                editedItem._isNew ||
+                                                                item._isNew;
+
                                                               // Get product info - prioritize edited productId
-                                                              const productId = editedItem.productId !== undefined 
-                                                                ? editedItem.productId 
-                                                                : item.productId || 0;
-                                                              
-                                                              const product = products.find(
-                                                                (p: any) => p.id === productId,
-                                                              );
-                                                              
+                                                              const productId =
+                                                                editedItem.productId !==
+                                                                undefined
+                                                                  ? editedItem.productId
+                                                                  : item.productId ||
+                                                                    0;
+
+                                                              const product =
+                                                                products.find(
+                                                                  (p: any) =>
+                                                                    p.id ===
+                                                                    productId,
+                                                                );
+
                                                               const priceIncludeTax =
                                                                 selectedInvoice?.priceIncludeTax ??
                                                                 storeSettings?.priceIncludesTax ??
                                                                 false;
 
                                                               // Get all field values - prioritize edited values
-                                                              const sku = editedItem.sku !== undefined
-                                                                ? editedItem.sku
-                                                                : item.sku || product?.sku || "";
-                                                              
-                                                              const productName = editedItem.productName !== undefined
-                                                                ? editedItem.productName
-                                                                : item.productName || "";
-                                                              
+                                                              const sku =
+                                                                editedItem.sku !==
+                                                                undefined
+                                                                  ? editedItem.sku
+                                                                  : item.sku ||
+                                                                    product?.sku ||
+                                                                    "";
+
+                                                              const productName =
+                                                                editedItem.productName !==
+                                                                undefined
+                                                                  ? editedItem.productName
+                                                                  : item.productName ||
+                                                                    "";
+
                                                               const unitPrice =
                                                                 parseFloat(
                                                                   editedItem.unitPrice !==
@@ -4364,7 +4480,9 @@ export default function SalesOrders() {
                                                                       <div className="relative">
                                                                         <Input
                                                                           list={`product-sku-list-${item.id}`}
-                                                                          value={sku}
+                                                                          value={
+                                                                            sku
+                                                                          }
                                                                           disabled={
                                                                             selectedInvoice.displayStatus ===
                                                                             1
@@ -4470,8 +4588,7 @@ export default function SalesOrders() {
                                                                       </div>
                                                                     ) : (
                                                                       <div className="truncate">
-                                                                        {item.sku ||
-                                                                          product?.sku ||
+                                                                        {sku ||
                                                                           "-"}
                                                                       </div>
                                                                     )}
@@ -4481,7 +4598,9 @@ export default function SalesOrders() {
                                                                       <div className="relative">
                                                                         <Input
                                                                           list={`product-name-list-${item.id}`}
-                                                                          value={productName}
+                                                                          value={
+                                                                            productName
+                                                                          }
                                                                           disabled={
                                                                             selectedInvoice.displayStatus ===
                                                                             1
@@ -4587,9 +4706,8 @@ export default function SalesOrders() {
                                                                       </div>
                                                                     ) : (
                                                                       <div className="truncate">
-                                                                        {
-                                                                          item.productName
-                                                                        }
+                                                                        {productName ||
+                                                                          "-"}
                                                                       </div>
                                                                     )}
                                                                   </td>
@@ -4600,7 +4718,9 @@ export default function SalesOrders() {
                                                                   <td className="text-center py-2 px-3 border-r text-xs w-[100px]">
                                                                     {isEditing ? (
                                                                       <NumericFormat
-                                                                        value={quantity}
+                                                                        value={
+                                                                          quantity
+                                                                        }
                                                                         onValueChange={(
                                                                           values,
                                                                         ) => {
@@ -4898,7 +5018,10 @@ export default function SalesOrders() {
                                                         </span>
                                                       </div>
                                                       <div className="flex justify-between text-red-600">
-                                                        <span>Chiết khấu:</span>
+                                                        <span>
+                                                          {t("common.discount")}
+                                                          :
+                                                        </span>
                                                         {isEditing &&
                                                         editableInvoice ? (
                                                           <Input
@@ -5122,8 +5245,8 @@ export default function SalesOrders() {
                                                           </span>
                                                         )}
                                                       </div>
-                                                      <div className="flex justify-between">
-                                                        <span>
+                                                      <div className="flex justify-between text-sm">
+                                                        <span className="text-gray-600">
                                                           {t("common.totalTax")}
                                                           :
                                                         </span>
@@ -5143,7 +5266,10 @@ export default function SalesOrders() {
                                                         "laundry" && (
                                                         <div className="flex justify-between items-center">
                                                           <span className="font-semibold text-gray-700">
-                                                            Khách hàng trả:
+                                                            {t(
+                                                              "common.customerPaid",
+                                                            )}
+                                                            :
                                                           </span>
                                                           <span className="font-bold text-green-600">
                                                             {formatCurrency(
@@ -5156,8 +5282,10 @@ export default function SalesOrders() {
                                                       )}
                                                       <div className="flex justify-between items-center">
                                                         <span className="font-semibold text-gray-700">
-                                                          Phương thức thanh
-                                                          toán:
+                                                          {t(
+                                                            "common.paymentMethodLabel",
+                                                          )}
+                                                          :
                                                         </span>
                                                         <span className="font-bold text-blue-600">
                                                           {(() => {
@@ -5180,7 +5308,9 @@ export default function SalesOrders() {
                                                                   parsed.length >
                                                                     0
                                                                 ) {
-                                                                  return "Nhiều phương thức";
+                                                                  return t(
+                                                                    "common.multiplePaymentMethods",
+                                                                  );
                                                                 }
                                                               }
                                                             } catch (e) {}
@@ -5213,7 +5343,9 @@ export default function SalesOrders() {
                                                       )
                                                     }
                                                     className="w-full p-3 border rounded min-h-[80px] resize-none"
-                                                    placeholder="Nhập ghi chú..."
+                                                    placeholder={t(
+                                                      "common.enterNotes",
+                                                    )}
                                                     disabled={
                                                       selectedInvoice.displayStatus ===
                                                       1
@@ -5244,6 +5376,7 @@ export default function SalesOrders() {
                                                             )
                                                           }
                                                         >
+                                                          <X className="w-4 h-4 mr-2" />
                                                           {t(
                                                             "common.cancelOrder",
                                                           )}
@@ -5281,7 +5414,7 @@ export default function SalesOrders() {
                                                               size="sm"
                                                             >
                                                               {t(
-                                                                "common.editOrder",
+                                                                "orders.editOrder",
                                                               )}
                                                             </Button>
                                                           );
@@ -5299,7 +5432,7 @@ export default function SalesOrders() {
                                                               size="sm"
                                                             >
                                                               {t(
-                                                                "common.editOrder",
+                                                                "orders.editOrder",
                                                               )}
                                                             </Button>
                                                           );
@@ -5420,7 +5553,7 @@ export default function SalesOrders() {
                                                           className="bg-green-600 hover:bg-green-700 text-white"
                                                         >
                                                           <CreditCard className="w-4 h-4 mr-2" />
-                                                          Thanh toán
+                                                          {t("common.payment")}
                                                         </Button>
                                                       )}
 
@@ -5443,7 +5576,9 @@ export default function SalesOrders() {
                                                           size="sm"
                                                           className="border-green-500 text-green-600 hover:bg-green-50"
                                                         >
-                                                          Phát hành hóa đơn
+                                                          {t(
+                                                            "orders.issueInvoice",
+                                                          )}
                                                         </Button>
                                                       )}
 
@@ -5465,16 +5600,14 @@ export default function SalesOrders() {
                                                         className="border-blue-500 text-blue-600 hover:bg-blue-50"
                                                       >
                                                         <Printer className="w-4 h-4 mr-2" />
-                                                        {t(
-                                                          "common.printInvoice",
-                                                        )}
+                                                        {t("common.print")}
                                                       </Button>
                                                     )}
 
                                                     {/* Nút Đóng: luôn hiển thị */}
                                                     <Button
-                                                      size="sm"
                                                       variant="outline"
+                                                      size="sm"
                                                       onClick={() =>
                                                         setSelectedInvoice(null)
                                                       }
@@ -5524,9 +5657,7 @@ export default function SalesOrders() {
                                                               variant="outline"
                                                               size="sm"
                                                             >
-                                                              {t(
-                                                                "common.cancel",
-                                                              )}
+                                                              {t("common.cancel")}
                                                             </Button>
                                                           </>
                                                         );
@@ -5693,7 +5824,7 @@ export default function SalesOrders() {
                           {t("common.subtotalAmount")}:
                         </span>
                         <div className="font-bold text-blue-600">
-                          {formatCurrency(displayTotals.subtotal)}
+                          {formatCurrency(totals.subtotal)}
                         </div>
                       </div>
                       <div>
@@ -5701,7 +5832,7 @@ export default function SalesOrders() {
                           {t("common.discount")}:
                         </span>
                         <div className="font-bold text-red-600">
-                          -{formatCurrency(displayTotals.discount || 0)}
+                          -{formatCurrency(totals.discount || 0)}
                         </div>
                       </div>
                       <div>
@@ -5709,7 +5840,7 @@ export default function SalesOrders() {
                           {t("common.totalTax")}:
                         </span>
                         <div className="font-bold text-orange-600">
-                          {formatCurrency(displayTotals.tax)}
+                          {formatCurrency(totals.tax)}
                         </div>
                       </div>
                       <div>
@@ -5717,7 +5848,7 @@ export default function SalesOrders() {
                           {t("common.grandTotal")}:
                         </span>
                         <div className="font-bold text-green-600">
-                          {formatCurrency(displayTotals.total)}
+                          {formatCurrency(totals.total)}
                         </div>
                       </div>
                     </div>
@@ -5735,14 +5866,15 @@ export default function SalesOrders() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hủy đơn hàng bán</AlertDialogTitle>
+            <AlertDialogTitle>{t("common.confirmBulkCancel")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Bạn có chắc muốn hủy {selectedOrderIds.size} đơn hàng đã chọn
-              không? Hành động này không thể hoàn tác.
+              {t("common.confirmBulkCancelMessage", {
+                count: selectedOrderIds.size,
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Bỏ qua</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (selectedOrderIds.size > 0) {
@@ -5754,8 +5886,8 @@ export default function SalesOrders() {
               className="bg-red-600 hover:bg-red-700"
             >
               {bulkCancelOrdersMutation.isPending
-                ? "Đang hủy..."
-                : `Hủy ${selectedOrderIds.size} đơn`}
+                ? t("common.cancelling")
+                : t("common.cancelSelected", { count: selectedOrderIds.size })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -5763,15 +5895,17 @@ export default function SalesOrders() {
       <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xác nhận hủy đơn hàng</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t("common.confirmCancelOrder")}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Bạn có chắc chắn muốn hủy đơn hàng{" "}
-              {selectedInvoice?.displayNumber} này không? Hành động này không
-              thể hoàn tác.
+              {t("common.confirmCancelOrderMessage", {
+                orderNumber: selectedInvoice?.displayNumber,
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Hủy</AlertDialogCancel>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (selectedInvoice) {
@@ -5781,7 +5915,9 @@ export default function SalesOrders() {
               }}
               className="bg-red-600 hover:bg-red-700"
             >
-              {cancelOrderMutation.isPending ? "Đang hủy..." : "Xác nhận hủy"}
+              {cancelOrderMutation.isPending
+                ? t("common.cancelling")
+                : t("common.confirmCancel")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

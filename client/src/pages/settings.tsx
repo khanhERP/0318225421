@@ -1785,6 +1785,70 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                               />
                             </div>
                             <div className="space-y-2">
+                              <Label htmlFor="bankName">
+                                Tên ngân hàng
+                              </Label>
+                              <Input
+                                id="bankName"
+                                value={storeSettings.bankName || ""}
+                                onChange={(e) =>
+                                  handleStoreSettingChange(
+                                    "bankName",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="VD: VietinBank"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="bankId">
+                                Mã ngân hàng (BIN)
+                              </Label>
+                              <Input
+                                id="bankId"
+                                value={storeSettings.bankId || ""}
+                                onChange={(e) =>
+                                  handleStoreSettingChange(
+                                    "bankId",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="VD: 970422 (VietinBank)"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="bankAccountNo">
+                                Số tài khoản ngân hàng
+                              </Label>
+                              <Input
+                                id="bankAccountNo"
+                                value={storeSettings.bankAccountNo || ""}
+                                onChange={(e) =>
+                                  handleStoreSettingChange(
+                                    "bankAccountNo",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Nhập số tài khoản"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="bankAccountName">
+                                Tên chủ tài khoản
+                              </Label>
+                              <Input
+                                id="bankAccountName"
+                                value={storeSettings.bankAccountName || ""}
+                                onChange={(e) =>
+                                  handleStoreSettingChange(
+                                    "bankAccountName",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Tên chủ tài khoản"
+                              />
+                            </div>
+                            <div className="space-y-2">
                               <Label htmlFor="businessType">
                                 {t("settings.businessType")}
                               </Label>
@@ -3409,7 +3473,10 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                           selectedCategoryFilter === "all" ||
                                           category.id.toString() ===
                                             selectedCategoryFilter;
-                                        return matchesSearch && matchesCategory;
+                                          const checkRequired =
+                                            category.id !== 15 &&
+                                            category.id !== 17; 
+                                        return matchesSearch && matchesCategory && checkRequired;
                                       })
                                       .map((category: any, index) => {
                                         const productCount = productsData
