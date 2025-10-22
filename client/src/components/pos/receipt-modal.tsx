@@ -340,6 +340,7 @@ export function ReceiptModal({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Origin": "https://0108670987-001.edpos.vn"
         },
         body: JSON.stringify({
           printers,
