@@ -449,10 +449,10 @@ function MenuReport() {
             <div className="text-center py-12">
               <BarChart3 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500 text-lg font-medium mb-2">
-                Không có dữ liệu biểu đồ
+                {t("reports.noCategoryData") || "No category data"}
               </p>
               <p className="text-gray-400 text-sm">
-                Chọn khoảng thời gian có dữ liệu bán hàng để xem biểu đồ
+                {t("reports.noDataDescription") || "Select a date range with sales data to view charts"}
               </p>
               <Button
                 onClick={handleRefresh}
@@ -460,7 +460,7 @@ function MenuReport() {
                 variant="outline"
               >
                 <RefreshCw className="w-4 h-4" />
-                Làm mới dữ liệu
+                {t("common.refresh") || "Refresh"}
               </Button>
             </div>
           ) : (
@@ -765,7 +765,7 @@ function MenuReport() {
                 {t("common.noData") || "Không có dữ liệu bán hàng"}
               </p>
               <p className="text-sm text-gray-400 mt-2">
-                Chọn khoảng thời gian có dữ liệu bán hàng để xem phân tích
+                {t("reports.noDataDescription") || "Select a date range with sales data to view analysis"}
               </p>
             </div>
           ) : (

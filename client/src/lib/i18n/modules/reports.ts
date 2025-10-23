@@ -380,7 +380,7 @@ export const reportsTranslations: { [key: string]: ReportsTranslations } = {
     // Additional missing keys
     floor: "Tầng",
     period: "Kỳ",
-    noDataDescription: "Không có dữ liệu để hiển thị",
+    noDataDescription: "Chọn khoảng thời gian có dữ liệu bán hàng để xem phân tích",
     monthAccumulated: "Tháng tích lũy",
     peakHour: "Giờ cao điểm",
     filters: "Bộ lọc",
@@ -928,7 +928,7 @@ export const reportsTranslations: { [key: string]: ReportsTranslations } = {
     // Additional missing keys
     floor: "층",
     period: "기간",
-    noDataDescription: "표시할 데이터가 없습니다",
+    noDataDescription: "판매 데이터가 있는 날짜 범위를 선택하여 분석을 확인하세요",
     monthAccumulated: "월 누적",
     peakHour: "피크 시간",
     filters: "필터",
@@ -1477,7 +1477,7 @@ export const reportsTranslations: { [key: string]: ReportsTranslations } = {
     // Additional missing keys
     floor: "Floor",
     period: "Period",
-    noDataDescription: "No data to display",
+    noDataDescription: "Select a date range with sales data to view analysis",
     monthAccumulated: "Month Accumulated",
     peakHour: "Peak Hour",
     filters: "Filters",
