@@ -37,6 +37,13 @@ import { ReceiptModal } from "@/components/pos/receipt-modal";
 import { PaymentMethodModal } from "@/components/pos/payment-method-modal"; // Import PaymentMethodModal
 import { toast } from "@/hooks/use-toast";
 import { NumericFormat } from "react-number-format"; // Import NumericFormat
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Invoice {
   id: number;
@@ -5711,111 +5718,113 @@ export default function SalesOrders() {
                       </tbody>
                     </table>
                   </div>
-                  <div className="flex justify-between items-center mt-4">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-600">
-                        {t("common.itemsPerPage")}:
-                      </span>
-                      <select
-                        value={itemsPerPage}
-                        onChange={(e) => {
-                          setItemsPerPage(parseInt(e.target.value, 10));
-                          setCurrentPage(1);
-                        }}
-                        className="border rounded p-1 text-sm"
-                      >
-                        <option value={10}>10</option>
-                        <option value={20}>20</option>
-                        <option value={50}>50</option>
-                        <option value={100}>100</option>
-                      </select>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {(() => {
-                        const totalPagesForPagination =
-                          Math.ceil(filteredInvoices.length / itemsPerPage) ||
-                          1;
-
-                        if (totalPagesForPagination <= 7) {
-                          return Array.from(
-                            { length: totalPagesForPagination },
-                            (_, i) => i + 1,
-                          ).map((pageNum) => (
-                            <Button
-                              key={pageNum}
-                              variant={
-                                currentPage === pageNum ? "default" : "outline"
-                              }
-                              size="sm"
-                              onClick={() => setCurrentPage(pageNum)}
-                              className="w-8 h-8 p-0 text-sm"
-                            >
-                              {pageNum}
-                            </Button>
-                          ));
-                        }
-
-                        const pages = [];
-
-                        pages.push(1);
-
-                        if (currentPage > 4) {
-                          pages.push("...");
-                        }
-
-                        const start = Math.max(2, currentPage - 1);
-                        const end = Math.min(
-                          totalPagesForPagination - 1,
-                          currentPage + 1,
-                        );
-
-                        for (let i = start; i <= end; i++) {
-                          if (i !== 1 && i !== totalPagesForPagination) {
-                            pages.push(i);
-                          }
-                        }
-
-                        if (currentPage < totalPagesForPagination - 3) {
-                          pages.push("...");
-                        }
-
-                        if (totalPagesForPagination > 1) {
-                          pages.push(totalPagesForPagination);
-                        }
-
-                        return pages.map((pageNumber, index) => {
-                          if (pageNumber === "...") {
-                            return (
-                              <span
-                                key={`ellipsis-${index}`}
-                                className="px-2 text-gray-500 text-sm"
+                  {/* Pagination Controls */}
+                      {ordersResponse?.pagination &&
+                        ordersResponse.pagination.totalCount > 0 && (
+                          <div className="flex items-center justify-between space-x-6 py-4">
+                            <div className="flex items-center space-x-2">
+                              <p className="text-sm font-medium">
+                                {t("common.show")}
+                              </p>
+                              <Select
+                                value={itemsPerPage.toString()}
+                                onValueChange={(value) => {
+                                  setItemsPerPage(Number(value));
+                                  setCurrentPage(1);
+                                }}
                               >
-                                ...
-                              </span>
-                            );
-                          }
+                                <SelectTrigger className="h-8 w-[70px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent side="top">
+                                  <SelectItem value="10">10</SelectItem>
+                                  <SelectItem value="20">20</SelectItem>
+                                  <SelectItem value="30">30</SelectItem>
+                                  <SelectItem value="50">50</SelectItem>
+                                  <SelectItem value="100">100</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <p className="text-sm font-medium">
+                                {t("common.rows")}
+                              </p>
+                            </div>
 
-                          return (
-                            <Button
-                              key={pageNumber}
-                              variant={
-                                currentPage === pageNumber
-                                  ? "default"
-                                  : "outline"
-                              }
-                              size="sm"
-                              onClick={() =>
-                                setCurrentPage(pageNumber as number)
-                              }
-                              className="w-8 h-8 p-0 text-sm"
-                            >
-                              {pageNumber}
-                            </Button>
-                          );
-                        });
-                      })()}
-                    </div>
-                  </div>
+                            <div className="flex items-center space-x-2">
+                              <p className="text-sm text-muted-foreground">
+                                {t("common.showing")}{" "}
+                                {(currentPage - 1) * itemsPerPage + 1} -{" "}
+                                {Math.min(
+                                  currentPage * itemsPerPage,
+                                  ordersResponse.pagination.totalCount,
+                                )}{" "}
+                                {t("common.of")}{" "}
+                                {ordersResponse.pagination.totalCount}
+                              </p>
+                              <div className="flex items-center space-x-1">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => setCurrentPage(1)}
+                                  disabled={!ordersResponse.pagination.hasPrev}
+                                  className="h-8 w-8"
+                                >
+                                  «
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() =>
+                                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                                  }
+                                  disabled={!ordersResponse.pagination.hasPrev}
+                                  className="h-8 w-8"
+                                >
+                                  ‹
+                                </Button>
+                                <div className="flex items-center gap-1 px-2">
+                                  <span className="text-sm font-medium">
+                                    {currentPage}
+                                  </span>
+                                  <span className="text-sm text-muted-foreground">
+                                    /
+                                  </span>
+                                  <span className="text-sm text-muted-foreground">
+                                    {ordersResponse.pagination.totalPages}
+                                  </span>
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() =>
+                                    setCurrentPage((prev) =>
+                                      Math.min(
+                                        prev + 1,
+                                        ordersResponse.pagination.totalPages,
+                                      ),
+                                    )
+                                  }
+                                  disabled={!ordersResponse.pagination.hasNext}
+                                  className="h-8 w-8"
+                                >
+                                  ›
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() =>
+                                    setCurrentPage(
+                                      ordersResponse.pagination.totalPages,
+                                    )
+                                  }
+                                  disabled={!ordersResponse.pagination.hasNext}
+                                  className="h-8 w-8"
+                                >
+                                  »
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
                   <div className="mt-4 border-t bg-blue-50 p-3 rounded text-center">
                     <div className="grid grid-cols-4 gap-4 text-sm">
