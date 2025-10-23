@@ -144,6 +144,7 @@ export const customersTranslations: { [key: string]: CustomersTranslations } = {
     customerError: "고객 정보 업데이트 중 오류가 발생했습니다",
     thresholdUpdated: "멤버십 등급 기준이 업데이트되었습니다",
     thresholdUpdateError: "멤버십 등급 기준 업데이트 중 오류가 발생했습니다",
+    noOrderHistory: "고객에게 주문 내역이 없습니다",
   },
   en: {
     title: "Customer Management",
@@ -289,6 +290,7 @@ export const customersTranslations: { [key: string]: CustomersTranslations } = {
     customerError: "An error occurred while updating customer information",
     thresholdUpdated: "Membership threshold has been updated",
     thresholdUpdateError: "An error occurred while updating membership threshold",
+    noOrderHistory: "Customer has no order history",
   },
   vi: {
     createNewCustomer: "Tạo khách hàng mới",
@@ -431,5 +433,6 @@ export const customersTranslations: { [key: string]: CustomersTranslations } = {
     customerError: "Đã xảy ra lỗi khi cập nhật thông tin khách hàng",
     thresholdUpdated: "Đã cập nhật mức chi tiêu nâng hạng",
     thresholdUpdateError: "Không thể cập nhật mức chi tiêu",
+    noOrderHistory: "Khách hàng chưa có đơn hàng nào",
   },
 };

@@ -3,6 +3,7 @@ import type { OrdersTranslations } from "../types";
 export const ordersTranslations: { [key: string]: OrdersTranslations } = {
   ko: {
     atCounter: "카운터",
+    itemList: "상품 목록",
     phoneNumber: "전화번호",
     orderNumberLabel: "주문 번호",
     orderDateLabel: "주문 날짜",
@@ -227,9 +228,11 @@ export const ordersTranslations: { [key: string]: OrdersTranslations } = {
     useall: "모두 사용",
     additionalpaymentrequired: "추가 결제 필요",
     selectpaymentmethod: "남은 금액에 대한 결제 방법을 선택하세요",
+    paymentStatus: "결제 상태",
   },
   en: {
     atCounter: "At Counter",
+    itemList: "Item List",
     orderNumberLabel: "Order Number",
     phoneNumber: "Phone Number",
     orderDateLabel: "Order Date",
@@ -458,9 +461,11 @@ export const ordersTranslations: { [key: string]: OrdersTranslations } = {
     useall: "Use All",
     additionalpaymentrequired: "Additional payment required",
     selectpaymentmethod: "Select payment method for the remaining amount",
+    paymentStatus: "Payment Status",
   },
   vi: {
     atCounter: "Tại quầy",
+    itemList: "Danh sách hàng hóa",
     phoneNumber: "Số điện thoại",
     orderNumberLabel: "Số đơn hàng",
     orderDateLabel: "Ngày đơn hàng",
@@ -691,5 +696,6 @@ export const ordersTranslations: { [key: string]: OrdersTranslations } = {
     useall: "Sử dụng tất cả",
     additionalpaymentrequired: "Cần thanh toán thêm",
     selectpaymentmethod: "Chọn phương thức thanh toán cho phần còn lại",
+    paymentStatus: "Trạng thái thanh toán",
   },
 };

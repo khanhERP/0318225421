@@ -122,6 +122,7 @@ export const storeSettings = pgTable("store_settings", {
   id: serial("id").primaryKey(),
   storeName: text("store_name").notNull().default("EDPOS 레스토랑"),
   storeCode: text("store_code"),
+  domain: text("domain"), // Added domain field
   taxId: text("tax_id"),
   priceListId: integer("price_list_id").references(() => priceLists.id),
   businessType: text("business_type").default("restaurant"),
@@ -332,8 +333,7 @@ export const insertProductSchema = createInsertSchema(products)
   .extend({
     price: z.union([z.string(), z.number()]).refine(
       (val) => {
-        const numVal =
-          typeof val === "string" ? parseFloat(val) : Number(val);
+        const numVal = typeof val === "string" ? parseFloat(val) : Number(val);
         return !isNaN(numVal) && numVal > 0 && numVal < 100000000;
       },
       {
@@ -515,6 +515,7 @@ export const insertStoreSettingsSchema = createInsertSchema(storeSettings)
     createdAt: true,
   })
   .extend({
+    domain: z.string().optional(), // Added domain to schema
     priceIncludesTax: z.boolean().optional().default(false),
     defaultFloor: z.string().optional().default("1"),
     enableMultiFloor: z.boolean().optional().default(false),
@@ -827,17 +828,6 @@ export type Order = typeof orders.$inferSelect;
 export type OrderItem = typeof orderItems.$inferSelect;
 export type StoreSettings = typeof storeSettings.$inferSelect;
 export type Supplier = typeof suppliers.$inferSelect;
-
-// Add priceListId to user token payload type
-export type UserTokenPayload = {
-  userId: number;
-  userName: string;
-  storeCode: string;
-  storeName: string;
-  priceListId?: number | null;
-  isAdmin: boolean;
-  typeUser: number;
-};
 
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
@@ -1184,8 +1174,12 @@ export const priceLists = pgTable("price_lists", {
   isActive: boolean("is_active").notNull().default(true),
   isDefault: boolean("is_default").notNull().default(false),
   storeCode: varchar("store_code", { length: 50 }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 // Price List Items table
@@ -1199,8 +1193,12 @@ export const priceListItems = pgTable("price_list_items", {
     .notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   storeCode: varchar("store_code", { length: 50 }),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 export const insertPriceListSchema = createInsertSchema(priceLists)
@@ -1232,3 +1230,35 @@ export type PriceList = typeof priceLists.$inferSelect;
 export type InsertPriceList = z.infer<typeof insertPriceListSchema>;
 export type PriceListItem = typeof priceListItems.$inferSelect;
 export type InsertPriceListItem = z.infer<typeof insertPriceListItemSchema>;
+
+// General Settings table
+export const generalSettings = pgTable("general_settings", {
+  id: serial("id").primaryKey(),
+  settingCode: varchar("setting_code", { length: 100 }).notNull().unique(),
+  settingName: varchar("setting_name", { length: 255 }).notNull(),
+  settingValue: text("setting_value"),
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  storeCode: varchar("store_code", { length: 50 }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const insertGeneralSettingSchema = createInsertSchema(generalSettings)
+  .omit({
+    id: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    settingCode: z.string().min(1, "Mã thiết lập là bắt buộc"),
+    settingName: z.string().min(1, "Tên thiết lập là bắt buộc"),
+    isActive: z.boolean().optional().default(true),
+  });
+
+export type GeneralSetting = typeof generalSettings.$inferSelect;
+export type InsertGeneralSetting = z.infer<typeof insertGeneralSettingSchema>;

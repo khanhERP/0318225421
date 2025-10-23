@@ -126,6 +126,11 @@ export function ProductManagerModal({
     enabled: isOpen,
   });
 
+  const { data: units = [] } = useQuery<string[]>({
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products/units"],
+    enabled: isOpen,
+  });
+
   const createProductMutation = useMutation({
     mutationFn: async (data: z.infer<typeof productFormSchema>) => {
       let finalData = { ...data };
@@ -1243,16 +1248,26 @@ export function ProductManagerModal({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="Cái">Cái</SelectItem>
-                              <SelectItem value="Ly">Ly</SelectItem>
-                              <SelectItem value="Chai">Chai</SelectItem>
-                              <SelectItem value="Lon">Lon</SelectItem>
-                              <SelectItem value="Phần">Phần</SelectItem>
-                              <SelectItem value="Đĩa">Đĩa</SelectItem>
-                              <SelectItem value="Tô">Tô</SelectItem>
-                              <SelectItem value="Kg">Kg</SelectItem>
-                              <SelectItem value="Gói">Gói</SelectItem>
-                              <SelectItem value="Hộp">Hộp</SelectItem>
+                              {units && units.length > 0 ? (
+                                units.map((unit) => (
+                                  <SelectItem key={unit} value={unit}>
+                                    {unit}
+                                  </SelectItem>
+                                ))
+                              ) : (
+                                <>
+                                  <SelectItem value="Cái">Cái</SelectItem>
+                                  <SelectItem value="Ly">Ly</SelectItem>
+                                  <SelectItem value="Chai">Chai</SelectItem>
+                                  <SelectItem value="Lon">Lon</SelectItem>
+                                  <SelectItem value="Phần">Phần</SelectItem>
+                                  <SelectItem value="Đĩa">Đĩa</SelectItem>
+                                  <SelectItem value="Tô">Tô</SelectItem>
+                                  <SelectItem value="Kg">Kg</SelectItem>
+                                  <SelectItem value="Gói">Gói</SelectItem>
+                                  <SelectItem value="Hộp">Hộp</SelectItem>
+                                </>
+                              )}
                             </SelectContent>
                           </Select>
                           <FormMessage />

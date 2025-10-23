@@ -3,7 +3,9 @@ import type { CommonTranslations } from "../types";
 export const commonTranslations: { [key: string]: CommonTranslations } = {
   ko: {
     loading: "로딩 중...",
+    serving: "서빙 중",
     save: "저장",
+    select: "선택됨",
     view: "보기",
     notReturned: "반환되지 않음",
     viewDetails: "자세히 보기",
@@ -380,8 +382,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     phoneNumberPlaceholder: "전화번호",
     explanationPlaceholder: "자세한 설명...",
     confirmDelete: "삭제 확인",
-    confirmDeleteVoucher:
-      "증서 '{voucherNumber}'을(를) 삭제하시겠습니까?",
+    confirmDeleteVoucher: "증서 '{voucherNumber}'을(를) 삭제하시겠습니까?",
     cannotUndo: "이 작업은 되돌릴 수 없습니다.",
     skip: "건너뛰기",
     agree: "동의",
@@ -675,7 +676,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     selectImageFile: "이미지 파일을 선택하거나",
     dragDropUpload: "드래그엤드롭으로 업로드",
     summary: "요약",
-    
+
     // Receipt translations
     storeName: "매장명",
     storeAddress: "주소",
@@ -694,7 +695,9 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
   en: {
     save: "Save",
     payment: "Payment",
+    serving: "Serving",
     view: "View",
+    select: "Selected",
     cancel: "Cancel",
     notReturned: "Not Returned",
     viewDetails: "View Details",
@@ -1261,7 +1264,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     fileUpload: "File Upload",
     totalAmountSubtotal: "Subtotal Amount",
     summary: "Summary",
-    
+
     // Receipt translations
     storeName: "Store Name",
     storeAddress: "Address",
@@ -1279,6 +1282,8 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
   },
   vi: {
     save: "Lưu",
+    serving: "Đang phục vụ",
+    select: "Đã chọn",
     payment: "Thanh toán",
     view: "Xem",
     cancel: "Hủy",
@@ -1833,7 +1838,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     urlInput: "Nhập URL",
     fileUpload: "Tải lên tệp",
     summary: "Tóm tắt",
-    
+
     // Receipt translations
     storeName: "Tên cửa hàng",
     storeAddress: "Địa chỉ",

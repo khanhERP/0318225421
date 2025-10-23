@@ -69,7 +69,14 @@ export function PinAuth({ onAuthSuccess }: PinAuthProps) {
     setIsLoading(true);
 
     try {
-      console.log("Submitting PIN:", pin);
+      // Lấy domain hiện tại từ window.location
+      const currentDomain = window.location.hostname;
+      
+      console.log("Submitting PIN with domain:", {
+        pin,
+        domain: currentDomain,
+        fullUrl: window.location.href,
+      });
       
       // Gọi API đăng nhập bằng PIN
       const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/auth/login-pin", {
@@ -77,7 +84,10 @@ export function PinAuth({ onAuthSuccess }: PinAuthProps) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ pinCode: pin }),
+        body: JSON.stringify({ 
+          pinCode: pin,
+          domain: currentDomain 
+        }),
       });
 
       const result = await response.json();

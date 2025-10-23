@@ -1930,7 +1930,7 @@ export default function SalesOrders() {
       const currentItem = prev[itemId] || {};
       const originalItem = orderItems.find((item: any) => item.id === itemId);
 
-      // PRESERVE existing edited values - prioritize what user has already entered
+      // PRESERVE ALL existing values - only update the field being changed
       let quantity =
         currentItem.quantity !== undefined
           ? currentItem.quantity
@@ -1955,13 +1955,13 @@ export default function SalesOrders() {
       // Track if product changed (to recalculate tax with new taxRate)
       let productChanged = false;
 
-      // Update ONLY the field that user is editing
+      // Update ONLY the specific field that user is editing
       if (field === "quantity") {
-        quantity = parseFloat(value) || 1; // Allow decimal quantity
-        // KEEP product info unchanged - do NOT reset productId, sku, productName
+        quantity = parseFloat(value) || 1;
+        // ✅ KEEP all product info unchanged (productId, sku, productName)
       } else if (field === "unitPrice") {
         unitPrice = parseFloat(value) || 0;
-        // KEEP product info unchanged - do NOT reset productId, sku, productName
+        // ✅ KEEP all product info unchanged (productId, sku, productName)
       } else if (field === "productId") {
         // User is actively changing productId - update all related fields
         productId = value;
@@ -2075,7 +2075,10 @@ export default function SalesOrders() {
       }
 
       // Calculate tax - ALWAYS get product info to ensure we have latest taxRate
-      const product = products.find((p: any) => p.id === productId);
+      let product = products.find((p: any) => p.id === productId);
+      if (!sku) {
+        sku = product?.sku || "";
+      }
       const taxRate = product?.taxRate ? parseFloat(product.taxRate) / 100 : 0;
       const priceIncludeTax =
         editableInvoice?.priceIncludeTax ??
@@ -2262,15 +2265,15 @@ export default function SalesOrders() {
       },
       { subtotal: 0, tax: 0, discount: 0, total: 0 },
     );
-    
+
     console.log("📊 Calculated totals from all filtered invoices:", {
       count: filteredInvoices.length,
       subtotal: totals.subtotal,
       tax: totals.tax,
       discount: totals.discount,
-      total: totals.total
+      total: totals.total,
     });
-    
+
     return totals;
   };
 
@@ -2308,9 +2311,7 @@ export default function SalesOrders() {
               : item.unitPrice || "0",
           );
           const quantity = parseFloat(
-            editedItem.quantity !== undefined
-              ? editedItem.quantity
-              : item.quantity || "0",
+            editedItem.quantity !== undefined ? editedItem.quantity : item.quantity || "0",
           );
           calculatedSubtotal += unitPrice * quantity;
         } else {
@@ -2326,9 +2327,7 @@ export default function SalesOrders() {
               : item.unitPrice || "0",
           );
           const quantity = parseFloat(
-            editedItem.quantity !== undefined
-              ? editedItem.quantity
-              : item.quantity || "0",
+            editedItem.quantity !== undefined ? editedItem.quantity : item.quantity || "0",
           );
 
           const itemSubtotal = unitPrice * quantity;
@@ -3051,7 +3050,7 @@ export default function SalesOrders() {
                     <table className="w-full min-w-[1600px] table-fixed">
                       <thead>
                         <tr className="bg-gray-50 border-b">
-                          <th className="w-[50px] px-3 py-3 text-center font-medium text-sm text-gray-600">
+                          <th className="w-[50px] px-3 py-3 text-center font-medium text-[16px] text-gray-600">
                             <Checkbox
                               checked={isAllSelected}
                               ref={(el) => {
@@ -3061,7 +3060,7 @@ export default function SalesOrders() {
                             />
                           </th>
                           <th
-                            className="w-[180px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[180px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("orderNumber")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3074,12 +3073,12 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           {storeSettings?.businessType === "laundry" && (
-                            <th className="w-[100px] px-3 py-3 text-center font-medium text-sm text-gray-600">
+                            <th className="w-[100px] px-3 py-3 text-center font-medium text-[16px] text-gray-600">
                               {t("common.returned")}
                             </th>
                           )}
                           <th
-                            className="w-[120px] px-3 py-3 text-center font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[120px] px-3 py-3 text-center font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("status")}
                           >
                             <div className="leading-tight flex items-center justify-center gap-1">
@@ -3092,7 +3091,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[180px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[180px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("createdAt")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3105,7 +3104,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[180px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[180px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("updatedAt")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3118,7 +3117,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[80px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[80px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("salesChannel")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3131,7 +3130,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[120px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[120px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("customerCode")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3144,7 +3143,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[150px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[150px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("customerName")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3157,7 +3156,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[100px] px-3 py-3 text-right font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[120px] px-3 py-3 text-right font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("subtotal")}
                           >
                             <div className="leading-tight flex items-center justify-end gap-1">
@@ -3170,7 +3169,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[80px] px-3 py-3 text-right font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[100px] px-3 py-3 text-right font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("discount")}
                           >
                             <div className="leading-tight flex items-center justify-end gap-1">
@@ -3183,7 +3182,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[90px] px-3 py-3 text-right font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[100px] px-3 py-3 text-right font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("tax")}
                           >
                             <div className="leading-tight flex items-center justify-end gap-1">
@@ -3196,7 +3195,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[110px] px-3 py-3 text-right font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[120px] px-3 py-3 text-right font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("total")}
                           >
                             <div className="leading-tight flex items-center justify-end gap-1">
@@ -3209,7 +3208,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[110px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[110px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("employeeCode")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3222,7 +3221,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[120px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[120px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("employeeName")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3235,7 +3234,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[120px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[120px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("symbol")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3248,7 +3247,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[110px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[110px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("invoiceNumber")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3261,7 +3260,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[200px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[200px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("notes")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3358,7 +3357,7 @@ export default function SalesOrders() {
                                   </td>
                                   <td className="px-3 py-3">
                                     <div
-                                      className="font-medium text-xs"
+                                      className="font-medium text-[16px]"
                                       title={
                                         item.orderNumber || item.displayNumber
                                       }
@@ -3389,12 +3388,12 @@ export default function SalesOrders() {
                                     )}
                                   </td>
                                   <td className="px-3 py-3">
-                                    <div className="text-sm truncate">
+                                    <div className="text-[16px] truncate">
                                       {formatDate(item.createdAt)}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3">
-                                    <div className="text-sm truncate">
+                                    <div className="text-[16px] truncate">
                                       {(() => {
                                         // Show completion/cancellation date based on status
                                         if (
@@ -3415,7 +3414,7 @@ export default function SalesOrders() {
                                     </div>
                                   </td>
                                   <td className="px-3 py-3">
-                                    <div className="text-sm">
+                                    <div className="text-[16px]">
                                       {(() => {
                                         if (item.salesChannel === "table") {
                                           return t("orders.eatIn");
@@ -3438,7 +3437,7 @@ export default function SalesOrders() {
                                   </td>
                                   <td className="px-3 py-3">
                                     <div
-                                      className="text-sm font-mono truncate"
+                                      className="text-[16px] font-mono truncate"
                                       title={customerCode}
                                     >
                                       {customerCode}
@@ -3446,58 +3445,58 @@ export default function SalesOrders() {
                                   </td>
                                   <td className="px-3 py-3">
                                     <div
-                                      className="text-sm truncate"
+                                      className="text-[16px] truncate"
                                       title={customerName}
                                     >
                                       {customerName}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3 text-right">
-                                    <div className="text-sm font-medium">
+                                    <div className="text-[16px] font-medium">
                                       {formatCurrency(subtotal)}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3 text-right">
-                                    <div className="text-sm">
+                                    <div className="text-[16px]">
                                       {formatCurrency(discount)}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3 text-right">
-                                    <div className="text-sm">
+                                    <div className="text-[16px]">
                                       {formatCurrency(tax)}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3 text-right">
-                                    <div className="text-sm font-medium">
+                                    <div className="text-[16px] font-medium">
                                       {formatCurrency(total)}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3">
-                                    <div className="text-sm font-mono">
+                                    <div className="text-[16px] font-mono">
                                       {employeeCode}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3">
                                     <div
-                                      className="text-sm truncate"
+                                      className="text-[16px] truncate"
                                       title={employeeName}
                                     >
                                       {employeeName}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3">
-                                    <div className="text-sm">
+                                    <div className="text-[16px]">
                                       {itemSymbol || "-"}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3">
-                                    <div className="text-sm font-mono">
+                                    <div className="text-[16px] font-mono">
                                       {invoiceNumber}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3">
                                     <div
-                                      className="text-sm truncate"
+                                      className="text-[16px] truncate"
                                       title={notes || "-"}
                                     >
                                       {notes || "-"}
@@ -3527,16 +3526,16 @@ export default function SalesOrders() {
                                             <CardContent className="space-y-4">
                                               <div className="bg-white p-4 rounded-lg overflow-x-auto">
                                                 <div className="min-w-[1200px]">
-                                                  <table className="w-full text-sm border-collapse">
+                                                  <table className="w-full text-base border-collapse">
                                                     <tbody>
                                                       <tr>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t(
                                                             "orders.orderNumberLabel",
                                                           )}
                                                           :
                                                         </td>
-                                                        <td className="py-1 pr-6 text-blue-600 font-medium">
+                                                        <td className="py-2 pr-6 text-blue-600 font-semibold text-base">
                                                           {isEditing &&
                                                           editableInvoice ? (
                                                             <Input
@@ -3562,10 +3561,10 @@ export default function SalesOrders() {
                                                             selectedInvoice.displayNumber
                                                           )}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t("common.date")}:
                                                         </td>
-                                                        <td className="py-1 pr-6">
+                                                        <td className="py-2 pr-6 text-base">
                                                           {isEditing &&
                                                           editableInvoice ? (
                                                             <Input
@@ -3595,11 +3594,10 @@ export default function SalesOrders() {
                                                             )
                                                           )}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
-                                                          {t("orders.customer")}
-                                                          :
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
+                                                          {t("orders.customer")}:
                                                         </td>
-                                                        <td className="py-1 pr-6 text-blue-600 font-medium">
+                                                        <td className="py-2 pr-6 text-blue-600 font-semibold text-base">
                                                           {isEditing &&
                                                           editableInvoice ? (
                                                             <>
@@ -3827,13 +3825,13 @@ export default function SalesOrders() {
                                                             "Khách hàng"
                                                           )}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t(
                                                             "orders.phoneNumber",
                                                           )}
                                                           :
                                                         </td>
-                                                        <td className="py-1 pr-6">
+                                                        <td className="py-2 pr-6 text-base">
                                                           {isEditing &&
                                                           editableInvoice ? (
                                                             <Input
@@ -3862,10 +3860,10 @@ export default function SalesOrders() {
                                                             </span>
                                                           )}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t("orders.table")}:
                                                         </td>
-                                                        <td className="py-1 pr-6">
+                                                        <td className="py-2 pr-6 text-base">
                                                           {selectedInvoice.salesChannel ===
                                                             "table" &&
                                                           selectedInvoice.tableId
@@ -3874,10 +3872,10 @@ export default function SalesOrders() {
                                                               )
                                                             : "-"}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t("common.status")}:
                                                         </td>
-                                                        <td className="py-1">
+                                                        <td className="py-2 text-base">
                                                           {(() => {
                                                             const statusLabels =
                                                               {
@@ -3899,13 +3897,13 @@ export default function SalesOrders() {
                                                         {storeSettings?.businessType ===
                                                           "laundry" && (
                                                           <>
-                                                            <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                            <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                               {t(
                                                                 "common.returned",
                                                               )}
                                                               :
                                                             </td>
-                                                            <td className="py-1 pr-6">
+                                                            <td className="py-2 pr-6 text-base">
                                                               {isEditing &&
                                                               editableInvoice ? (
                                                                 <Checkbox
@@ -3946,13 +3944,13 @@ export default function SalesOrders() {
                                                             </td>
                                                           </>
                                                         )}
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t(
                                                             "orders.salesType",
                                                           )}
                                                           :
                                                         </td>
-                                                        <td className="py-1 pr-6">
+                                                        <td className="py-2 pr-6 text-base">
                                                           {(() => {
                                                             const salesChannel =
                                                               selectedInvoice.salesChannel;
@@ -3989,13 +3987,13 @@ export default function SalesOrders() {
                                                             );
                                                           })()}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t(
                                                             "orders.invoiceSymbol",
                                                           )}
                                                           :
                                                         </td>
-                                                        <td className="py-1 pr-6">
+                                                        <td className="py-2 pr-6 text-base">
                                                           {isEditing &&
                                                           editableInvoice ? (
                                                             <Input
@@ -4024,13 +4022,13 @@ export default function SalesOrders() {
                                                             </span>
                                                           )}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t(
                                                             "orders.invoiceNumber",
                                                           )}
                                                           :
                                                         </td>
-                                                        <td className="py-1 pr-6">
+                                                        <td className="py-2 pr-6 text-base">
                                                           {isEditing &&
                                                           editableInvoice &&
                                                           selectedInvoice.displayStatus !==
@@ -4060,12 +4058,12 @@ export default function SalesOrders() {
                                                             </span>
                                                           )}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t(
                                                             "common.einvoiceStatusLabel",
                                                           )}
                                                         </td>
-                                                        <td className="py-1 pr-6">
+                                                        <td className="py-2 pr-6 text-base">
                                                           {getEInvoiceStatusBadge(
                                                             selectedInvoice.einvoiceStatus,
                                                           )}
@@ -4131,49 +4129,49 @@ export default function SalesOrders() {
                                                     <table className="w-full text-sm min-w-[1200px]">
                                                       <thead>
                                                         <tr className="bg-gray-50 border-b">
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-left sticky left-0 bg-green-50 z-10 w-12">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-left sticky left-0 bg-green-50 z-10 w-12">
                                                             {t("common.no")}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-left min-w-[100px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-left min-w-[100px]">
                                                             {t(
                                                               "orders.itemCode",
                                                             )}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-left min-w-[250px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-left min-w-[180px] max-w-[220px]">
                                                             {t(
                                                               "orders.itemName",
                                                             )}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-center min-w-[60px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-center min-w-[60px]">
                                                             {t("orders.unit")}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-center min-w-[80px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-center min-w-[80px]">
                                                             {t(
                                                               "common.quantity",
                                                             )}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-right min-w-[100px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-right min-w-[100px]">
                                                             {t(
                                                               "orders.unitPrice",
                                                             )}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-right min-w-[100px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-right min-w-[100px]">
                                                             {t(
                                                               "common.subtotalAmount",
                                                             )}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-right min-w-[100px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-right min-w-[100px]">
                                                             {t(
                                                               "common.discount",
                                                             )}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-right min-w-[100px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-right min-w-[100px]">
                                                             {t("common.tax")}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-right min-w-[100px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-right min-w-[100px]">
                                                             {t("common.total")}
                                                           </th>
-                                                          <th className="text-center px-3 py-2 font-medium text-xs whitespace-nowrap w-[80px]">
+                                                          <th className="text-center px-3 py-2 font-medium text-base whitespace-nowrap w-[80px]">
                                                             {isEditing &&
                                                             selectedInvoice?.displayStatus !==
                                                               1 &&
@@ -4482,7 +4480,7 @@ export default function SalesOrders() {
                                                                   <td className="text-center py-2 px-3 border-r text-xs w-[50px]">
                                                                     {index + 1}
                                                                   </td>
-                                                                  <td className="text-left py-2 px-3 border-r text-xs w-[120px]">
+                                                                  <td className="text-left py-2 px-3 border-r text-base w-[120px]">
                                                                     {isEditing ? (
                                                                       <div className="relative">
                                                                         <Input
@@ -4498,10 +4496,23 @@ export default function SalesOrders() {
                                                                           onChange={(
                                                                             e,
                                                                           ) => {
-                                                                            const selectedSku =
+                                                                            const inputValue =
                                                                               e
                                                                                 .target
                                                                                 .value;
+
+                                                                            // Trích xuất chỉ SKU từ giá trị datalist (phần trước " - ")
+                                                                            const selectedSku =
+                                                                              inputValue.includes(
+                                                                                " - ",
+                                                                              )
+                                                                                ? inputValue
+                                                                                    .split(
+                                                                                      " - ",
+                                                                                    )[0]
+                                                                                    .trim()
+                                                                                : inputValue;
+
                                                                             updateOrderItemField(
                                                                               item.id,
                                                                               "sku",
@@ -4548,7 +4559,7 @@ export default function SalesOrders() {
                                                                               "sku",
                                                                             )
                                                                           }
-                                                                          className="w-full h-8 text-xs"
+                                                                          className="w-full h-8 text-base"
                                                                           placeholder="Chọn mã hàng"
                                                                         />
                                                                         <datalist
@@ -4594,13 +4605,13 @@ export default function SalesOrders() {
                                                                         </datalist>
                                                                       </div>
                                                                     ) : (
-                                                                      <div className="truncate">
+                                                                      <div className="truncate text-base">
                                                                         {sku ||
                                                                           "-"}
                                                                       </div>
                                                                     )}
                                                                   </td>
-                                                                  <td className="text-left py-2 px-3 border-r text-xs w-[150px]">
+                                                                  <td className="text-left py-2 px-3 border-r text-base w-[180px] max-w-[220px]">
                                                                     {isEditing ? (
                                                                       <div className="relative">
                                                                         <Input
@@ -4616,10 +4627,24 @@ export default function SalesOrders() {
                                                                           onChange={(
                                                                             e,
                                                                           ) => {
-                                                                            const selectedName =
+                                                                            const inputValue =
                                                                               e
                                                                                 .target
                                                                                 .value;
+
+                                                                            // Trích xuất chỉ tên sản phẩm từ giá trị datalist
+                                                                            // Format: "Tên - SKU (Giá)" -> lấy phần trước " - "
+                                                                            const selectedName =
+                                                                              inputValue.includes(
+                                                                                " - ",
+                                                                              )
+                                                                                ? inputValue
+                                                                                    .split(
+                                                                                      " - ",
+                                                                                    )[0]
+                                                                                    .trim()
+                                                                                : inputValue;
+
                                                                             updateOrderItemField(
                                                                               item.id,
                                                                               "productName",
@@ -4666,7 +4691,7 @@ export default function SalesOrders() {
                                                                               "productName",
                                                                             )
                                                                           }
-                                                                          className="w-full h-8 text-xs"
+                                                                          className="w-full h-8 text-base"
                                                                           placeholder="Chọn tên hàng"
                                                                         />
                                                                         <datalist
@@ -4712,17 +4737,17 @@ export default function SalesOrders() {
                                                                         </datalist>
                                                                       </div>
                                                                     ) : (
-                                                                      <div className="truncate">
+                                                                      <div className="truncate text-base font-semibold">
                                                                         {productName ||
                                                                           "-"}
                                                                       </div>
                                                                     )}
                                                                   </td>
-                                                                  <td className="text-center py-2 px-3 border-r text-xs w-[80px]">
+                                                                  <td className="text-center py-2 px-3 border-r text-base w-[60px]">
                                                                     {product?.unit ||
-                                                                      "Cái"}
+                                                                      "pcs"}
                                                                   </td>
-                                                                  <td className="text-center py-2 px-3 border-r text-xs w-[100px]">
+                                                                  <td className="text-center py-2 px-3 border-r text-base w-[100px]">
                                                                     {isEditing ? (
                                                                       <NumericFormat
                                                                         value={
@@ -4808,7 +4833,7 @@ export default function SalesOrders() {
                                                                           selectedInvoice.displayStatus ===
                                                                           1
                                                                         }
-                                                                        className="w-full h-8 text-xs text-right"
+                                                                        className="w-full h-8 text-base text-center"
                                                                       />
                                                                     ) : (
                                                                       quantity.toLocaleString(
@@ -4820,7 +4845,7 @@ export default function SalesOrders() {
                                                                       )
                                                                     )}
                                                                   </td>
-                                                                  <td className="text-right py-2 px-3 border-r text-xs w-[120px]">
+                                                                  <td className="text-right py-2 px-3 border-r text-base w-[120px]">
                                                                     {isEditing ? (
                                                                       <Input
                                                                         type="text"
@@ -4872,7 +4897,7 @@ export default function SalesOrders() {
                                                                       )
                                                                     )}
                                                                   </td>
-                                                                  <td className="text-right py-2 px-3 border-r text-xs w-[120px]">
+                                                                  <td className="text-right py-2 px-3 border-r text-base w-[120px]">
                                                                     {Math.floor(
                                                                       unitPrice *
                                                                         quantity,
@@ -4880,14 +4905,14 @@ export default function SalesOrders() {
                                                                       "vi-VN",
                                                                     )}
                                                                   </td>
-                                                                  <td className="text-red-600 text-right py-2 px-3 border-r text-xs w-[100px]">
+                                                                  <td className="text-red-600 text-right py-2 px-3 border-r text-base w-[100px]">
                                                                     {Math.floor(
                                                                       itemDiscountAmount,
                                                                     ).toLocaleString(
                                                                       "vi-VN",
                                                                     )}
                                                                   </td>
-                                                                  <td className="text-right py-2 px-3 border-r text-xs w-[100px]">
+                                                                  <td className="text-right py-2 px-3 border-r text-base w-[100px]">
                                                                     {(() => {
                                                                       // ALWAYS use edited tax if available from state
                                                                       const editedItem =
@@ -4915,7 +4940,7 @@ export default function SalesOrders() {
                                                                       );
                                                                     })()}
                                                                   </td>
-                                                                  <td className="text-right py-2 px-3 font-medium text-blue-600 text-xs w-[120px]">
+                                                                  <td className="text-right py-2 px-3 border-r text-base w-[100px]">
                                                                     {(() => {
                                                                       const editedItem =
                                                                         editedOrderItems[
@@ -4987,8 +5012,8 @@ export default function SalesOrders() {
                                               </div>
 
                                               <div>
-                                                <h4 className="font-medium mb-3">
-                                                  {t("common.summary")}
+                                                <h4 className="font-semibold text-lg mb-3">
+                                                  {t("orders.summary")}
                                                 </h4>
                                                 <div className="bg-blue-50 p-4 rounded-lg">
                                                   <div className="grid grid-cols-2 gap-8">
@@ -5055,7 +5080,7 @@ export default function SalesOrders() {
                                                                 ) || 0;
 
                                                               console.log(
-                                                                "💰 Thay đổi chiết khấu:",
+                                                                                               "💰 Thay đổi chiết khấu:",
                                                                 {
                                                                   oldDiscount:
                                                                     editableInvoice.discount,
@@ -5564,11 +5589,9 @@ export default function SalesOrders() {
                                                         </Button>
                                                       )}
 
-                                                    {/* Nút Phát hành hóa đơn: hiển thị khi order.status != 'cancelled' && order.status == 'paid' && einvoiceStatus == 0 */}
-                                                    {selectedInvoice.status !==
-                                                      "cancelled" &&
-                                                      selectedInvoice.status ===
-                                                        "paid" &&
+                                                    {/* Nút Phát hành hóa đơn: hiển thị khi order.status != 'paid' */}
+                                                    {selectedInvoice.status ===
+                                                      "paid" &&
                                                       selectedInvoice.einvoiceStatus ===
                                                         0 &&
                                                       storeSettings?.businessType !==
@@ -5719,112 +5742,112 @@ export default function SalesOrders() {
                     </table>
                   </div>
                   {/* Pagination Controls */}
-                      {ordersResponse?.pagination &&
-                        ordersResponse.pagination.totalCount > 0 && (
-                          <div className="flex items-center justify-between space-x-6 py-4">
-                            <div className="flex items-center space-x-2">
-                              <p className="text-sm font-medium">
-                                {t("common.show")}
-                              </p>
-                              <Select
-                                value={itemsPerPage.toString()}
-                                onValueChange={(value) => {
-                                  setItemsPerPage(Number(value));
-                                  setCurrentPage(1);
-                                }}
-                              >
-                                <SelectTrigger className="h-8 w-[70px]">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent side="top">
-                                  <SelectItem value="10">10</SelectItem>
-                                  <SelectItem value="20">20</SelectItem>
-                                  <SelectItem value="30">30</SelectItem>
-                                  <SelectItem value="50">50</SelectItem>
-                                  <SelectItem value="100">100</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <p className="text-sm font-medium">
-                                {t("common.rows")}
-                              </p>
-                            </div>
+                  {ordersResponse?.pagination &&
+                    ordersResponse.pagination.totalCount > 0 && (
+                      <div className="flex items-center justify-between space-x-6 py-4">
+                        <div className="flex items-center space-x-2">
+                          <p className="text-sm font-medium">
+                            {t("common.show")}
+                          </p>
+                          <Select
+                            value={itemsPerPage.toString()}
+                            onValueChange={(value) => {
+                              setItemsPerPage(Number(value));
+                              setCurrentPage(1);
+                            }}
+                          >
+                            <SelectTrigger className="h-8 w-[70px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent side="top">
+                              <SelectItem value="10">10</SelectItem>
+                              <SelectItem value="20">20</SelectItem>
+                              <SelectItem value="30">30</SelectItem>
+                              <SelectItem value="50">50</SelectItem>
+                              <SelectItem value="100">100</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <p className="text-sm font-medium">
+                            {t("common.rows")}
+                          </p>
+                        </div>
 
-                            <div className="flex items-center space-x-2">
-                              <p className="text-sm text-muted-foreground">
-                                {t("common.showing")}{" "}
-                                {(currentPage - 1) * itemsPerPage + 1} -{" "}
-                                {Math.min(
-                                  currentPage * itemsPerPage,
-                                  ordersResponse.pagination.totalCount,
-                                )}{" "}
-                                {t("common.of")}{" "}
-                                {ordersResponse.pagination.totalCount}
-                              </p>
-                              <div className="flex items-center space-x-1">
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() => setCurrentPage(1)}
-                                  disabled={!ordersResponse.pagination.hasPrev}
-                                  className="h-8 w-8"
-                                >
-                                  «
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() =>
-                                    setCurrentPage((prev) => Math.max(prev - 1, 1))
-                                  }
-                                  disabled={!ordersResponse.pagination.hasPrev}
-                                  className="h-8 w-8"
-                                >
-                                  ‹
-                                </Button>
-                                <div className="flex items-center gap-1 px-2">
-                                  <span className="text-sm font-medium">
-                                    {currentPage}
-                                  </span>
-                                  <span className="text-sm text-muted-foreground">
-                                    /
-                                  </span>
-                                  <span className="text-sm text-muted-foreground">
-                                    {ordersResponse.pagination.totalPages}
-                                  </span>
-                                </div>
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() =>
-                                    setCurrentPage((prev) =>
-                                      Math.min(
-                                        prev + 1,
-                                        ordersResponse.pagination.totalPages,
-                                      ),
-                                    )
-                                  }
-                                  disabled={!ordersResponse.pagination.hasNext}
-                                  className="h-8 w-8"
-                                >
-                                  ›
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() =>
-                                    setCurrentPage(
-                                      ordersResponse.pagination.totalPages,
-                                    )
-                                  }
-                                  disabled={!ordersResponse.pagination.hasNext}
-                                  className="h-8 w-8"
-                                >
-                                  »
-                                </Button>
-                              </div>
+                        <div className="flex items-center space-x-2">
+                          <p className="text-sm text-muted-foreground">
+                            {t("common.showing")}{" "}
+                            {(currentPage - 1) * itemsPerPage + 1} -{" "}
+                            {Math.min(
+                              currentPage * itemsPerPage,
+                              ordersResponse.pagination.totalCount,
+                            )}{" "}
+                            {t("common.of")}{" "}
+                            {ordersResponse.pagination.totalCount}
+                          </p>
+                          <div className="flex items-center space-x-1">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => setCurrentPage(1)}
+                              disabled={!ordersResponse.pagination.hasPrev}
+                              className="h-8 w-8"
+                            >
+                              «
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() =>
+                                setCurrentPage((prev) => Math.max(prev - 1, 1))
+                              }
+                              disabled={!ordersResponse.pagination.hasPrev}
+                              className="h-8 w-8"
+                            >
+                              ‹
+                            </Button>
+                            <div className="flex items-center gap-1 px-2">
+                              <span className="text-sm font-medium">
+                                {currentPage}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                /
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                {ordersResponse.pagination.totalPages}
+                              </span>
                             </div>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() =>
+                                setCurrentPage((prev) =>
+                                  Math.min(
+                                    prev + 1,
+                                    ordersResponse.pagination.totalPages,
+                                  ),
+                                )
+                              }
+                              disabled={!ordersResponse.pagination.hasNext}
+                              className="h-8 w-8"
+                            >
+                              ›
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() =>
+                                setCurrentPage(
+                                  ordersResponse.pagination.totalPages,
+                                )
+                              }
+                              disabled={!ordersResponse.pagination.hasNext}
+                              className="h-8 w-8"
+                            >
+                              »
+                            </Button>
                           </div>
-                        )}
+                        </div>
+                      </div>
+                    )}
 
                   <div className="mt-4 border-t bg-blue-50 p-3 rounded text-center">
                     <div className="grid grid-cols-4 gap-4 text-sm">

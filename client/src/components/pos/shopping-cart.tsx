@@ -10,6 +10,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { NumericFormat } from "react-number-format";
 import { useTranslation } from "@/lib/i18n";
 import { PaymentMethodModal } from "./payment-method-modal";
@@ -47,7 +54,7 @@ export function ShoppingCart({
   onSwitchOrder,
   onRemoveOrder,
 }: ShoppingCartProps) {
-  const [paymentMethod, setPaymentMethod] = useState<string>("bankTransfer");
+  const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [amountReceived, setAmountReceived] = useState<string>("");
   const [discountAmount, setDiscountAmount] = useState<string>(""); // This state is still used for the input value itself
   const [discount, setDiscount] = useState(0);
@@ -718,6 +725,17 @@ export function ShoppingCart({
     },
   });
 
+  // Auto-select first enabled payment method when data loads
+  useEffect(() => {
+    if (paymentMethodsData && paymentMethodsData.length > 0 && !paymentMethod) {
+      const firstEnabled = paymentMethodsData.find((m: any) => m.enabled === true);
+      if (firstEnabled) {
+        setPaymentMethod(firstEnabled.nameKey);
+        console.log("🔧 Auto-selected first payment method:", firstEnabled.nameKey);
+      }
+    }
+  }, [paymentMethodsData, paymentMethod]);
+
   // Helper function to get payment method name
   const getPaymentMethodName = (nameKey: string) => {
     const names: { [key: string]: string } = {
@@ -904,6 +922,19 @@ export function ShoppingCart({
       return;
     }
 
+    // Generate next order number with BH prefix
+    let orderNumber = `BH-0000001`; // Default fallback
+    try {
+      const orderNumberResponse = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/next-order-number");
+      if (orderNumberResponse.ok) {
+        const data = await orderNumberResponse.json();
+        orderNumber = data.nextOrderNumber;
+        console.log("✅ Generated order number:", orderNumber);
+      }
+    } catch (error) {
+      console.warn("⚠️ Failed to generate order number, using fallback:", error);
+    }
+
     // Get storeCode from authenticated user
     const storeCode =
       userInfo?.storeCode || storeSettings?.storeCode || "STORE001";
@@ -1015,7 +1046,7 @@ export function ShoppingCart({
 
     // Create order with "pending" status (đặt hàng chưa thanh toán)
     const orderData = {
-      orderNumber: `ORD-${Date.now()}`,
+      orderNumber: orderNumber,
       tableId: null,
       customerId: selectedCustomer.id,
       customerName: selectedCustomer.name,
@@ -1140,6 +1171,19 @@ export function ShoppingCart({
       return;
     }
 
+    // Generate next order number with BH prefix
+    let orderNumber = `BH-0000001`; // Default fallback
+    try {
+      const orderNumberResponse = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/next-order-number");
+      if (orderNumberResponse.ok) {
+        const data = await orderNumberResponse.json();
+        orderNumber = data.nextOrderNumber;
+        console.log("✅ Generated order number for checkout:", orderNumber);
+      }
+    } catch (error) {
+      console.warn("⚠️ Failed to generate order number, using fallback:", error);
+    }
+
     // Get storeCode from authenticated user
     const storeCode =
       userInfo?.storeCode || storeSettings?.storeCode || "STORE001";
@@ -1250,7 +1294,7 @@ export function ShoppingCart({
       try {
         // Create order data
         const orderData = {
-          orderNumber: `ORD-${Date.now()}`,
+          orderNumber: orderNumber,
           tableId: null,
           customerId: selectedCustomer?.id || null,
           customerName: selectedCustomer?.name || "Khách hàng lẻ",
@@ -1341,7 +1385,7 @@ export function ShoppingCart({
     // For non-laundry business, show receipt preview as before
     const receiptPreview = {
       id: `temp-${Date.now()}`,
-      orderNumber: `POS-${Date.now()}`,
+      orderNumber: orderNumber,
       customerId: selectedCustomer?.id || null,
       customerName: selectedCustomer?.name || "Khách hàng lẻ",
       customerPhone: selectedCustomer?.phone || null,
@@ -1366,7 +1410,7 @@ export function ShoppingCart({
 
     const orderForPaymentData = {
       id: `temp-${Date.now()}`,
-      orderNumber: `POS-${Date.now()}`,
+      orderNumber: orderNumber,
       tableId: null,
       customerId: selectedCustomer?.id || null,
       customerName: selectedCustomer?.name || "Khách hàng lẻ",

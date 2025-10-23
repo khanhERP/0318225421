@@ -246,9 +246,9 @@ export function CustomerFormModal({ isOpen, onClose, customer, initialPhone }: C
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="info">Thông tin chính</TabsTrigger>
+            <TabsTrigger value="info">{t('customers.customerFormTitle')}</TabsTrigger>
             <TabsTrigger value="orders" disabled={!customer?.id}>
-              Lịch sử đơn hàng
+              {t('customers.history')}
               {orderHistory && orderHistory.length > 0 && (
                 <Badge variant="secondary" className="ml-2">{orderHistory.length}</Badge>
               )}
@@ -443,25 +443,25 @@ export function CustomerFormModal({ isOpen, onClose, customer, initialPhone }: C
                     <thead className="bg-gray-50 border-b sticky top-0">
                       <tr>
                         <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-12">
-                          No
+                          {t('common.no')}
                         </th>
                         <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-36">
-                          Ngày tạo đơn
+                          {t('orders.createdDate')}
                         </th>
                         <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider w-40">
-                          Số đơn bán
+                          {t('orders.orderNumber')}
                         </th>
                         <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-32">
-                          Tổng tiền
+                          {t('common.total')}
                         </th>
                         <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-28">
-                          Trạng thái
+                          {t('common.status')}
                         </th>
                         <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider w-28">
-                          Đã trả đồ
+                          {t('orders.paymentStatus')}
                         </th>
                         <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                          Ghi chú
+                          {t('common.notes')}
                         </th>
                       </tr>
                     </thead>
@@ -497,7 +497,7 @@ export function CustomerFormModal({ isOpen, onClose, customer, initialPhone }: C
                           </td>
                           <td className="px-3 py-2 text-center">
                             <Badge className={order.isPaid ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
-                              {order.isPaid ? "Đã trả" : "Chưa trả"}
+                              {order.isPaid === true ? t('common.paid') : t('common.unpaid')}
                             </Badge>
                           </td>
                           <td className="px-3 py-2 text-sm text-gray-600 truncate max-w-xs">
@@ -515,7 +515,7 @@ export function CustomerFormModal({ isOpen, onClose, customer, initialPhone }: C
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
-                  <p className="text-gray-500">Khách hàng chưa có đơn hàng nào</p>
+                  <p className="text-gray-500">{t('customers.noOrderHistory')}</p>
                 </div>
               )}
             </ScrollArea>
