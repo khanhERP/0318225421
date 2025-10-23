@@ -434,7 +434,16 @@ export function ShoppingCart({
   const fetchCustomers = async (searchTerm: string) => {
     try {
       setIsSearching(true);
-      const response = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/customers?search=${searchTerm}`);
+      // const response = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/customers?search=${searchTerm}`);
+      const response = await fetch(
+        `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/customers?search=${encodeURIComponent(searchTerm)}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
       if (!response.ok) {
         throw new Error("Failed to fetch customers");
       }
