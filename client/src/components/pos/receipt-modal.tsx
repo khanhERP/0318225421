@@ -65,8 +65,8 @@ export function ReceiptModal({
   // Calculate title: isTitle=true always shows payment invoice, otherwise use isPreview
   let title =
     isTitle === false
-      ? `${t("pos.receiptPreview").toUpperCase()}`
-      : `${t("common.paymentInvoice").toUpperCase()}`;
+      ? t("pos.receiptPreview").toUpperCase()
+      : t("common.paymentInvoice").toUpperCase();
 
   // Query store settings
   const { data: storeSettings } = useQuery({
@@ -475,7 +475,7 @@ export function ReceiptModal({
 
             // Show success message based on device type
             const successMessage = isMobile
-              ? "✅ H=�a đơn đã được gửi đến máy in thành công!\nKiểm tra máy in POS của bạn."
+              ? "✅ H=�a đơn đã đưa��c gửi đến máy in thành công!\nKiểm tra máy in POS của bạn."
               : "✅ Hóa đơn đã được gửi đến máy in POS thành công!";
 
             alert(successMessage);
@@ -717,7 +717,7 @@ export function ReceiptModal({
 
           body {
             font-family: 'Noto Sans KR', 'Arial Unicode MS', sans-serif;
-            font-size: 18px;
+            font-size: 24px;
             line-height: 1.4;
             width: 100%;
             max-width: 576px;
@@ -794,7 +794,6 @@ export function ReceiptModal({
           .py-2 { padding: 4px 0 !important; }
           .py-3 { padding: 6px 0 !important; }
           .pt-3 { padding-top: 6px !important; }
-          img { max-width: 80px; height: auto; display: block; margin: 0 auto; }
 
           .receipt-container { 
             width: 100%;
@@ -803,17 +802,6 @@ export function ReceiptModal({
             padding: 16px;
             box-sizing: border-box;
             background: #ffffff;
-          }
-
-          @media print {
-            body {
-              width: 576px;
-              max-width: 576px;
-            }
-            .receipt-container {
-              width: 576px;
-              max-width: 576px;
-            }
           }
         </style>
       </head>
@@ -1219,13 +1207,14 @@ export function ReceiptModal({
               }}
             >
               <p className="font-bold mb-0">
-                Tên cửa hàng: {storeSettings?.storeName || "Cửa hàng ABC"}
+                {t("common.storeName")}:{" "}
+                {storeSettings?.storeName || "Cửa hàng ABC"}
               </p>
               <p className="mb-0 font-bold">
-                Địa chỉ: {storeSettings?.address || ""}
+                {t("common.storeAddress")}: {storeSettings?.address || ""}
               </p>
               <p className="mb-0 font-bold">
-                SĐT: {storeSettings?.phone || "xxxxxxxxxx"}
+                {t("common.storePhone")}: {storeSettings?.phone || "xxxxxxxxxx"}
               </p>
             </div>
 
@@ -1256,21 +1245,23 @@ export function ReceiptModal({
             >
               <tbody>
                 <tr>
-                  <td style={{ padding: "2px 0" }}>Số hóa đơn:</td>
+                  <td style={{ padding: "2px 0" }}>{t("common.invoiceNo")}:</td>
                   <td style={{ padding: "2px 0", textAlign: "right" }}>
                     {receipt?.orderNumber || `ORD-${receipt?.id}`}
                   </td>
                 </tr>
                 {storeSettings?.businessType !== "laundry" && (
                   <tr>
-                    <td style={{ padding: "2px 0" }}>Bàn:</td>
+                    <td style={{ padding: "2px 0" }}>{t("common.table")}:</td>
                     <td style={{ padding: "2px 0", textAlign: "right" }}>
                       {tableInfo?.tableNumber || receipt?.tableNumber || "-"}
                     </td>
                   </tr>
                 )}
                 <tr>
-                  <td style={{ padding: "2px 0" }}>Thời gian:</td>
+                  <td style={{ padding: "2px 0" }}>
+                    {t("common.receiptTime")}:
+                  </td>
                   <td style={{ padding: "2px 0", textAlign: "right" }}>
                     {new Date().toLocaleString("vi-VN", {
                       day: "2-digit",
@@ -1284,13 +1275,17 @@ export function ReceiptModal({
                 {storeSettings?.businessType === "laundry" ? (
                   <>
                     <tr>
-                      <td style={{ padding: "2px 0" }}>Tên khách hàng:</td>
+                      <td style={{ padding: "2px 0" }}>
+                        {t("common.customerNameLabel")}:
+                      </td>
                       <td style={{ padding: "2px 0", textAlign: "right" }}>
                         {receipt?.customerName || "Khách hàng"}
                       </td>
                     </tr>
                     <tr>
-                      <td style={{ padding: "2px 0" }}>Số điện thoại:</td>
+                      <td style={{ padding: "2px 0" }}>
+                        {t("common.customerPhoneLabel")}:
+                      </td>
                       <td style={{ padding: "2px 0", textAlign: "right" }}>
                         {receipt?.customerPhone || receipt?.phone || "-"}
                       </td>
@@ -1298,7 +1293,7 @@ export function ReceiptModal({
                   </>
                 ) : (
                   <tr>
-                    <td style={{ padding: "2px 0" }}>Thu ngân:</td>
+                    <td style={{ padding: "2px 0" }}>{t("common.cashier")}:</td>
                     <td style={{ padding: "2px 0", textAlign: "right" }}>
                       {receipt?.cashierName || "Thu ngân"}
                     </td>
@@ -1331,7 +1326,7 @@ export function ReceiptModal({
                       borderBottom: "1px dashed #000",
                     }}
                   >
-                    Tên hàng
+                    {t("common.itemName")}
                   </th>
                   <th
                     style={{
@@ -1341,7 +1336,7 @@ export function ReceiptModal({
                       width: "60px",
                     }}
                   >
-                    SL
+                    {t("common.qty")}
                   </th>
                   <th
                     style={{
@@ -1351,7 +1346,7 @@ export function ReceiptModal({
                       width: "100px",
                     }}
                   >
-                    Thành tiền
+                    {t("common.lineTotal")}
                   </th>
                 </tr>
               </thead>
@@ -1408,7 +1403,9 @@ export function ReceiptModal({
             >
               <tbody>
                 <tr>
-                  <td style={{ padding: "2px 0" }}>Tổng tiền:</td>
+                  <td style={{ padding: "2px 0" }}>
+                    {t("common.totalBeforeDiscount")}:
+                  </td>
                   <td style={{ padding: "2px 0", textAlign: "right" }}>
                     {(() => {
                       const itemsSubtotal = (receipt.items || []).reduce(
@@ -1438,7 +1435,9 @@ export function ReceiptModal({
                     orderDiscount > 0 ? orderDiscount : totalItemDiscount;
                   return totalDiscount > 0 ? (
                     <tr>
-                      <td style={{ padding: "2px 0" }}>Giảm giá:</td>
+                      <td style={{ padding: "2px 0" }}>
+                        {t("common.discountLabel")}:
+                      </td>
                       <td style={{ padding: "2px 0", textAlign: "right" }}>
                         {Math.floor(totalDiscount).toLocaleString("vi-VN")}
                       </td>
@@ -1492,7 +1491,7 @@ export function ReceiptModal({
                   return sortedTaxRates.map((taxRate) => (
                     <tr key={taxRate}>
                       <td style={{ padding: "2px 0" }}>
-                        Tiền thuế ({taxRate}%):
+                        {t("common.tax")} ({taxRate}%):
                       </td>
                       <td style={{ padding: "2px 0", textAlign: "right" }}>
                         {Math.floor(taxGroups[taxRate]).toLocaleString("vi-VN")}
@@ -1510,7 +1509,7 @@ export function ReceiptModal({
                       borderTop: "1px dashed #000",
                     }}
                   >
-                    Tổng thanh toán:
+                    {t("common.finalTotal")}:
                   </td>
                   <td
                     style={{
@@ -1529,6 +1528,43 @@ export function ReceiptModal({
               </tbody>
             </table>
 
+            <div
+              style={{ borderTop: "1px dashed #000", margin: "8px 0" }}
+            ></div>
+            <div
+              style={{
+                fontSize: "12px",
+                margin: "8px 0",
+                fontWeight: "normal",
+                lineHeight: "1.6",
+              }}
+            >
+              <p style={{ margin: "4px 0" }}>
+                Quý khách nhận được hàng vui lòng kiểm tra đồ giặt, sau 24 giờ
+                kể từ khi giao hàng cửa hàng không chịu trách nhiệm các vấn đề
+                phát sinh sau đó. Các vấn đề phát sinh sau khi dịch vụ tại cửa
+                hàng sẽ được giải quyết dựa trên 「Tiêu chuẩn giải quyết khiếu
+                nại khách hàng
+              </p>
+              <p style={{ margin: "4px 0", fontStyle: "italic" }}>
+                If you receive the goods, please check the laundry, after 24
+                hours of delivery, the store is not responsible for problems
+                arising afterwards. For problems that occur after using the
+                service at this store, we will compensate you according to the
+                compensation ratio of 「Consumer Dispute Resolution Standards.
+              </p>
+              <p style={{ margin: "4px 0" }}>
+                세탁물 수령후 세탁확인 바랍니다. 수령 후 24시간이후에 문제
+                제기시 매장에서 책임지지 않습니다. 본 매장에서 서비스를 이용하신
+                후 발생한 문제에 대해서는 「소비자분쟁해결기준」 배상비율에 따라
+                배상해드립니다.
+              </p>
+            </div>
+
+            <div
+              style={{ borderTop: "1px dashed #000", margin: "8px 0" }}
+            ></div>
+
             {/* QR Code - Bank Transfer */}
             <div className="text-center my-4">
               <div
@@ -1542,33 +1578,18 @@ export function ReceiptModal({
                 }}
               >
                 <img
-                  src={(() => {
-                    // Generate VietQR URL with bank account info from store settings
-                    const bankId = storeSettings?.bankId || "970424"; // Shinhan Bank as default
-                    const accountNo =
-                      storeSettings?.bankAccountNo || "700037614418";
-                    const accountName =
-                      "PARK CHEON KYU" ||
-                      storeSettings?.bankAccountName ||
-                      storeSettings?.storeName ||
-                      "WASH FRIEND THE ZEI";
-                    const amount = Math.floor(parseFloat(receipt.total || "0"));
-                    const description = `THANH TOAN ${receipt.orderNumber || `HD${receipt.id}`}`;
-
-                    // VietQR format - using VietQR API
-                    const qrUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.jpg?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(accountName)}`;
-
-                    return qrUrl;
-                  })()}
-                  alt="QR Code thanh toán"
+                  src={`https://img.vietqr.io/image/970424-700037614418-compact2.jpg?amount=${Math.floor(
+                    parseFloat(receipt.total || "0"),
+                  )}&addInfo=${encodeURIComponent(
+                    `THANH TOAN ${receipt.orderNumber || `HD${receipt.id}`}`,
+                  )}&accountName=${encodeURIComponent("PARK CHEON KYU")}&logo=0`}
+                  alt="QR Thanh toán Shinhan Bank"
                   style={{
-                    width: "100%",
-                    height: "100%",
+                    width: "200px",
+                    height: "200px",
+                    display: "block",
+                    margin: "0 auto",
                     objectFit: "contain",
-                  }}
-                  onError={(e) => {
-                    // Fallback if image fails to load
-                    e.currentTarget.style.display = "none";
                   }}
                 />
               </div>
@@ -1584,43 +1605,8 @@ export function ReceiptModal({
                   fontWeight: "bold",
                 }}
               >
-                Xin cảm ơn Quý khách và Hẹn gặp lại !
+                {t("pos.thankYouAndComeAgain")}
               </p>
-              <div
-                style={{ borderTop: "1px dashed #000", margin: "8px 0" }}
-              ></div>
-              <div
-                style={{
-                  fontSize: "12px",
-                  margin: "8px 0",
-                  fontWeight: "normal",
-                  lineHeight: "1.6",
-                }}
-              >
-                <p style={{ margin: "4px 0" }}>
-                  Quý khách nhận được hàng vui lòng kiểm tra đồ giặt, sau 24 giờ
-                  kể từ khi giao hàng cửa hàng không chịu trách nhiệm các vấn đề
-                  phát sinh sau đó. Các vấn đề phát sinh sau khi dịch vụ tại cửa
-                  hàng sẽ được giải quyết dựa trên 「Tiêu chuẩn giải quyết khiếu
-                  nại khách hàng
-                </p>
-                <p style={{ margin: "4px 0", fontStyle: "italic" }}>
-                  If you receive the goods, please check the laundry, after 24
-                  hours of delivery, the store is not responsible for problems
-                  arising afterwards. For problems that occur after using the
-                  service at this store, we will compensate you according to the
-                  compensation ratio of 「Consumer Dispute Resolution Standards.
-                </p>
-                <p style={{ margin: "4px 0" }}>
-                  세탁물 수령후 세탁확인 바랍니다. 수령 후 24시간이후에 문제
-                  제기시 매장에서 책임지지 않습니다. 본 매장에서 서비스를
-                  이용하신 후 발생한 문제에 대해서는 「소비자분쟁해결기준」
-                  배상비율에 따라 배상해드립니다.
-                </p>
-              </div>
-              <div
-                style={{ borderTop: "1px dashed #000", margin: "8px 0" }}
-              ></div>
               <p
                 className="text-center"
                 style={{
@@ -1629,7 +1615,7 @@ export function ReceiptModal({
                   fontWeight: "bold",
                 }}
               >
-                Powered by EDPOS
+                {t("pos.thankYou")}
               </p>
             </div>
           </div>

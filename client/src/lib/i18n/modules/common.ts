@@ -4,8 +4,10 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
   ko: {
     loading: "로딩 중...",
     save: "저장",
+    view: "보기",
     notReturned: "반환되지 않음",
     viewDetails: "자세히 보기",
+    payment: "결제",
     icon: "아이콘",
     paymentMethodLabel: "결제 방법",
     customerCodeSearchPlaceholder: "이름 또는 제품 코드로 검색",
@@ -32,6 +34,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     productCreateSuccess: "상품이 생성되었습니다",
     invoiceSavedForLater: "나중에 발행하기 위해 송장이 저장되었습니다",
     displayingInvoiceForPrint: "인쇄를 위해 송장을 표시하는 중입니다",
+    paymentInvoice: "결제 송장",
     invoiceSavedSuccess: "송장이 성공적으로 저장되었습니다",
     search: "검색",
     successTitle: "성공",
@@ -300,6 +303,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     grabpayWallet: "GrabPay 전자지갑",
     paymentMethodGeneric: "결제 방법",
     paid: "결제 완료",
+    unpaid: "미결제",
     changeAmount: "거스름돈",
 
     // Customer info section
@@ -671,9 +675,26 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     selectImageFile: "이미지 파일을 선택하거나",
     dragDropUpload: "드래그엤드롭으로 업로드",
     summary: "요약",
+    
+    // Receipt translations
+    storeName: "매장명",
+    storeAddress: "주소",
+    storePhone: "전화",
+    invoiceNo: "송장 번호",
+    receiptTime: "시간",
+    customerNameLabel: "고객명",
+    customerPhoneLabel: "전화번호",
+    itemName: "품목명",
+    qty: "수량",
+    lineTotal: "금액",
+    totalBeforeDiscount: "합계",
+    discountLabel: "할인",
+    finalTotal: "총 결제액",
   },
   en: {
     save: "Save",
+    payment: "Payment",
+    view: "View",
     cancel: "Cancel",
     notReturned: "Not Returned",
     viewDetails: "View Details",
@@ -937,6 +958,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     grabpayWallet: "GrabPay Wallet",
     paymentMethodGeneric: "Payment Method",
     paid: "Paid",
+    unpaid: "Unpaid",
     changeAmount: "Change",
 
     // Customer info section
@@ -1239,9 +1261,26 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     fileUpload: "File Upload",
     totalAmountSubtotal: "Subtotal Amount",
     summary: "Summary",
+    
+    // Receipt translations
+    storeName: "Store Name",
+    storeAddress: "Address",
+    storePhone: "Phone",
+    invoiceNo: "Invoice No",
+    receiptTime: "Time",
+    customerNameLabel: "Customer Name",
+    customerPhoneLabel: "Phone Number",
+    itemName: "Item Name",
+    qty: "Qty",
+    lineTotal: "Amount",
+    totalBeforeDiscount: "Total",
+    discountLabel: "Discount",
+    finalTotal: "Total Payment",
   },
   vi: {
     save: "Lưu",
+    payment: "Thanh toán",
+    view: "Xem",
     cancel: "Hủy",
     notReturned: "Chưa trả",
     viewDetails: "Xem chi tiết",
@@ -1474,6 +1513,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     grabpayWallet: "GrabPay Wallet",
     paymentMethodGeneric: "Phương thức thanh toán",
     paid: "Đã thanh toán",
+    unpaid: "Chưa thanh toán",
     changeAmount: "Tiền thối",
 
     // Customer info section
@@ -1793,5 +1833,20 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     urlInput: "Nhập URL",
     fileUpload: "Tải lên tệp",
     summary: "Tóm tắt",
+    
+    // Receipt translations
+    storeName: "Tên cửa hàng",
+    storeAddress: "Địa chỉ",
+    storePhone: "SĐT",
+    invoiceNo: "Số hóa đơn",
+    receiptTime: "Thời gian",
+    customerNameLabel: "Tên khách hàng",
+    customerPhoneLabel: "Số điện thoại",
+    itemName: "Tên hàng",
+    qty: "SL",
+    lineTotal: "Thành tiền",
+    totalBeforeDiscount: "Tổng tiền",
+    discountLabel: "Giảm giá",
+    finalTotal: "Tổng thanh toán",
   },
 };
