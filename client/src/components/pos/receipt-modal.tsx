@@ -58,10 +58,16 @@ export function ReceiptModal({
 
   const lstBank = [
     {
+      bankId: "970423",
+      bankAccountNo: "00004128635",
+      bankAccountName: "SHIN INSUNG",
+      domain: "",
+    },
+    {
       bankId: "970424",
       bankAccountNo: "700037614418",
       bankAccountName: "PARK CHEON KYU",
-      domain: "",
+      domain: "0108670987-001.edpos.vn",
     },
     {
       bankId: "970407",
@@ -1229,7 +1235,7 @@ export function ReceiptModal({
             >
               <h3 className="text-center mb-1 font-bold">GIẶT SẤY WASH FRIENDS</h3>
               <p className="text-center font-bold mb-0">
-                {t("common.storeName")}: {storeSettings?.storeName || ""}
+                {t("common.branch")}: {storeSettings?.storeName || ""}
               </p>
               <p className="text-center mb-0">
                 {t("common.storeAddress")}: {storeSettings?.address || ""}

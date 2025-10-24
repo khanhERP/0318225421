@@ -676,6 +676,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     selectImageFile: "이미지 파일을 선택하거나",
     dragDropUpload: "드래그엤드롭으로 업로드",
     summary: "요약",
+    branch: "지점",
 
     // Receipt translations
     storeName: "매장명",
@@ -1267,6 +1268,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
 
     // Receipt translations
     storeName: "Store Name",
+    branch: "Branch",
     storeAddress: "Address",
     storePhone: "Phone",
     invoiceNo: "Invoice No",
@@ -1838,6 +1840,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     urlInput: "Nhập URL",
     fileUpload: "Tải lên tệp",
     summary: "Tóm tắt",
+    branch: "Chi nhánh",
 
     // Receipt translations
     storeName: "Tên cửa hàng",
