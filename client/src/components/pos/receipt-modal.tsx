@@ -1643,8 +1643,8 @@ export function ReceiptModal({
                 <div className="text-center my-4">
                   <div
                     style={{
-                      width: "200px",
-                      height: "200px",
+                      width: "300px",
+                      height: "300px",
                       margin: "0 auto",
                       display: "flex",
                       alignItems: "center",
@@ -1669,8 +1669,8 @@ export function ReceiptModal({
                       })()}
                       alt="QR Code thanh toán"
                       style={{
-                        width: "200px",
-                        height: "200px",
+                        width: "100%",
+                        height: "100%",
                         display: "block",
                         margin: "0 auto",
                         objectFit: "contain",
