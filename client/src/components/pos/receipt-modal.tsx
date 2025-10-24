@@ -42,6 +42,8 @@ export function ReceiptModal({
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
   const [hasAutoOpened, setHasAutoOpened] = useState(false);
   const [printers, setPrinters] = useState([]);
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [domainName, setDomainName] = useState("");
   const { t } = useTranslation();
   const { toast } = useToast();
 
@@ -53,6 +55,21 @@ export function ReceiptModal({
     hasCartItems: cartItems?.length > 0,
     receiptIsPreview: receipt?.isPreview,
   });
+
+  const lstBank = [
+    {
+      bankId: "970424",
+      bankAccountNo: "700037614418",
+      bankAccountName: "PARK CHEON KYU",
+      domain: "",
+    },
+    {
+      bankId: "970407",
+      bankAccountNo: "6868568185",
+      bankAccountName: "NGUYEN THUY CHI",
+      domain: "0108670987-004.edpos.vn",
+    },
+  ];
 
   // CRITICAL: Always use prop isPreview, completely ignore receipt.isPreview
   console.log("🔍 ReceiptModal mode:", {
@@ -123,6 +140,20 @@ export function ReceiptModal({
 
   // Log receipt modal state for debugging - ALWAYS CALL THIS HOOK
   useEffect(() => {
+    const domainConnect = window.location.hostname;
+    setDomainName(domainConnect);
+    let selectBank = lstBank.find((item) => item.domain === domainConnect);
+    if (selectBank) {
+      setBankAccounts(selectBank);
+    } else if (
+      domainConnect != "https://0108670987-004.edpos.vn" ||
+      domainConnect != "https://0108670987-008.edpos.vn"
+    ) {
+      setBankAccounts(lstBank[0]);
+    }
+    console.log("domainConnect", domainConnect);
+    console.log("bankAccounts", selectBank);
+
     if (isOpen) {
       console.log("=== RECEIPT MODAL RENDERED ===");
       console.log(
@@ -1578,12 +1609,20 @@ export function ReceiptModal({
                 }}
               >
                 <img
-                  src={`https://img.vietqr.io/image/970424-700037614418-compact2.jpg?amount=${Math.floor(
-                    parseFloat(receipt.total || "0"),
-                  )}&addInfo=${encodeURIComponent(
-                    `THANH TOAN ${receipt.orderNumber || `HD${receipt.id}`}`,
-                  )}&accountName=${encodeURIComponent("PARK CHEON KYU")}&logo=0`}
-                  alt="QR Thanh toán Shinhan Bank"
+                  src={(() => {
+                    // Generate VietQR URL with bank account info from store settings
+                    const bankId = bankAccounts?.bankId; // Shinhan Bank as default
+                    const accountNo = bankAccounts?.bankAccountNo;
+                    const accountName = bankAccounts?.bankAccountName;
+                    const amount = Math.floor(parseFloat(receipt.total || "0"));
+                    const description = `THANH TOAN ${receipt.orderNumber}`;
+
+                    // VietQR format - using VietQR API
+                    const qrUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.jpg?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(accountName)}`;
+
+                    return qrUrl;
+                  })()}
+                  alt="QR Code thanh toán"
                   style={{
                     width: "200px",
                     height: "200px",
