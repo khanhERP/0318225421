@@ -745,7 +745,7 @@ export function ReceiptModal({
           }
 
           body {
-            font-family: 'Noto Sans KR', 'Arial Unicode MS', sans-serif;
+            font-family: 'Noto Sans KR', 'Times New Roman';
             font-size: 24px;
             line-height: 1.4;
             width: 100%;
@@ -1404,7 +1404,7 @@ export function ReceiptModal({
                             verticalAlign: "top",
                           }}
                         >
-                          {Math.floor(parseFloat(unitPrice.toLocaleString("vi-VN")))}
+                          {Math.floor(unitPrice.toLocaleString("vi-VN"))}
                         </td>
                         <td
                           style={{
