@@ -142,12 +142,12 @@ export function ReceiptModal({
   useEffect(() => {
     const domainConnect = window.location.hostname;
     setDomainName(domainConnect);
-    let selectBank = lstBank.find((item) => item.domain === domainConnect);
+    let selectBank = lstBank.find((item) => item.domain === domainName);
     if (selectBank) {
       setBankAccounts(selectBank);
     } else if (
-      domainConnect != "0108670987-004.edpos.vn" ||
-      domainConnect != "0108670987-008.edpos.vn"
+      domainName != "0108670987-004.edpos.vn" ||
+      domainName != "0108670987-008.edpos.vn"
     ) {
       setBankAccounts(lstBank[0]);
     }
@@ -1404,7 +1404,7 @@ export function ReceiptModal({
                             verticalAlign: "top",
                           }}
                         >
-                          {Math.floor(unitPrice.toLocaleString("vi-VN"))}
+                          {Math.floor(unitPrice).toLocaleString("vi-VN")}
                         </td>
                         <td
                           style={{
@@ -1585,26 +1585,30 @@ export function ReceiptModal({
                 lineHeight: "1.6",
               }}
             >
-              <p style={{ margin: "4px 0" }}>
-                Quý khách nhận được hàng vui lòng kiểm tra đồ giặt, sau 24 giờ
-                kể từ khi giao hàng cửa hàng không chịu trách nhiệm các vấn đề
-                phát sinh sau đó. Các vấn đề phát sinh sau khi dịch vụ tại cửa
-                hàng sẽ được giải quyết dựa trên 「Tiêu chuẩn giải quyết khiếu
-                nại khách hàng
-              </p>
-              <p style={{ margin: "4px 0", fontStyle: "italic" }}>
-                If you receive the goods, please check the laundry, after 24
-                hours of delivery, the store is not responsible for problems
-                arising afterwards. For problems that occur after using the
-                service at this store, we will compensate you according to the
-                compensation ratio of 「Consumer Dispute Resolution Standards.
-              </p>
-              <p style={{ margin: "4px 0" }}>
-                세탁물 수령후 세탁확인 바랍니다. 수령 후 24시간이후에 문제
-                제기시 매장에서 책임지지 않습니다. 본 매장에서 서비스를 이용하신
-                후 발생한 문제에 대해서는 「소비자분쟁해결기준」 배상비율에 따라
-                배상해드립니다.
-              </p>
+                {domainName != "0108670987-004.edpos.vn" && (
+                  <p style={{ margin: "4px 0" }}>
+                    Quý khách nhận được hàng vui lòng kiểm tra đồ giặt, sau 24 giờ
+                    kể từ khi giao hàng cửa hàng không chịu trách nhiệm các vấn đề
+                    phát sinh sau đó. Các vấn đề phát sinh sau khi dịch vụ tại cửa
+                    hàng sẽ được giải quyết dựa trên 「Tiêu chuẩn giải quyết khiếu
+                    nại khách hàng
+                  </p>
+                )}
+                <p style={{ margin: "4px 0", fontStyle: "italic" }}>
+                  If you receive the goods, please check the laundry, after 24
+                  hours of delivery, the store is not responsible for problems
+                  arising afterwards. For problems that occur after using the
+                  service at this store, we will compensate you according to the
+                  compensation ratio of 「Consumer Dispute Resolution Standards.
+                </p>
+                {domainName != "0108670987-004.edpos.vn" && (
+                  <p style={{ margin: "4px 0" }}>
+                    세탁물 수령후 세탁확인 바랍니다. 수령 후 24시간이후에 문제
+                    제기시 매장에서 책임지지 않습니다. 본 매장에서 서비스를
+                    이용하신 후 발생한 문제에 대해서는 「소비자분쟁해결기준」
+                    배상비율에 따라 배상해드립니다.
+                  </p>
+                )}
             </div>
               ) : (
                 <div
