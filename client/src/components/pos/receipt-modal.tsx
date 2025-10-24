@@ -146,13 +146,11 @@ export function ReceiptModal({
     if (selectBank) {
       setBankAccounts(selectBank);
     } else if (
-      domainConnect != "https://0108670987-004.edpos.vn" ||
-      domainConnect != "https://0108670987-008.edpos.vn"
+      domainConnect != "0108670987-004.edpos.vn" ||
+      domainConnect != "0108670987-008.edpos.vn"
     ) {
       setBankAccounts(lstBank[0]);
     }
-    console.log("domainConnect", domainConnect);
-    console.log("bankAccounts", selectBank);
 
     if (isOpen) {
       console.log("=== RECEIPT MODAL RENDERED ===");
@@ -1592,47 +1590,47 @@ export function ReceiptModal({
               </p>
             </div>
 
-            <div
-              style={{ borderTop: "1px dashed #000", margin: "8px 0" }}
-            ></div>
-
-            {/* QR Code - Bank Transfer */}
-            <div className="text-center my-4">
+            {domainName !== "0108670987-008.edpos.vn" && (
               <div
-                style={{
-                  width: "200px",
-                  height: "200px",
-                  margin: "0 auto",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <img
-                  src={(() => {
-                    // Generate VietQR URL with bank account info from store settings
-                    const bankId = bankAccounts?.bankId; // Shinhan Bank as default
-                    const accountNo = bankAccounts?.bankAccountNo;
-                    const accountName = bankAccounts?.bankAccountName;
-                    const amount = Math.floor(parseFloat(receipt.total || "0"));
-                    const description = `THANH TOAN ${receipt.orderNumber}`;
-
-                    // VietQR format - using VietQR API
-                    const qrUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.jpg?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(accountName)}`;
-
-                    return qrUrl;
-                  })()}
-                  alt="QR Code thanh toán"
+                style={{ borderTop: "1px dashed #000", margin: "8px 0" }}
+              ></div>
+              <div className="text-center my-4">
+                <div
                   style={{
                     width: "200px",
                     height: "200px",
-                    display: "block",
                     margin: "0 auto",
-                    objectFit: "contain",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
-                />
+                >
+                  <img
+                    src={(() => {
+                      // Generate VietQR URL with bank account info from store settings
+                      const bankId = bankAccounts?.bankId; // Shinhan Bank as default
+                      const accountNo = bankAccounts?.bankAccountNo;
+                      const accountName = bankAccounts?.bankAccountName;
+                      const amount = Math.floor(parseFloat(receipt.total || "0"));
+                      const description = `THANH TOAN ${receipt.orderNumber}`;
+
+                      // VietQR format - using VietQR API
+                      const qrUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.jpg?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(accountName)}`;
+
+                      return qrUrl;
+                    })()}
+                    alt="QR Code thanh toán"
+                    style={{
+                      width: "200px",
+                      height: "200px",
+                      display: "block",
+                      margin: "0 auto",
+                      objectFit: "contain",
+                    }}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Footer */}
             <div style={{ borderTop: "1px dashed #000", paddingTop: "8px" }}>
