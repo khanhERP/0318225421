@@ -959,7 +959,7 @@ export function ReceiptModal({
           const browserTip = isSafari
             ? "Vui lòng sử dụng menu Safari → Share → Print"
             : isChrome
-              ? "Vui lòng s  � dụng menu Chrome (⋮) → Print"
+              ? "Vui lòng sử dụng menu Chrome (⋮) → Print"
               : "Vui lòng sử dụng menu trình duyệt để in";
 
           alert(browserTip);
@@ -1613,7 +1613,7 @@ export function ReceiptModal({
               >
                 <p style={{ margin: "4px 0" }}>
                   - Quý khách nhận được hàng vui lòng kiểm tra đồ giặt, sau 24
-                  giờ kể từ khi giao hàng cửa hàng khm�ng chịu trách nhiệm các
+                  giờ kể từ khi giao hàng cửa hàng không chịu trách nhiệm các
                   vấn đề phát sinh sau đó.
                 </p>
                 <p style={{ margin: "4px 0", fontStyle: "italic" }}>
