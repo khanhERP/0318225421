@@ -1842,7 +1842,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     // Receipt translations
     storeName: "Tên cửa hàng",
     storeAddress: "Địa chỉ",
-    storePhone: "SĐT",
+    storePhone: "Điện thoại",
     invoiceNo: "Số hóa đơn",
     receiptTime: "Thời gian",
     customerNameLabel: "Tên khách hàng",
