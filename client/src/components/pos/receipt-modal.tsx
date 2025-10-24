@@ -1560,7 +1560,9 @@ export function ReceiptModal({
             <div
               style={{ borderTop: "1px dashed #000", margin: "8px 0" }}
             ></div>
-            <div
+            {domainName !== "0108670987-008.edpos.vn" ? 
+              (
+                <div
               style={{
                 fontSize: "12px",
                 margin: "8px 0",
@@ -1589,47 +1591,70 @@ export function ReceiptModal({
                 배상해드립니다.
               </p>
             </div>
+              ) : (
+                <div
+              style={{
+                fontSize: "12px",
+                margin: "8px 0",
+                fontWeight: "normal",
+                lineHeight: "1.6",
+              }}
+            >
+              <p style={{ margin: "4px 0" }}>
+                - Quý khách nhận được hàng vui lòng kiểm tra đồ giặt, sau 24 giờ kể từ khi giao hàng cửa hàng không chịu trách nhiệm các vấn đề phát sinh sau đó.
+              </p>
+              <p style={{ margin: "4px 0", fontStyle: "italic" }}>
+                - If you receive the goods, please check the laundry, after 24 hours of delivery, the store is not responsible for problems arising afterwards.
+              </p>
+              <p style={{ margin: "4px 0" }}>
+                -세탁물 수령후 세탁확인 바랍니다. 수령 후 24시간이후에 문제 제기시 매장에서 책임지지 않습니다
+              </p>
+            </div>
+              )
+            }
 
             {domainName !== "0108670987-008.edpos.vn" && (
-              <div
-                style={{ borderTop: "1px dashed #000", margin: "8px 0" }}
-              ></div>
-              <div className="text-center my-4">
+              <>
                 <div
-                  style={{
-                    width: "200px",
-                    height: "200px",
-                    margin: "0 auto",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <img
-                    src={(() => {
-                      // Generate VietQR URL with bank account info from store settings
-                      const bankId = bankAccounts?.bankId; // Shinhan Bank as default
-                      const accountNo = bankAccounts?.bankAccountNo;
-                      const accountName = bankAccounts?.bankAccountName;
-                      const amount = Math.floor(parseFloat(receipt.total || "0"));
-                      const description = `THANH TOAN ${receipt.orderNumber}`;
-
-                      // VietQR format - using VietQR API
-                      const qrUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.jpg?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(accountName)}`;
-
-                      return qrUrl;
-                    })()}
-                    alt="QR Code thanh toán"
+                style={{ borderTop: "1px dashed #000", margin: "8px 0" }}
+                ></div>
+                <div className="text-center my-4">
+                  <div
                     style={{
                       width: "200px",
                       height: "200px",
-                      display: "block",
                       margin: "0 auto",
-                      objectFit: "contain",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                     }}
-                  />
+                  >
+                    <img
+                      src={(() => {
+                        // Generate VietQR URL with bank account info from store settings
+                        const bankId = bankAccounts?.bankId; // Shinhan Bank as default
+                        const accountNo = bankAccounts?.bankAccountNo;
+                        const accountName = bankAccounts?.bankAccountName;
+                        const amount = Math.floor(parseFloat(receipt.total || "0"));
+                        const description = `THANH TOAN ${receipt.orderNumber}`;
+
+                        // VietQR format - using VietQR API
+                        const qrUrl = `https://img.vietqr.io/image/${bankId}-${accountNo}-compact2.jpg?amount=${amount}&addInfo=${encodeURIComponent(description)}&accountName=${encodeURIComponent(accountName)}`;
+
+                        return qrUrl;
+                      })()}
+                      alt="QR Code thanh toán"
+                      style={{
+                        width: "200px",
+                        height: "200px",
+                        display: "block",
+                        margin: "0 auto",
+                        objectFit: "contain",
+                      }}
+                    />
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
             {/* Footer */}
