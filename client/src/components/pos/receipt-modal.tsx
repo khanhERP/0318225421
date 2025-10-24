@@ -67,7 +67,7 @@ export function ReceiptModal({
       bankId: "970424",
       bankAccountNo: "700037614418",
       bankAccountName: "PARK CHEON KYU",
-      domain: "0108670987-001.edpos.vn",
+      domain: "0108670987-005.edpos.vn",
     },
     {
       bankId: "970407",
