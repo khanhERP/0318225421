@@ -1355,7 +1355,7 @@ export function ReceiptModal({
                       borderBottom: "1px dashed #000",
                     }}
                   >
-                    {t("common.itemName")}
+                    {t("common.unitPrice")}
                   </th>
                   <th
                     style={{
@@ -1391,7 +1391,7 @@ export function ReceiptModal({
                     <>
                       <tr key={item.id || index}>
                         <td
-                          style={{ padding: "4px 2px", verticalAlign: "top" }}
+                          style={{ padding: "4px 2px", verticalAlign: "top", textAlign: "justify" }}
                           colspan={3}
                         >
                           {item.productName || item.name || "Sản phẩm"}
@@ -1404,7 +1404,7 @@ export function ReceiptModal({
                             verticalAlign: "top",
                           }}
                         >
-                          {Math.floor(parseFloat(unitPrice.toString()))}
+                          {Math.floor(parseFloat(unitPrice.toLocaleString("vi-VN")))}
                         </td>
                         <td
                           style={{
