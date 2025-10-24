@@ -1388,29 +1388,44 @@ export function ReceiptModal({
                   const itemSubtotal = unitPrice * quantity;
 
                   return (
-                    <tr key={item.id || index}>
-                      <td style={{ padding: "4px 2px", verticalAlign: "top" }}>
-                        {item.productName || item.name || "Sản phẩm"}
-                      </td>
-                      <td
-                        style={{
-                          padding: "4px 2px",
-                          textAlign: "center",
-                          verticalAlign: "top",
-                        }}
-                      >
-                        {Math.floor(parseFloat(quantity.toString()))}
-                      </td>
-                      <td
-                        style={{
-                          padding: "4px 2px",
-                          textAlign: "right",
-                          verticalAlign: "top",
-                        }}
-                      >
-                        {Math.floor(itemSubtotal).toLocaleString("vi-VN")}
-                      </td>
-                    </tr>
+                    <>
+                      <tr key={item.id || index}>
+                        <td
+                          style={{ padding: "4px 2px", verticalAlign: "top" }}
+                          colspan={3}
+                        >
+                          {item.productName || item.name || "Sản phẩm"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td
+                          style={{
+                            padding: "4px 2px",
+                            verticalAlign: "top",
+                          }}
+                        >
+                          {Math.floor(parseFloat(unitPrice.toString()))}
+                        </td>
+                        <td
+                          style={{
+                            padding: "4px 2px",
+                            textAlign: "center",
+                            verticalAlign: "top",
+                          }}
+                        >
+                          {Math.floor(parseFloat(quantity.toString()))}
+                        </td>
+                        <td
+                          style={{
+                            padding: "4px 2px",
+                            textAlign: "right",
+                            verticalAlign: "top",
+                          }}
+                        >
+                          {Math.floor(itemSubtotal).toLocaleString("vi-VN")}
+                        </td>
+                      </tr>
+                    </>
                   );
                 })}
               </tbody>
