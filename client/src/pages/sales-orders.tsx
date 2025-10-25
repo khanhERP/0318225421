@@ -150,6 +150,7 @@ export default function SalesOrders() {
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
   const [orderForPayment, setOrderForPayment] = useState<any>(null);
   const [showEInvoiceModal, setShowEInvoiceModal] = useState(false); // State for EInvoiceModal
+  const [isTitle, setIsTitle] = useState(true); // State for title visibility
 
   // Listen for print completion and einvoice modal close events
   useEffect(() => {
@@ -5629,6 +5630,12 @@ export default function SalesOrders() {
                                                             ...selectedInvoice,
                                                             items: orderItems,
                                                           });
+                                                          setIsTitle(
+                                                            selectedInvoice.status ===
+                                                              "paid"
+                                                              ? true
+                                                              : false,
+                                                          );
                                                           setShowReceiptModal(
                                                             true,
                                                           );
@@ -6047,6 +6054,7 @@ export default function SalesOrders() {
           }}
           receipt={selectedReceipt}
           isPreview={false}
+          isTitle={isTitle}
         />
       )}
     </div>
