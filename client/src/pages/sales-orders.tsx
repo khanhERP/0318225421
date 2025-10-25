@@ -3301,10 +3301,22 @@ export default function SalesOrders() {
                           </tr>
                         ) : (
                           filteredInvoices.map((item) => {
-                            const customerCode =
-                              item.customerCode ||
-                              item.customerTaxCode ||
-                              `KH000${String(item.id).padStart(3, "0")}`;
+                            // Get customer info - prioritize customerId from customer table if order has customerId
+                            let customerCode = item.customerCode || item.customerTaxCode || "";
+                            
+                            // If order has customerId, try to find customer in customers list
+                            if (item.customerId && customers && customers.length > 0) {
+                              const customer = customers.find((c: any) => c.id === item.customerId);
+                              if (customer && customer.customerId) {
+                                customerCode = customer.customerId;
+                              }
+                            }
+                            
+                            // Fallback to generated code if still empty
+                            if (!customerCode) {
+                              customerCode = `KH${String(item.id).padStart(6, "0")}`;
+                            }
+                            
                             const customerName = item.customerName || "";
                             const discount = parseFloat(item.discount || "0");
                             const tax = parseFloat(item.tax || "0");

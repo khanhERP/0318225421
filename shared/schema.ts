@@ -265,6 +265,7 @@ export const orders = pgTable("orders", {
   orderNumber: text("order_number").notNull().unique(),
   tableId: integer("table_id").references(() => tables.id),
   employeeId: integer("employee_id").references(() => employees.id),
+  customerId: integer("customer_id").references(() => customers.id), // Add customerId field
   status: text("status").notNull().default("pending"), // "pending", "confirmed", "preparing", "ready", "served", "paid", "cancelled"
   customerName: text("customer_name"),
   customerPhone: text("customer_phone"), // Add customer phone field
@@ -464,6 +465,7 @@ export const insertOrderSchema = createInsertSchema(orders)
   })
   .extend({
     tableId: z.number().nullable().optional(),
+    customerId: z.number().nullable().optional(), // Added customerId to InsertOrder schema
     status: z.enum(
       [
         "pending",
@@ -985,6 +987,10 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     fields: [orders.employeeId],
     references: [employees.id],
   }),
+  customer: one(customers, {
+    fields: [orders.customerId],
+    references: [customers.id],
+  }),
   items: many(orderItems),
 }));
 
@@ -1001,6 +1007,7 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
 
 export const customersRelations = relations(customers, ({ many }) => ({
   pointTransactions: many(pointTransactions),
+  orders: many(orders),
 }));
 
 export const pointTransactionsRelations = relations(

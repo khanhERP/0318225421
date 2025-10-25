@@ -1069,12 +1069,12 @@ export function ShoppingCart({
     const orderData = {
       orderNumber: orderNumber,
       tableId: null,
-      customerId: selectedCustomer.id,
-      customerName: selectedCustomer.name,
-      customerPhone: selectedCustomer.phone || null,
-      customerTaxCode: selectedCustomer.address || null,
-      customerAddress: selectedCustomer.address || null,
-      customerEmail: selectedCustomer.email || null,
+      customerId: selectedCustomer?.id || null, // Ensure customerId is saved
+      customerName: selectedCustomer?.name || "",
+      customerPhone: selectedCustomer?.phone || null,
+      customerTaxCode: selectedCustomer?.taxCode || selectedCustomer?.address || null,
+      customerAddress: selectedCustomer?.address || null,
+      customerEmail: selectedCustomer?.email || null,
       status: "pending", // Trạng thái: Đặt hàng
       paymentStatus: "pending", // Trạng thái thanh toán: Chưa thanh toán
       customerCount: 1,
@@ -1086,7 +1086,7 @@ export function ShoppingCart({
       salesChannel: "pos",
       priceIncludeTax: priceIncludesTax,
       einvoiceStatus: 0,
-      notes: `Đặt hàng tại POS - Khách hàng: ${selectedCustomer.name}${selectedCustomer.phone ? ` - SĐT: ${selectedCustomer.phone}` : ""}${selectedCustomer.customerTaxCode ? ` - MST: ${selectedCustomer.customerTaxCode}` : ""} - Phương thức: ${getPaymentMethodName(paymentMethod)}`,
+      notes: `Đặt hàng tại POS - Khách hàng: ${selectedCustomer?.name || "Khách lẻ"}${selectedCustomer?.phone ? ` - SĐT: ${selectedCustomer.phone}` : ""}${selectedCustomer?.taxCode ? ` - MST: ${selectedCustomer.taxCode}` : ""} - Phương thức: ${getPaymentMethodName(paymentMethod)}`,
       storeCode: storeCode,
     };
 
@@ -1320,10 +1320,10 @@ export function ShoppingCart({
         const orderData = {
           orderNumber: orderNumber,
           tableId: null,
-          customerId: selectedCustomer?.id || null,
+          customerId: selectedCustomer?.id || null, // Ensure customerId is saved
           customerName: selectedCustomer?.name || "",
           customerPhone: selectedCustomer?.phone || null,
-          customerTaxCode: selectedCustomer?.address || null,
+          customerTaxCode: selectedCustomer?.taxCode || selectedCustomer?.address || null,
           customerAddress: selectedCustomer?.address || null,
           customerEmail: selectedCustomer?.email || null,
           status: "paid",
@@ -1410,10 +1410,10 @@ export function ShoppingCart({
     const receiptPreview = {
       id: `temp-${Date.now()}`,
       orderNumber: orderNumber,
-      customerId: selectedCustomer?.id || null,
+      customerId: selectedCustomer?.id || null, // Ensure customerId is saved
       customerName: selectedCustomer?.name || "",
       customerPhone: selectedCustomer?.phone || null,
-      customerTaxCode: selectedCustomer?.address || null,
+      customerTaxCode: selectedCustomer?.taxCode || selectedCustomer?.address || null,
       customerAddress: selectedCustomer?.address || null,
       customerEmail: selectedCustomer?.email || null,
       tableId: null,
@@ -1436,10 +1436,10 @@ export function ShoppingCart({
       id: `temp-${Date.now()}`,
       orderNumber: orderNumber,
       tableId: null,
-      customerId: selectedCustomer?.id || null,
+      customerId: selectedCustomer?.id || null, // Ensure customerId is saved
       customerName: selectedCustomer?.name || "",
       customerPhone: selectedCustomer?.phone || null,
-      customerTaxCode: selectedCustomer?.address || null,
+      customerTaxCode: selectedCustomer?.taxCode || selectedCustomer?.address || null,
       customerAddress: selectedCustomer?.address || null,
       customerEmail: selectedCustomer?.email || null,
       status: "pending",

@@ -54,18 +54,22 @@ export function CustomerFormModal({ isOpen, onClose, customer, initialPhone }: C
       if (!customer?.id) return [];
 
       // Fetch all orders and filter by customer ID on client side
-      // since the API doesn't support customerId filter yet
       const response = await apiRequest("GET", `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders`);
       const allOrders = await response.json();
 
       // Filter orders that belong to this customer
-      // Match by customer ID, phone, or name
+      // Prioritize customerId match, then fallback to phone/name
       return allOrders.filter((order: any) => {
-        const matchesId = order.customerId === customer.id;
+        // Primary match: customerId
+        if (order.customerId === customer.id) {
+          return true;
+        }
+
+        // Fallback matches for orders created before customerId was added
         const matchesPhone = customer.phone && order.customerPhone === customer.phone;
         const matchesName = customer.name && order.customerName === customer.name;
 
-        return matchesId || matchesPhone || matchesName;
+        return matchesPhone || matchesName;
       });
     },
     enabled: isOpen && !!customer?.id,
