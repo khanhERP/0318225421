@@ -3606,7 +3606,7 @@ export default function SalesOrders() {
                                                         <td className="py-2 pr-6 text-blue-600 font-semibold text-base">
                                                           {isEditing &&
                                                           editableInvoice ? (
-                                                            <>
+                                                            <div className="relative">
                                                               <Input
                                                                 list="customer-list-datalist"
                                                                 value={
@@ -3620,16 +3620,15 @@ export default function SalesOrders() {
                                                                     e.target
                                                                       .value;
 
-                                                                  // Luôn cập nhật tên khách hàng trước
+                                                                  // Luôn cập nhật tên khách hàng
                                                                   updateEditableInvoiceField(
                                                                     "customerName",
                                                                     inputValue,
                                                                   );
 
-                                                                  // Nếu xóa hoàn toàn (rỗng hoặc chỉ có khoảng trắng)
+                                                                  // Nếu xóa hoàn toàn (rỗng)
                                                                   if (
-                                                                    inputValue.trim() ===
-                                                                    ""
+                                                                    inputValue === ""
                                                                   ) {
                                                                     updateEditableInvoiceField(
                                                                       "customerPhone",
@@ -3650,7 +3649,7 @@ export default function SalesOrders() {
                                                                     return;
                                                                   }
 
-                                                                  // Chỉ tìm khách hàng nếu dữ liệu đã được load
+                                                                  // Tìm khách hàng nếu dữ liệu đã được load
                                                                   if (
                                                                     Array.isArray(
                                                                       customers,
@@ -3658,96 +3657,23 @@ export default function SalesOrders() {
                                                                     customers.length >
                                                                       0
                                                                   ) {
-                                                                    // Tìm khách hàng khớp chính xác
+                                                                    // Tìm khách hàng khớp chính xác hoặc theo phone/code
                                                                     const matchingCustomer =
                                                                       customers.find(
                                                                         (
                                                                           c: any,
                                                                         ) =>
                                                                           c.name ===
-                                                                          inputValue,
+                                                                          inputValue ||
+                                                                          c.phone === inputValue ||
+                                                                          c.customerId === inputValue ||
+                                                                          c.customerTaxCode === inputValue,
                                                                       );
 
                                                                     if (
                                                                       matchingCustomer
                                                                     ) {
                                                                       // Cập nhật tất cả thông tin khách hàng
-                                                                      updateEditableInvoiceField(
-                                                                        "customerPhone",
-                                                                        matchingCustomer.phone ||
-                                                                          "",
-                                                                      );
-                                                                      updateEditableInvoiceField(
-                                                                        "customerTaxCode",
-                                                                        matchingCustomer.customerTaxCode ||
-                                                                          "",
-                                                                      );
-                                                                      updateEditableInvoiceField(
-                                                                        "customerAddress",
-                                                                        matchingCustomer.address ||
-                                                                          "",
-                                                                      );
-                                                                      updateEditableInvoiceField(
-                                                                        "customerEmail",
-                                                                        matchingCustomer.email ||
-                                                                          "",
-                                                                      );
-                                                                    }
-                                                                  }
-                                                                }}
-                                                                onBlur={(e) => {
-                                                                  const inputValue =
-                                                                    e.target.value.trim();
-
-                                                                  // Nếu rỗng sau khi blur, xóa hết
-                                                                  if (
-                                                                    inputValue ===
-                                                                    ""
-                                                                  ) {
-                                                                    updateEditableInvoiceField(
-                                                                      "customerName",
-                                                                      "",
-                                                                    );
-                                                                    updateEditableInvoiceField(
-                                                                      "customerPhone",
-                                                                      "",
-                                                                    );
-                                                                    updateEditableInvoiceField(
-                                                                      "customerTaxCode",
-                                                                      "",
-                                                                    );
-                                                                    updateEditableInvoiceField(
-                                                                      "customerAddress",
-                                                                      "",
-                                                                    );
-                                                                    updateEditableInvoiceField(
-                                                                      "customerEmail",
-                                                                      "",
-                                                                    );
-                                                                    return;
-                                                                  }
-
-                                                                  // Chỉ kiểm tra lại khách hàng nếu dữ liệu đã load
-                                                                  if (
-                                                                    Array.isArray(
-                                                                      customers,
-                                                                    ) &&
-                                                                    customers.length >
-                                                                      0
-                                                                  ) {
-                                                                    // Tìm khách hàng khớp chính xác
-                                                                    const matchingCustomer =
-                                                                      customers.find(
-                                                                        (
-                                                                          c: any,
-                                                                        ) =>
-                                                                          c.name ===
-                                                                          inputValue,
-                                                                      );
-
-                                                                    if (
-                                                                      matchingCustomer
-                                                                    ) {
                                                                       updateEditableInvoiceField(
                                                                         "customerName",
                                                                         matchingCustomer.name,
@@ -3775,7 +3701,7 @@ export default function SalesOrders() {
                                                                     }
                                                                   }
                                                                 }}
-                                                                className="w-40"
+                                                                className="w-40 pr-8"
                                                                 disabled={
                                                                   selectedInvoice.displayStatus ===
                                                                   1
@@ -3787,9 +3713,39 @@ export default function SalesOrders() {
                                                                   customers.length ===
                                                                     0
                                                                     ? "Đang tải..."
-                                                                    : "Chọn hoặc nhập tên"
+                                                                    : "Tìm theo tên, SĐT, mã KH"
                                                                 }
                                                               />
+                                                              {editableInvoice.customerName && selectedInvoice.displayStatus !== 1 && (
+                                                                <button
+                                                                  type="button"
+                                                                  onClick={() => {
+                                                                    updateEditableInvoiceField(
+                                                                      "customerName",
+                                                                      "",
+                                                                    );
+                                                                    updateEditableInvoiceField(
+                                                                      "customerPhone",
+                                                                      "",
+                                                                    );
+                                                                    updateEditableInvoiceField(
+                                                                      "customerTaxCode",
+                                                                      "",
+                                                                    );
+                                                                    updateEditableInvoiceField(
+                                                                      "customerAddress",
+                                                                      "",
+                                                                    );
+                                                                    updateEditableInvoiceField(
+                                                                      "customerEmail",
+                                                                      "",
+                                                                    );
+                                                                  }}
+                                                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                                >
+                                                                  <X className="w-4 h-4" />
+                                                                </button>
+                                                              )}
                                                               {Array.isArray(
                                                                 customers,
                                                               ) &&
@@ -3825,7 +3781,7 @@ export default function SalesOrders() {
                                                                     )}
                                                                   </datalist>
                                                                 )}
-                                                            </>
+                                                            </div>
                                                           ) : (
                                                             selectedInvoice.customerName ||
                                                             "Khách hàng"
@@ -4274,6 +4230,7 @@ export default function SalesOrders() {
                                                                   ? editedItem.sku
                                                                   : item.sku ||
                                                                     product?.sku ||
+                                                                    item.productSku || // Fallback to item.productSku
                                                                     "";
 
                                                               const productName =
@@ -4390,8 +4347,7 @@ export default function SalesOrders() {
                                                                               editedOrderItems[
                                                                                 it
                                                                                   .id
-                                                                              ] ||
-                                                                              {};
+                                                                              ] || {};
                                                                             const itPrice =
                                                                               parseFloat(
                                                                                 editedIt.unitPrice !==
@@ -4613,8 +4569,7 @@ export default function SalesOrders() {
                                                                       </div>
                                                                     ) : (
                                                                       <div className="truncate text-base">
-                                                                        {sku ||
-                                                                          "-"}
+                                                                        {sku || "-"}
                                                                       </div>
                                                                     )}
                                                                   </td>
@@ -5700,9 +5655,7 @@ export default function SalesOrders() {
                                                               variant="outline"
                                                               size="sm"
                                                             >
-                                                              {t(
-                                                                "common.cancel",
-                                                              )}
+                                                              {t("common.cancel")}
                                                             </Button>
                                                           </>
                                                         );

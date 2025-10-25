@@ -510,7 +510,7 @@ export function ReceiptModal({
 
             // Show success message based on device type
             const successMessage = isMobile
-              ? "✅ H=�a đơn đã đưa��c gửi đến máy in thành công!\nKiểm tra máy in POS của bạn."
+              ? "✅ H=a đơn đã đưac gửi đến máy in thành công!\nKiểm tra máy in POS của bạn."
               : "✅ Hóa đơn đã được gửi đến máy in POS thành công!";
 
             alert(successMessage);
@@ -965,7 +965,7 @@ export function ReceiptModal({
           const browserTip = isSafari
             ? "Vui lòng sử dụng menu Safari → Share → Print"
             : isChrome
-              ? "Vui lòng s  � dụng menu Chrome (⋮) → Print"
+              ? "Vui lòng s   dụng menu Chrome (⋮) → Print"
               : "Vui lòng sử dụng menu trình duyệt để in";
 
           alert(browserTip);
@@ -1303,19 +1303,27 @@ export function ReceiptModal({
                 {storeSettings?.businessType === "laundry" ? (
                   <>
                     <tr>
-                      <td style={{ padding: "2px 0" }}>
+                      <td style={{ padding: "2px 0", width: "45%", whiteSpace: "nowrap" }}>
                         {t("common.customerNameLabel")}:
                       </td>
-                      <td style={{ padding: "2px 0", textAlign: "right" }}>
+                      <td style={{ padding: "2px 0", textAlign: "right", width: "55%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {receipt?.customerName || ""}
                       </td>
                     </tr>
                     <tr>
-                      <td style={{ padding: "2px 0" }}>
+                      <td style={{ padding: "2px 0", width: "45%", whiteSpace: "nowrap" }}>
                         {t("common.customerPhoneLabel")}:
                       </td>
-                      <td style={{ padding: "2px 0", textAlign: "right" }}>
+                      <td style={{ padding: "2px 0", textAlign: "right", width: "55%", whiteSpace: "nowrap" }}>
                         {receipt?.customerPhone || receipt?.phone || "-"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: "2px 0" }}>
+                        {t("customers.address")}:
+                      </td>
+                      <td style={{ padding: "2px 0", textAlign: "right" }}>
+                        {receipt.customerTaxCode}
                       </td>
                     </tr>
                   </>
