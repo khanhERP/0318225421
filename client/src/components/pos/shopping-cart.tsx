@@ -101,6 +101,11 @@ export function ShoppingCart({
     [orderId: string]: any | null;
   }>({});
 
+  // State for tracking price input values during editing
+  const [priceInputValues, setPriceInputValues] = useState<{
+    [itemId: number]: string;
+  }>({});
+
   // Fetch store settings to check price_include_tax setting
   const { data: storeSettings } = useQuery({
     queryKey: ["store-settings"],
@@ -1076,7 +1081,7 @@ export function ShoppingCart({
       subtotal: Math.floor(calculatedSubtotal).toString(),
       tax: calculatedTax.toString(),
       discount: finalDiscount.toString(),
-      total: finalTotal.toString(),
+      total: baseTotal.toString(), // Use baseTotal (before subtracting discount) - discount is stored separately
       paymentMethod: paymentMethod, // Lưu phương thức thanh toán đã chọn
       salesChannel: "pos",
       priceIncludeTax: priceIncludesTax,
@@ -1327,7 +1332,7 @@ export function ShoppingCart({
           subtotal: Math.floor(displayedSubtotal).toString(),
           tax: displayedTax.toString(),
           discount: displayedDiscount.toString(),
-          total: displayedTotal.toString(),
+          total: Math.round(displayedSubtotal + displayedTax).toString(), // baseTotal = subtotal + tax (before discount)
           paymentMethod: paymentMethod,
           salesChannel: "pos",
           priceIncludeTax: priceIncludesTax,
@@ -1999,7 +2004,7 @@ export function ShoppingCart({
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
               />
             </svg>
             <span className="font-medium">{cart.length}</span>{" "}
@@ -2052,12 +2057,113 @@ export function ShoppingCart({
                     {item.name}
                   </h4>
                   <div className="space-y-1">
-                    <p className="text-xs pos-text-secondary">
-                      {Math.round(getDisplayPrice(item)).toLocaleString(
-                        "vi-VN",
-                      )}{" "}
-                      ₫ {t("pos.each")}
-                    </p>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={
+                          priceInputValues[item.id] !== undefined
+                            ? priceInputValues[item.id]
+                            : Math.round(getDisplayPrice(item)).toLocaleString(
+                                "vi-VN",
+                              )
+                        }
+                        onChange={(e) => {
+                          // Store input value in state
+                          setPriceInputValues((prev) => ({
+                            ...prev,
+                            [item.id]: e.target.value,
+                          }));
+                        }}
+                        onFocus={(e) => {
+                          // Select all text when focused for easy editing
+                          e.target.select();
+                          // Initialize state with current value
+                          setPriceInputValues((prev) => ({
+                            ...prev,
+                            [item.id]: Math.round(
+                              getDisplayPrice(item),
+                            ).toLocaleString("vi-VN"),
+                          }));
+                        }}
+                        onBlur={(e) => {
+                          const rawValue = e.target.value.replace(/[^\d]/g, "");
+                          const newPrice = parseFloat(rawValue) || 0;
+
+                          if (newPrice <= 0) {
+                            toast({
+                              title: "Giá không hợp lệ",
+                              description:
+                                "Giá phải lớn hơn 0. Giá đã được khôi phục.",
+                              variant: "destructive",
+                            });
+                            // Clear state to show original price
+                            setPriceInputValues((prev) => {
+                              const updated = { ...prev };
+                              delete updated[item.id];
+                              return updated;
+                            });
+                            return;
+                          }
+
+                          // Update price when user finishes editing
+                          const productId =
+                            typeof item.id === "string"
+                              ? parseInt(item.id)
+                              : item.id;
+
+                          // Calculate new total
+                          const newTotal = newPrice * item.quantity;
+
+                          console.log("💰 Price updated:", {
+                            productId: productId,
+                            oldPrice: item.price,
+                            newPrice: newPrice,
+                            quantity: item.quantity,
+                            oldTotal: item.total,
+                            newTotal: newTotal,
+                          });
+
+                          // Update the item price in cart
+                          item.price = newPrice.toString();
+                          item.total = newTotal.toString();
+
+                          // Clear input state
+                          setPriceInputValues((prev) => {
+                            const updated = { ...prev };
+                            delete updated[item.id];
+                            return updated;
+                          });
+
+                          // Trigger cart update
+                          onUpdateQuantity(productId, item.quantity);
+
+                          // Broadcast update via WebSocket
+                          setTimeout(() => {
+                            broadcastCartUpdate();
+                          }, 100);
+                        }}
+                        onKeyDown={(e) => {
+                          // Allow Enter key to trigger blur and save
+                          if (e.key === "Enter") {
+                            e.currentTarget.blur();
+                          }
+                          // Allow Escape key to cancel editing
+                          if (e.key === "Escape") {
+                            setPriceInputValues((prev) => {
+                              const updated = { ...prev };
+                              delete updated[item.id];
+                              return updated;
+                            });
+                            e.currentTarget.blur();
+                          }
+                        }}
+                        className="flex h-6 w-24 rounded-md border border-input bg-white px-3 py-2 text-xs text-right ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                        placeholder="Nhập giá"
+                      />
+                      <span className="text-xs pos-text-secondary whitespace-nowrap">
+                        ₫ {t("pos.each")}
+                      </span>
+                    </div>
                     {item.taxRate && parseFloat(item.taxRate) > 0 && (
                       <p className="text-xs text-orange-600">
                         Thuế ({item.taxRate}%):{" "}
