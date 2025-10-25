@@ -194,12 +194,12 @@ export function CategorySidebar({
                       : "bg-white hover:bg-gray-50 border border-gray-200"
                   }`}
                 >
-                  <span className="flex items-center text-sm font-medium truncate">
+                  <span className="flex items-center text-sm font-medium">
                     <IconComponent
                       className={`w-4 mr-2 flex-shrink-0 ${isSelected ? "text-white" : "text-gray-500"}`}
                       size={16}
                     />
-                    <span className="truncate">{category.name}</span>
+                    <span className="break-words">{category.name}</span>
                   </span>
                   <span
                     className={`text-xs px-2 py-0.5 rounded-full font-semibold ml-2 flex-shrink-0 ${

@@ -5,6 +5,7 @@ export const ordersTranslations: { [key: string]: OrdersTranslations } = {
     atCounter: "카운터",
     itemList: "상품 목록",
     phoneNumber: "전화번호",
+    tryChangingFilters: "필터를 변경해 보세요",
     orderNumberLabel: "주문 번호",
     orderDateLabel: "주문 날짜",
     customerNameLabel: "고객명",
@@ -234,6 +235,7 @@ export const ordersTranslations: { [key: string]: OrdersTranslations } = {
     atCounter: "At Counter",
     itemList: "Item List",
     orderNumberLabel: "Order Number",
+    tryChangingFilters: "Try changing the filters",
     phoneNumber: "Phone Number",
     orderDateLabel: "Order Date",
     customerNameLabel: "Customer Name",
@@ -466,6 +468,7 @@ export const ordersTranslations: { [key: string]: OrdersTranslations } = {
   vi: {
     atCounter: "Tại quầy",
     itemList: "Danh sách hàng hóa",
+    tryChangingFilters: "Thử thay đổi bộ lọc",
     phoneNumber: "Số điện thoại",
     orderNumberLabel: "Số đơn hàng",
     orderDateLabel: "Ngày đơn hàng",

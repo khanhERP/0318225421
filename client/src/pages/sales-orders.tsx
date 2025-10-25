@@ -1416,6 +1416,9 @@ export default function SalesOrders() {
           // Get data from cache (may be incomplete for new items)
           const fullItemData = orderItems.find((item: any) => item.id === id);
 
+          // Get product info to ensure we have the SKU
+          const product = products.find((p: any) => p.id === (changes.productId || fullItemData?.productId));
+          
           // Merge all available data - prioritize changes from editedOrderItems
           const completeItemData = {
             ...(fullItemData || {}),
@@ -1427,6 +1430,7 @@ export default function SalesOrders() {
               changes.sku ||
               fullItemData?.sku ||
               fullItemData?.productSku ||
+              product?.sku ||
               "",
             quantity:
               changes.quantity !== undefined
@@ -1461,7 +1465,7 @@ export default function SalesOrders() {
           }
 
           console.log(
-            `✅ Will INSERT new item: ${completeItemData.productName} (Product ID: ${completeItemData.productId})`,
+            `✅ Will INSERT new item: ${completeItemData.productName} (Product ID: ${completeItemData.productId}, SKU: ${completeItemData.sku})`,
           );
           itemsToCreate.push(completeItemData);
         } else {
@@ -1492,6 +1496,7 @@ export default function SalesOrders() {
         console.log(`📝 [INSERT] Creating new order item in database:`, {
           productId: item.productId,
           productName: item.productName,
+          sku: item.sku,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
         });
@@ -1517,6 +1522,7 @@ export default function SalesOrders() {
         console.log(`📊 Item calculation data:`, {
           productId: item.productId,
           productName: item.productName,
+          sku: item.sku,
           unitPrice,
           quantity,
           taxRate: taxRate * 100 + "%",
@@ -1765,6 +1771,7 @@ export default function SalesOrders() {
 
       // Clear and refresh all related queries
       queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
       queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items"] });
       queryClient.removeQueries({
         queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range"],
@@ -1772,6 +1779,7 @@ export default function SalesOrders() {
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
         queryClient.invalidateQueries({
           queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", editableInvoice.id],
         }),
@@ -1779,6 +1787,7 @@ export default function SalesOrders() {
           queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range"],
         }),
         queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
         queryClient.refetchQueries({
           queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", editableInvoice.id],
         }),
@@ -1800,6 +1809,9 @@ export default function SalesOrders() {
 
       // Close the selected invoice to show the updated list
       setSelectedInvoice(null);
+
+      // Dispatch custom event to force refresh
+      window.dispatchEvent(new CustomEvent('forceRefresh'));
 
       toast({
         title: "Lưu thành công",
@@ -4241,8 +4253,8 @@ export default function SalesOrders() {
                                                                 undefined
                                                                   ? editedItem.sku
                                                                   : item.sku ||
+                                                                    item.productSku ||
                                                                     product?.sku ||
-                                                                    item.productSku || // Fallback to item.productSku
                                                                     "";
 
                                                               const productName =

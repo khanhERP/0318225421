@@ -3,6 +3,7 @@ import type { CommonTranslations } from "../types";
 export const commonTranslations: { [key: string]: CommonTranslations } = {
   ko: {
     loading: "로딩 중...",
+    tryChangingFilters: "필터를 변경해보세요",
     confirmCancelOrder: "주문 취소 확인",
     confirmCancelOrderDesc: "이 주문을 취소하시겠습니까?",
     confirmCancelOrderWarning: "이 작업은 취소할 수 없습니다.",
@@ -707,6 +708,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
   en: {
     save: "Save",
     confirmCancelOrder: "Confirm Cancel Order",
+    tryChangingFilters: "Try changing the filters",
     confirmCancelOrderDesc: "Are you sure you want to cancel this order?",
     confirmCancelOrderWarning: "This action cannot be undone.",
     cancelOrderAction: "Cancel Order",
@@ -1308,6 +1310,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
   vi: {
     save: "Lưu",
     confirmCancelOrder: "Xác nhận hủy đơn hàng",
+    tryChangingFilters: "Thử thay đổi bộ lọc",
     confirmCancelOrderDesc: "Bạn có chắc chắn muốn hủy đơn hàng này không?",
     confirmCancelOrderWarning: "Hành động này không thể hoàn tác.",
     cancelOrderAction: "Hủy đơn hàng",

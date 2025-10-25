@@ -983,9 +983,20 @@ export function ShoppingCart({
       paymentMethod: paymentMethod, // Log payment method
     });
 
-    // Prepare cart items for order
+    // Prepare cart items for order - USE EDITED PRICES FROM UI
     const cartItemsForOrder = cart.map((item) => {
-      const unitPrice = parseFloat(item.price);
+      // Get the EDITED price from priceInputValues state (or original if not edited)
+      const editedPriceStr = priceInputValues[item.id];
+      let unitPrice = parseFloat(item.price);
+      
+      if (editedPriceStr !== undefined) {
+        const cleanPrice = editedPriceStr.replace(/[^\d]/g, "");
+        const parsedPrice = parseFloat(cleanPrice);
+        if (!isNaN(parsedPrice) && parsedPrice > 0) {
+          unitPrice = parsedPrice;
+        }
+      }
+
       const quantity = item.quantity;
       const taxRate = parseFloat(item.taxRate || "0") / 100;
       const orderDiscount = parseFloat(
@@ -999,7 +1010,10 @@ export function ShoppingCart({
 
       if (orderDiscount > 0) {
         const totalBeforeDiscount = cart.reduce((total, cartItem) => {
-          return parseFloat(cartItem.price) * cartItem.quantity;
+          const cartItemPrice = priceInputValues[cartItem.id] 
+            ? parseFloat(priceInputValues[cartItem.id].replace(/[^\d]/g, "")) || parseFloat(cartItem.price)
+            : parseFloat(cartItem.price);
+          return total + (cartItemPrice * cartItem.quantity);
         }, 0);
 
         const currentIndex = cart.findIndex(
@@ -1011,8 +1025,10 @@ export function ShoppingCart({
           let previousDiscounts = 0;
           for (let i = 0; i < cart.length - 1; i++) {
             const prevItem = cart[i];
-            const prevItemTotal =
-              parseFloat(prevItem.price) * prevItem.quantity;
+            const prevItemPrice = priceInputValues[prevItem.id]
+              ? parseFloat(priceInputValues[prevItem.id].replace(/[^\d]/g, "")) || parseFloat(prevItem.price)
+              : parseFloat(prevItem.price);
+            const prevItemTotal = prevItemPrice * prevItem.quantity;
             const prevItemDiscount =
               totalBeforeDiscount > 0
                 ? Math.round(
@@ -1052,11 +1068,18 @@ export function ShoppingCart({
         totalAfterDiscount = itemPriceBeforeTax;
       }
 
+      console.log(`📦 Item for order - ${item.name}:`, {
+        originalPrice: item.price,
+        editedPrice: unitPrice,
+        quantity: quantity,
+        unitPriceUsed: unitPrice,
+      });
+
       return {
         productId: item.id,
         productName: item.name,
         quantity: item.quantity,
-        unitPrice: item.price,
+        unitPrice: unitPrice.toString(),
         total: totalAfterDiscount.toString(),
         notes: null,
         discount: itemDiscountAmount.toString(),
@@ -1227,9 +1250,20 @@ export function ShoppingCart({
       businessType: storeSettings?.businessType,
     });
 
-    // Chuẩn bị items với đúng thông tin đã tính toán và hiển thị
+    // Chuẩn bị items với đúng thông tin đã tính toán và hiển thị - USE EDITED PRICES FROM UI
     const cartItemsForReceipt = cart.map((item) => {
-      const unitPrice = parseFloat(item.price);
+      // Get the EDITED price from priceInputValues state (or original if not edited)
+      const editedPriceStr = priceInputValues[item.id];
+      let unitPrice = parseFloat(item.price);
+      
+      if (editedPriceStr !== undefined) {
+        const cleanPrice = editedPriceStr.replace(/[^\d]/g, "");
+        const parsedPrice = parseFloat(cleanPrice);
+        if (!isNaN(parsedPrice) && parsedPrice > 0) {
+          unitPrice = parsedPrice;
+        }
+      }
+
       const quantity = item.quantity;
       const taxRate = parseFloat(item.taxRate || "0") / 100;
       const orderDiscount = displayedDiscount;
@@ -1238,7 +1272,10 @@ export function ShoppingCart({
       let itemDiscountAmount = 0;
       if (orderDiscount > 0) {
         const totalBeforeDiscount = cart.reduce((total, cartItem) => {
-          return parseFloat(cartItem.price) * cartItem.quantity;
+          const cartItemPrice = priceInputValues[cartItem.id] 
+            ? parseFloat(priceInputValues[cartItem.id].replace(/[^\d]/g, "")) || parseFloat(cartItem.price)
+            : parseFloat(cartItem.price);
+          return total + (cartItemPrice * cartItem.quantity);
         }, 0);
 
         const currentIndex = cart.findIndex(
@@ -1250,8 +1287,10 @@ export function ShoppingCart({
           let previousDiscounts = 0;
           for (let i = 0; i < cart.length - 1; i++) {
             const prevItem = cart[i];
-            const prevItemTotal =
-              parseFloat(prevItem.price) * prevItem.quantity;
+            const prevItemPrice = priceInputValues[prevItem.id]
+              ? parseFloat(priceInputValues[prevItem.id].replace(/[^\d]/g, "")) || parseFloat(prevItem.price)
+              : parseFloat(prevItem.price);
+            const prevItemTotal = prevItemPrice * prevItem.quantity;
             const prevItemDiscount =
               totalBeforeDiscount > 0
                 ? Math.round(
@@ -1289,6 +1328,13 @@ export function ShoppingCart({
         itemTax = taxRate > 0 ? Math.round(itemPriceBeforeTax * taxRate) : 0;
         totalAfterDiscount = itemPriceBeforeTax;
       }
+
+      console.log(`📦 Item for checkout - ${item.name}:`, {
+        originalPrice: item.price,
+        editedPrice: unitPrice,
+        quantity: quantity,
+        unitPriceUsed: unitPrice,
+      });
 
       return {
         id: item.id,
