@@ -341,7 +341,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
                   {/* From Date */}
                   <div className="flex flex-col">
                     <label className="text-xs text-gray-600 mb-1 font-bold">
-                      {t("purchases.fromDateLabel")}
+                      {t("common.fromDate")}
                     </label>
                     <Input
                       type="date"
@@ -355,7 +355,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
                   {/* To Date */}
                   <div className="flex flex-col">
                     <label className="text-xs text-gray-600 mb-1 font-bold">
-                      {t("purchases.toDateLabel")}
+                      {t("common.toDate")}
                     </label>
                     <Input
                       type="date"
@@ -372,7 +372,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
                       {t("purchases.supplier")}
                     </label>
                     <Input
-                      placeholder="Nhập tên nhà cung cấp..."
+                      placeholder={t("purchases.supplierFilterPlaceholder")}
                       value={supplierFilter}
                       onChange={(e) => setSupplierFilter(e.target.value)}
                       className="w-full text-sm"
@@ -388,7 +388,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                       <Input
-                        placeholder="Nhập số phiếu nhập..."
+                        placeholder={t("purchases.receiptNumberPlaceholder")}
                         value={poNumberFilter}
                         onChange={(e) => setPoNumberFilter(e.target.value)}
                         className="pl-10 w-full text-sm"
@@ -456,13 +456,13 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
                   <ClipboardCheck className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-base sm:text-lg font-semibold text-gray-700 mb-2">
                     {purchaseOrders.length === 0
-                      ? "Không có phiếu nhập nào"
-                      : "Không tìm thấy phiếu nhập"}
+                      ? t("purchases.noOrders")
+                      : t("purchases.noOrdersFound")}
                   </h3>
                   <p className="text-sm sm:text-base text-gray-500 mb-4 sm:mb-6 max-w-md mx-auto">
                     {purchaseOrders.length === 0
-                      ? "Tạo phiếu nhập đầu tiên để bắt đầu quản lý hàng hóa"
-                      : "Thử thay đổi bộ lọc để tìm phiếu nhập phù hợp"}
+                      ? t("purchases.createFirstOrder")
+                      : t("purchases.tryDifferentFilters")}
                   </p>
                   <Button
                     className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 sm:px-6 py-2 sm:py-3 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 text-sm sm:text-base"
@@ -471,8 +471,8 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
                     size="lg"
                   >
                     <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                    <span className="hidden sm:inline">Tạo phiếu nhập mới</span>
-                    <span className="sm:hidden">Tạo phiếu nhập</span>
+                    <span className="hidden sm:inline">{t("purchases.createNewPurchaseOrder")}</span>
+                    <span className="sm:hidden">{t("purchases.createOrder")}</span>
                   </Button>
                 </div>
               ) : (

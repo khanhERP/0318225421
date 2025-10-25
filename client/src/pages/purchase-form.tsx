@@ -273,7 +273,6 @@ export default function PurchaseFormPage({
         })),
   });
 
-
   // Fetch products for selection
   const { data: allProducts = [] } = useQuery({
     queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products"],
@@ -1145,7 +1144,11 @@ export default function PurchaseFormPage({
 
       // Validate payment method if isPaid = true
       if (formValues.isPaid) {
-        if (!editPaymentMethods || editPaymentMethods.length === 0 || !editPaymentMethods[0].method) {
+        if (
+          !editPaymentMethods ||
+          editPaymentMethods.length === 0 ||
+          !editPaymentMethods[0].method
+        ) {
           toast({
             title: "Lỗi",
             description: "Vui lòng chọn phương thức thanh toán",
@@ -1155,7 +1158,7 @@ export default function PurchaseFormPage({
           return;
         }
 
-        const paymentAmount = parseFloat(editPaymentMethods[0].amount || '0');
+        const paymentAmount = parseFloat(editPaymentMethods[0].amount || "0");
         if (paymentAmount <= 0) {
           toast({
             title: "Lỗi",
@@ -1174,7 +1177,8 @@ export default function PurchaseFormPage({
       );
 
       // Get storeCode from logged-in user
-      const storeCode = userInfo?.storeCode || storeSettings?.storeCode || "STORE001";
+      const storeCode =
+        userInfo?.storeCode || storeSettings?.storeCode || "STORE001";
 
       // Prepare submission data
       const submissionData = {
@@ -1188,15 +1192,17 @@ export default function PurchaseFormPage({
         tax: "0.00",
         total: subtotalAmount.toFixed(2),
         isPaid: formValues.isPaid || false,
-        paymentMethod: formValues.isPaid && editPaymentMethods.length > 0
-          ? JSON.stringify({
-              method: editPaymentMethods[0].method,
-              amount: parseFloat(editPaymentMethods[0].amount || '0')
-            })
-          : null,
-        paymentAmount: formValues.isPaid && editPaymentMethods.length > 0
-          ? editPaymentMethods[0].amount
-          : null,
+        paymentMethod:
+          formValues.isPaid && editPaymentMethods.length > 0
+            ? JSON.stringify({
+                method: editPaymentMethods[0].method,
+                amount: parseFloat(editPaymentMethods[0].amount || "0"),
+              })
+            : null,
+        paymentAmount:
+          formValues.isPaid && editPaymentMethods.length > 0
+            ? editPaymentMethods[0].amount
+            : null,
         notes: formValues.notes?.trim() || null,
         storeCode: storeCode, // Add storeCode from logged-in user
         items: validItems.map((item) => {
@@ -1847,32 +1853,50 @@ export default function PurchaseFormPage({
                                     field.onChange(checked);
                                     // Khi check isPaid, tự động điền số tiền = tổng tiền
                                     if (checked) {
-                                      const itemsTotal = selectedItems.reduce((sum, item) => {
-                                        const subtotal = (item.quantity || 0) * (item.unitPrice || 0);
-                                        const discountAmount = parseFloat((item as any).discountAmount || 0);
-                                        return sum + (subtotal - discountAmount);
-                                      }, 0);
+                                      const itemsTotal = selectedItems.reduce(
+                                        (sum, item) => {
+                                          const subtotal =
+                                            (item.quantity || 0) *
+                                            (item.unitPrice || 0);
+                                          const discountAmount = parseFloat(
+                                            (item as any).discountAmount || 0,
+                                          );
+                                          return (
+                                            sum + (subtotal - discountAmount)
+                                          );
+                                        },
+                                        0,
+                                      );
 
-                                      setEditPaymentMethods([{
-                                        method: 'cash',
-                                        amount: Math.round(itemsTotal).toString()
-                                      }]);
+                                      setEditPaymentMethods([
+                                        {
+                                          method: "cash",
+                                          amount:
+                                            Math.round(itemsTotal).toString(),
+                                        },
+                                      ]);
 
                                       // Cập nhật form values
-                                      form.setValue("paymentMethod", JSON.stringify({
-                                        method: 'cash',
-                                        amount: Math.round(itemsTotal)
-                                      }));
-                                      form.setValue("paymentAmount", Math.round(itemsTotal).toString());
+                                      form.setValue(
+                                        "paymentMethod",
+                                        JSON.stringify({
+                                          method: "cash",
+                                          amount: Math.round(itemsTotal),
+                                        }),
+                                      );
+                                      form.setValue(
+                                        "paymentAmount",
+                                        Math.round(itemsTotal).toString(),
+                                      );
                                     }
                                   }}
                                   disabled={viewOnly}
                                 />
                               </FormControl>
                               <div className="space-y-1 leading-none">
-                                <FormLabel>Đã thanh toán</FormLabel>
+                                <FormLabel>{t("purchases.paid")}</FormLabel>
                                 <p className="text-sm text-muted-foreground">
-                                  Đánh dấu nếu phiếu nhập đã được thanh toán
+                                  {t("purchases.paidDescription")}
                                 </p>
                               </div>
                             </FormItem>
@@ -1885,54 +1909,75 @@ export default function PurchaseFormPage({
                         <div className="md:col-span-5">
                           <div className="border rounded-lg p-3 bg-blue-50 h-full">
                             <h4 className="font-semibold mb-2 text-sm">
-                              Phương thức thanh toán
+                              {t("purchases.paymentMethod")}
                             </h4>
 
                             {(() => {
                               const getMethodName = (method: string) => {
-                                const names: Record<string, string> = {
-                                  cash: "Tiền mặt",
-                                  bank_transfer: "Chuyển khoản",
-                                  credit_card: "Thẻ tín dụng",
-                                  other: "Khác",
-                                };
-                                return names[method] || method;
+                                // Find the payment method from the list
+                                const paymentMethod = paymentMethods.find(
+                                  (pm) => pm.nameKey === method,
+                                );
+                                return paymentMethod
+                                  ? paymentMethod.name
+                                  : method;
                               };
 
                               // Tính tổng tiền từ items - tự động cập nhật
-                              const itemsTotal = selectedItems.reduce((sum, item) => {
-                                const subtotal = (item.quantity || 0) * (item.unitPrice || 0);
-                                const discountAmount = parseFloat((item as any).discountAmount || 0);
-                                return sum + (subtotal - discountAmount);
-                              }, 0);
+                              const itemsTotal = selectedItems.reduce(
+                                (sum, item) => {
+                                  const subtotal =
+                                    (item.quantity || 0) *
+                                    (item.unitPrice || 0);
+                                  const discountAmount = parseFloat(
+                                    (item as any).discountAmount || 0,
+                                  );
+                                  return sum + (subtotal - discountAmount);
+                                },
+                                0,
+                              );
 
                               // Lấy method hiện tại hoặc mặc định
                               const currentMethod = editPaymentMethods[0] || {
-                                method: 'cash',
-                                amount: Math.round(itemsTotal).toString()
+                                method: "cash",
+                                amount: Math.round(itemsTotal).toString(),
                               };
 
                               // Auto-update payment amount khi items thay đổi
                               if (editPaymentMethods[0]) {
-                                editPaymentMethods[0].amount = Math.round(itemsTotal).toString();
+                                editPaymentMethods[0].amount =
+                                  Math.round(itemsTotal).toString();
                               }
 
                               return (
                                 <div className="space-y-2">
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-2 bg-white rounded border text-xs">
                                     <div className="space-y-1">
-                                      <label className="text-xs font-medium">Phương thức</label>
+                                      <label className="text-xs font-medium">
+                                        {t("purchases.paymentMethod")}
+                                      </label>
                                       {!viewOnly ? (
                                         <Select
                                           value={currentMethod.method || "cash"}
                                           onValueChange={(value) => {
-                                            const updated = [{
-                                              method: value,
-                                              amount: Math.round(itemsTotal).toString()
-                                            }];
+                                            const updated = [
+                                              {
+                                                method: value,
+                                                amount:
+                                                  Math.round(
+                                                    itemsTotal,
+                                                  ).toString(),
+                                              },
+                                            ];
                                             setEditPaymentMethods(updated);
-                                            form.setValue("paymentMethod", JSON.stringify(updated[0]));
-                                            form.setValue("paymentAmount", Math.round(itemsTotal).toString());
+                                            form.setValue(
+                                              "paymentMethod",
+                                              JSON.stringify(updated[0]),
+                                            );
+                                            form.setValue(
+                                              "paymentAmount",
+                                              Math.round(itemsTotal).toString(),
+                                            );
                                           }}
                                         >
                                           <SelectTrigger className="h-8 text-xs">
@@ -1940,8 +1985,12 @@ export default function PurchaseFormPage({
                                           </SelectTrigger>
                                           <SelectContent>
                                             {paymentMethods.map((method) => (
-                                              <SelectItem key={method.id} value={method.nameKey}>
-                                                {method.icon} {method.name}
+                                              <SelectItem
+                                                key={method.id}
+                                                value={method.nameKey}
+                                              >
+                                                {method.icon}{" "}
+                                                {t(`common.${method.nameKey}`)}
                                               </SelectItem>
                                             ))}
                                           </SelectContent>
@@ -1949,17 +1998,24 @@ export default function PurchaseFormPage({
                                       ) : (
                                         <div className="h-8 px-2 py-1 bg-blue-50 border border-blue-200 rounded flex items-center">
                                           <span className="font-medium text-blue-900 text-xs">
-                                            {getMethodName(currentMethod.method)}
+                                            {getMethodName(
+                                              currentMethod.method,
+                                            )}
                                           </span>
                                         </div>
                                       )}
                                     </div>
 
                                     <div className="space-y-1">
-                                      <label className="text-xs font-medium">Số tiền</label>
+                                      <label className="text-xs font-medium">
+                                        {t("common.amount")}
+                                      </label>
                                       <div className="h-8 px-2 py-1 bg-gray-100 border border-gray-300 rounded flex items-center justify-end">
                                         <span className="font-semibold text-gray-800 text-xs">
-                                          {Math.round(itemsTotal).toLocaleString("vi-VN")} ₫
+                                          {Math.round(
+                                            itemsTotal,
+                                          ).toLocaleString("vi-VN")}{" "}
+                                          ₫
                                         </span>
                                       </div>
                                     </div>
@@ -1968,9 +2024,14 @@ export default function PurchaseFormPage({
                                   {/* Payment status display */}
                                   <div className="space-y-1 mt-2">
                                     <div className="flex justify-between items-center pt-2 border-t">
-                                      <span className="font-semibold text-sm">Tổng thanh toán:</span>
+                                      <span className="font-semibold text-sm">
+                                        {t("common.totalPayment")}:
+                                      </span>
                                       <span className="text-base font-bold text-gray-900">
-                                        {Math.round(itemsTotal).toLocaleString("vi-VN")} ₫
+                                        {Math.round(itemsTotal).toLocaleString(
+                                          "vi-VN",
+                                        )}{" "}
+                                        ₫
                                       </span>
                                     </div>
                                   </div>
@@ -2126,7 +2187,7 @@ export default function PurchaseFormPage({
                           <TableHeader>
                             <TableRow>
                               <TableHead className="w-12 text-center p-2 font-bold">
-                                No
+                                {t("purchases.rowNumber")}
                               </TableHead>
                               <TableHead className="w-32 text-center p-2 font-bold">
                                 {t("purchases.productCode")}
@@ -2157,7 +2218,7 @@ export default function PurchaseFormPage({
                               </TableHead>
                               {!viewOnly && (
                                 <TableHead className="w-20 text-center p-2 font-bold">
-                                  {t("purchases.actions")}
+                                  {t("common.actions")}
                                 </TableHead>
                               )}
                             </TableRow>
@@ -2345,7 +2406,12 @@ export default function PurchaseFormPage({
                                               }
                                             }
                                           }}
-                                          placeholder={t("purchases.searchProductPlaceholder") || "Nhập mã/tên SP hoặc click để chọn"}
+                                          placeholder={
+                                            t(
+                                              "purchases.searchProductPlaceholder",
+                                            ) ||
+                                            "Nhập mã/tên SP hoặc click để chọn"
+                                          }
                                           className="w-28 text-center text-sm h-8 border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
                                           disabled={viewOnly}
                                           data-testid={`input-sku-${index}`}
@@ -2413,7 +2479,7 @@ export default function PurchaseFormPage({
                                           }
                                         }}
                                         className="w-full text-sm h-8 bg-gray-100"
-                                        placeholder="Tên sản phẩm"
+                                        placeholder={t("purchases.productName")}
                                         readOnly
                                         disabled={viewOnly}
                                       />
@@ -2422,7 +2488,7 @@ export default function PurchaseFormPage({
                                     {/* 4. Đơn vị tính */}
                                     <TableCell className="text-center p-2">
                                       <span className="text-sm text-gray-600 bg-gray-50 px-2 py-1 rounded-full">
-                                        Cái
+                                        {t("common.unit")}
                                       </span>
                                     </TableCell>
 
@@ -2744,7 +2810,7 @@ export default function PurchaseFormPage({
 
                                     {/* Tên sản phẩm - Placeholder for "TỔNG CỘNG" */}
                                     <TableCell className="p-2 font-bold text-blue-800">
-                                      TỔNG CỘNG
+                                      {t("purchases.totalSummary")}
                                     </TableCell>
 
                                     {/* Đơn vị tính */}

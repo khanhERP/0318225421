@@ -434,7 +434,6 @@ export function ShoppingCart({
   const fetchCustomers = async (searchTerm: string) => {
     try {
       setIsSearching(true);
-      // const response = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/customers?search=${searchTerm}`);
       const response = await fetch(
         `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/customers?search=${encodeURIComponent(searchTerm)}`,
         {
@@ -737,10 +736,15 @@ export function ShoppingCart({
   // Auto-select first enabled payment method when data loads
   useEffect(() => {
     if (paymentMethodsData && paymentMethodsData.length > 0 && !paymentMethod) {
-      const firstEnabled = paymentMethodsData.find((m: any) => m.enabled === true);
+      const firstEnabled = paymentMethodsData.find(
+        (m: any) => m.enabled === true,
+      );
       if (firstEnabled) {
         setPaymentMethod(firstEnabled.nameKey);
-        console.log("🔧 Auto-selected first payment method:", firstEnabled.nameKey);
+        console.log(
+          "🔧 Auto-selected first payment method:",
+          firstEnabled.nameKey,
+        );
       }
     }
   }, [paymentMethodsData, paymentMethod]);
@@ -941,7 +945,10 @@ export function ShoppingCart({
         console.log("✅ Generated order number:", orderNumber);
       }
     } catch (error) {
-      console.warn("⚠️ Failed to generate order number, using fallback:", error);
+      console.warn(
+        "⚠️ Failed to generate order number, using fallback:",
+        error,
+      );
     }
 
     // Get storeCode from authenticated user
@@ -1190,7 +1197,10 @@ export function ShoppingCart({
         console.log("✅ Generated order number for checkout:", orderNumber);
       }
     } catch (error) {
-      console.warn("⚠️ Failed to generate order number, using fallback:", error);
+      console.warn(
+        "⚠️ Failed to generate order number, using fallback:",
+        error,
+      );
     }
 
     // Get storeCode from authenticated user
@@ -2508,12 +2518,12 @@ export function ShoppingCart({
                   if (discountType === "percent") {
                     // Calculate discount from percentage - use total price WITHOUT any previous discount
                     const percentage = Math.min(100, inputValue);
-                    
+
                     // Calculate total BEFORE discount (sum of all item prices * quantities)
                     const totalBeforeDiscount = cart.reduce((sum, item) => {
-                      return sum + (parseFloat(item.price) * item.quantity);
+                      return sum + parseFloat(item.price) * item.quantity;
                     }, 0);
-                    
+
                     // Apply percentage to total before discount
                     finalDiscountAmount = Math.round(
                       totalBeforeDiscount * (percentage / 100),

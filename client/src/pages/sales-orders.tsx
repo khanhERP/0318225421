@@ -2311,7 +2311,9 @@ export default function SalesOrders() {
               : item.unitPrice || "0",
           );
           const quantity = parseFloat(
-            editedItem.quantity !== undefined ? editedItem.quantity : item.quantity || "0",
+            editedItem.quantity !== undefined
+              ? editedItem.quantity
+              : item.quantity || "0",
           );
           calculatedSubtotal += unitPrice * quantity;
         } else {
@@ -2327,7 +2329,9 @@ export default function SalesOrders() {
               : item.unitPrice || "0",
           );
           const quantity = parseFloat(
-            editedItem.quantity !== undefined ? editedItem.quantity : item.quantity || "0",
+            editedItem.quantity !== undefined
+              ? editedItem.quantity
+              : item.quantity || "0",
           );
 
           const itemSubtotal = unitPrice * quantity;
@@ -3595,7 +3599,8 @@ export default function SalesOrders() {
                                                           )}
                                                         </td>
                                                         <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
-                                                          {t("orders.customer")}:
+                                                          {t("orders.customer")}
+                                                          :
                                                         </td>
                                                         <td className="py-2 pr-6 text-blue-600 font-semibold text-base">
                                                           {isEditing &&
@@ -4384,7 +4389,8 @@ export default function SalesOrders() {
                                                                               editedOrderItems[
                                                                                 it
                                                                                   .id
-                                                                              ] || {};
+                                                                              ] ||
+                                                                              {};
                                                                             const itPrice =
                                                                               parseFloat(
                                                                                 editedIt.unitPrice !==
@@ -5080,7 +5086,7 @@ export default function SalesOrders() {
                                                                 ) || 0;
 
                                                               console.log(
-                                                                                               "💰 Thay đổi chiết khấu:",
+                                                                "💰 Thay đổi chiết khấu:",
                                                                 {
                                                                   oldDiscount:
                                                                     editableInvoice.discount,
@@ -5687,7 +5693,9 @@ export default function SalesOrders() {
                                                               variant="outline"
                                                               size="sm"
                                                             >
-                                                              {t("common.cancel")}
+                                                              {t(
+                                                                "common.cancel",
+                                                              )}
                                                             </Button>
                                                           </>
                                                         );

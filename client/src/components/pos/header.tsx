@@ -191,17 +191,17 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
     } catch (error) {
       console.error("Lỗi khi đăng xuất:", error);
     }
-    
+
     // Xóa tất cả thông tin đăng nhập
     sessionStorage.removeItem("pinAuthenticated");
     localStorage.removeItem("authToken");
     localStorage.removeItem("storeInfo");
-    
+
     // Gọi callback onLogout nếu có
     if (onLogout) {
       onLogout();
     }
-    
+
     // Reload trang để quay về màn hình đăng nhập PIN
     window.location.reload();
   };

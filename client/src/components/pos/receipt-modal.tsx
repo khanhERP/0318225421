@@ -965,7 +965,7 @@ export function ReceiptModal({
           const browserTip = isSafari
             ? "Vui lòng sử dụng menu Safari → Share → Print"
             : isChrome
-              ? "Vui lòng sử dụng menu Chrome (⋮) → Print"
+              ? "Vui lòng s  � dụng menu Chrome (⋮) → Print"
               : "Vui lòng sử dụng menu trình duyệt để in";
 
           alert(browserTip);
@@ -1233,7 +1233,9 @@ export function ReceiptModal({
                 lineHeight: "1.4",
               }}
             >
-              <h3 className="text-center mb-1 font-bold">GIẶT SẤY WASH FRIENDS</h3>
+              <h3 className="text-center mb-1 font-bold">
+                GIẶT SẤY WASH FRIENDS
+              </h3>
               <p className="text-center font-bold mb-0">
                 {t("common.branch")}: {storeSettings?.storeName || ""}
               </p>
@@ -1413,7 +1415,7 @@ export function ReceiptModal({
                             verticalAlign: "top",
                           }}
                         >
-                          {Math.floor(parseFloat(quantity.toString()))}
+                          {quantity.toLocaleString("vi-VN")}
                         </td>
                         <td
                           style={{
@@ -1688,7 +1690,6 @@ export function ReceiptModal({
                 style={{
                   fontSize: "16px",
                   margin: "4px 0",
-                  fontWeight: "bold",
                 }}
               >
                 {t("pos.thankYouAndComeAgain")}
@@ -1698,7 +1699,6 @@ export function ReceiptModal({
                 style={{
                   fontSize: "14px",
                   margin: "4px 0",
-                  fontWeight: "bold",
                 }}
               >
                 {t("pos.thankYou")}

@@ -3,7 +3,10 @@ import type { CommonTranslations } from "../types";
 export const commonTranslations: { [key: string]: CommonTranslations } = {
   ko: {
     loading: "로딩 중...",
+    branch: "지점",
     serving: "서빙 중",
+    noOrders: "주문이 없습니다",
+    tryChangingFilters: "필터를 변경해보세요",
     save: "저장",
     select: "선택됨",
     view: "보기",
@@ -676,7 +679,6 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     selectImageFile: "이미지 파일을 선택하거나",
     dragDropUpload: "드래그엤드롭으로 업로드",
     summary: "요약",
-    branch: "지점",
 
     // Receipt translations
     storeName: "매장명",
@@ -695,7 +697,11 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
   },
   en: {
     save: "Save",
+    branch: "Branch",
+    noOrders: "No Orders",
+    tryChangingFilters: "Try changing the filters",
     payment: "Payment",
+    returned: "Returned",
     serving: "Serving",
     view: "View",
     select: "Selected",
@@ -1268,7 +1274,6 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
 
     // Receipt translations
     storeName: "Store Name",
-    branch: "Branch",
     storeAddress: "Address",
     storePhone: "Phone",
     invoiceNo: "Invoice No",
@@ -1286,6 +1291,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     save: "Lưu",
     serving: "Đang phục vụ",
     select: "Đã chọn",
+    branch: "Chi nhánh",
     payment: "Thanh toán",
     view: "Xem",
     cancel: "Hủy",
@@ -1840,12 +1846,13 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     urlInput: "Nhập URL",
     fileUpload: "Tải lên tệp",
     summary: "Tóm tắt",
-    branch: "Chi nhánh",
 
     // Receipt translations
     storeName: "Tên cửa hàng",
     storeAddress: "Địa chỉ",
     storePhone: "Điện thoại",
+    noOrders: "Không có đơn hàng nào",
+    tryChangingFilters: "Thử thay đổi bộ lọc",
     invoiceNo: "Số hóa đơn",
     receiptTime: "Thời gian",
     customerNameLabel: "Tên khách hàng",

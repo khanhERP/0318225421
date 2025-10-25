@@ -254,6 +254,8 @@ export const purchasesTranslations = {
     selectEmployee: "직원 선택",
     receiptNumber: "입고 번호",
     receiptNumberLabel: "입고 번호",
+    supplierFilterPlaceholder: "공급업체명 입력...",
+    receiptNumberPlaceholder: "입고 번호 입력...",
 
     // Delete functionality
     deleteSelected: "선택 항목 삭제",
@@ -266,6 +268,8 @@ export const purchasesTranslations = {
     paid: "결제 완료",
     paidDescription: "구매 주문이 결제되었는지 표시",
     totalPayment: "총 결제 금액",
+    paymentMethod: "결제 방법",
+    amount: "금액",
     searchProductPlaceholder: "제품 코드/이름 입력 또는 클릭하여 선택",
     totalSummary: "합계",
     updateReceipt: "입고 전표 업데이트",
@@ -554,6 +558,8 @@ export const purchasesTranslations = {
     selectEmployee: "Select Employee",
     receiptNumber: "Receipt Number",
     receiptNumberLabel: "Receipt Number",
+    supplierFilterPlaceholder: "Enter supplier name...",
+    receiptNumberPlaceholder: "Enter receipt number...",
 
     // Delete functionality
     deleteSelected: "Delete Selected",
@@ -566,6 +572,8 @@ export const purchasesTranslations = {
     paid: "Paid",
     paidDescription: "Mark if purchase order has been paid",
     totalPayment: "Total Payment",
+    paymentMethod: "Payment Method",
+    amount: "Amount",
     searchProductPlaceholder: "Enter product code/name or click to select",
     totalSummary: "TOTAL",
     updateReceipt: "Update Receipt",
@@ -855,6 +863,8 @@ export const purchasesTranslations = {
     selectEmployee: "Chọn nhân viên",
     receiptNumber: "Số phiếu nhập",
     receiptNumberLabel: "Số phiếu nhập",
+    supplierFilterPlaceholder: "Nhập tên nhà cung cấp...",
+    receiptNumberPlaceholder: "Nhập số phiếu nhập...",
 
     // Delete functionality
     deleteSelected: "Xóa phiếu nhập",
@@ -867,6 +877,8 @@ export const purchasesTranslations = {
     paid: "Đã thanh toán",
     paidDescription: "Đánh dấu nếu phiếu nhập đã được thanh toán",
     totalPayment: "Tổng thanh toán",
+    paymentMethod: "Phương thức thanh toán",
+    amount: "Số tiền",
     searchProductPlaceholder: "Nhập mã/tên SP hoặc click để chọn",
     totalSummary: "TỔNG CỘNG",
     updateReceipt: "Cập nhật phiếu nhập",
