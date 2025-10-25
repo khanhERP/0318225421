@@ -2439,7 +2439,7 @@ export default function SalesOrders() {
 
   const exportSelectedOrdersToExcel = () => {
     if (selectedOrderIds.size === 0) {
-      alert("Vui lòng chọn ít nhất một đơn hàng để xuất Excel ");
+      alert("Vui lòng chọn ít nhất một đơn hàng để xuất Excel");
       return;
     }
 
