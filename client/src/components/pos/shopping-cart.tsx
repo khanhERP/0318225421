@@ -1082,7 +1082,7 @@ export function ShoppingCart({
       tax: calculatedTax.toString(),
       discount: finalDiscount.toString(),
       total: baseTotal.toString(), // Use baseTotal (before subtracting discount) - discount is stored separately
-      paymentMethod: paymentMethod, // Lưu phương thức thanh toán đã chọn
+      paymentMethod: "", // Lưu phương thức thanh toán đã chọn
       salesChannel: "pos",
       priceIncludeTax: priceIncludesTax,
       einvoiceStatus: 0,
