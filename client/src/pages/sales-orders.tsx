@@ -5619,8 +5619,8 @@ export default function SalesOrders() {
                                                       )}
 
                                                     {/* Nút In hóa đơn: hiển thị khi order.status != 'paid' */}
-                                                    {selectedInvoice.status ===
-                                                      "paid" && (
+                                                    {selectedInvoice.status !==
+                                                      "cancelled" && (
                                                       <Button
                                                         size="sm"
                                                         variant="outline"
