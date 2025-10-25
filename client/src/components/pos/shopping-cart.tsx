@@ -964,7 +964,7 @@ export function ShoppingCart({
         ? orderDiscounts[activeOrderId] || "0"
         : discountAmount || "0",
     );
-    const finalTotal = Math.max(0, baseTotal - finalDiscount);
+    const finalTotal = Math.max(0, baseTotal);
 
     console.log("📝 Place Order Calculation:", {
       subtotal: calculatedSubtotal,

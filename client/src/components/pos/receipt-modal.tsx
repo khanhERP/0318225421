@@ -1382,7 +1382,7 @@ export function ReceiptModal({
                   const unitPrice = parseFloat(
                     item.unitPrice || item.price || "0",
                   );
-                  const quantity = item.quantity || 1;
+                  const quantity = parseFloat(item.quantity || "1");
                   const itemSubtotal = unitPrice * quantity;
 
                   return (
