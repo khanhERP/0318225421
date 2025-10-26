@@ -214,68 +214,23 @@ export default function SalesOrders() {
     };
   }, [queryClient]);
 
-  // Auto-refresh when new orders are created
+  // Chỉ refetch khi có sự kiện cụ thể từ các action thành công
   useEffect(() => {
-    const handleNewOrder = async () => {
-      console.log("📱 Sales Orders: New order detected, refreshing data...");
-      // Force immediate refresh with all date ranges
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
-
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/invoices"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/transactions"] }),
-        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
-      ]);
-    };
-
     const handleOrderUpdate = async () => {
-      console.log("🔄 Sales Orders: Order updated, refreshing data...");
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
-
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/invoices"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/transactions"] }),
-        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
-      ]);
+      console.log("🔄 Sales Orders: Order updated, refetching data...");
+      await queryClient.refetchQueries({ 
+        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"],
+        exact: false 
+      });
     };
 
-    const handleRefreshOrders = async () => {
-      console.log("🔄 Sales Orders: Manual refresh triggered...");
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
-
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/invoices"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/transactions"] }),
-        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
-      ]);
-    };
-
-    // Listen for order creation and update events
-    window.addEventListener("newOrderCreated", handleNewOrder);
+    // Chỉ listen các event quan trọng
     window.addEventListener("orderStatusUpdated", handleOrderUpdate);
     window.addEventListener("paymentCompleted", handleOrderUpdate);
-    window.addEventListener("refreshOrders", handleRefreshOrders);
-    window.addEventListener("invoiceCreated", handleNewOrder);
-    window.addEventListener("receiptCreated", handleNewOrder);
-    window.addEventListener("forceRefresh", handleRefreshOrders);
 
     return () => {
-      window.removeEventListener("newOrderCreated", handleNewOrder);
       window.removeEventListener("orderStatusUpdated", handleOrderUpdate);
       window.removeEventListener("paymentCompleted", handleOrderUpdate);
-      window.removeEventListener("refreshOrders", handleRefreshOrders);
-      window.removeEventListener("invoiceCreated", handleNewOrder);
-      window.removeEventListener("receiptCreated", handleNewOrder);
-      window.removeEventListener("forceRefresh", handleRefreshOrders);
     };
   }, [queryClient]);
   // Get URL parameters
@@ -422,12 +377,12 @@ export default function SalesOrders() {
     },
     retry: 1,
     retryDelay: 500,
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-    refetchInterval: 2000, // Poll every 2 seconds for real-time updates
-    refetchIntervalInBackground: true, // Continue polling in background
+    staleTime: 0, // Không cache
+    gcTime: 0, // Không giữ trong memory
+    refetchOnMount: false, // Không tự động refetch khi mount
+    refetchOnWindowFocus: false, // Không tự động refetch khi focus
+    refetchInterval: false, // Không auto-refresh
+    refetchIntervalInBackground: false, // Không background polling
   });
 
   const orders = ordersResponse?.orders || [];
@@ -559,7 +514,7 @@ export default function SalesOrders() {
         customerAddress: updatedOrder.customerAddress || "",
         customerTaxCode: updatedOrder.customerTaxCode || "",
         customerEmail: updatedOrder.customerEmail || "",
-        isPaid: updatedOrder.isPaid, // Trạng thái đã trả đồ
+        isPaid: updatedOrder.isPaid,
         notes: updatedOrder.notes || "",
         status: updatedOrder.status,
         paymentStatus: updatedOrder.paymentStatus,
@@ -567,9 +522,9 @@ export default function SalesOrders() {
         tax: updatedOrder.tax,
         total: updatedOrder.total,
         discount: updatedOrder.discount,
-        invoiceNumber: updatedOrder.invoiceNumber, // Added invoiceNumber here
-        symbol: updatedOrder.symbol, // Added symbol here
-        einvoiceStatus: updatedOrder.einvoiceStatus, // Added einvoiceStatus here
+        invoiceNumber: updatedOrder.invoiceNumber,
+        symbol: updatedOrder.symbol,
+        einvoiceStatus: updatedOrder.einvoiceStatus,
       };
 
       console.log("📝 Update payload:", updatePayload);
@@ -590,35 +545,26 @@ export default function SalesOrders() {
     onSuccess: async (data, updatedOrder) => {
       console.log("✅ Order updated successfully:", data);
 
-      // Clear cache completely
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
-      queryClient.removeQueries({
+      // Chỉ refetch orders list và order items cụ thể
+      await queryClient.refetchQueries({ 
+        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"],
+        exact: false 
+      });
+      
+      await queryClient.refetchQueries({
         queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", updatedOrder.id],
       });
-
-      // Force fresh fetch from server
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
-        queryClient.invalidateQueries({
-          queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", updatedOrder.id],
-        }),
-        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
-        queryClient.refetchQueries({
-          queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", updatedOrder.id],
-        }),
-      ]);
 
       setIsEditing(false);
       setEditableInvoice(null);
 
-      // Update selected order with fresh data from server
       if (selectedInvoice) {
         setSelectedInvoice({ ...selectedInvoice, ...data });
       }
 
       toast({
         title: "Cập nhật thành công",
-        description: "Đơn hàng đã được cập nhật và danh sách đã được làm mới",
+        description: "Đơn hàng đã được cập nhật",
       });
     },
     onError: (error) => {
@@ -856,25 +802,11 @@ export default function SalesOrders() {
 
       setShowCancelDialog(false);
 
-      // Clear cache completely and force fresh fetch
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range"] });
-
-      // Force immediate refetch with fresh data
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range"] }),
-        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
-        queryClient.refetchQueries({
-          queryKey: [
-            "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range",
-            startDate,
-            endDate,
-            currentPage,
-            itemsPerPage,
-          ],
-        }),
-      ]);
+      // Chỉ refetch orders list
+      await queryClient.refetchQueries({ 
+        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"],
+        exact: false 
+      });
 
       // Update selected order if it was cancelled
       if (selectedInvoice && selectedInvoice.id === orderId) {
@@ -887,11 +819,9 @@ export default function SalesOrders() {
         setEditableInvoice(null);
       }
 
-      console.log("✅ Order cancelled and list refreshed from database");
-
       toast({
         title: "Đã hủy đơn hàng",
-        description: "Đơn hàng đã được hủy và danh sách đã được cập nhật",
+        description: "Đơn hàng đã được hủy",
       });
     },
     onError: (error) => {
@@ -1063,7 +993,7 @@ export default function SalesOrders() {
                 : order.status === "cancelled"
                   ? 3
                   : 2,
-        customerName: order.customerName || "Khách hàng l ",
+        customerName: order.customerName || "",
         invoiceStatus:
           order.status === "paid"
             ? 1
@@ -1078,8 +1008,7 @@ export default function SalesOrders() {
         customerAddress: order.customerAddress || "",
         customerTaxCode: order.customerTaxCode || "",
         symbol: order.symbol || order.templateNumber || "",
-        invoiceNumber:
-          order.orderNumber || `ORD-${String(order.id).padStart(8, "0")}`,
+        invoiceNumber: order.orderNumber || ``,
         tradeNumber: order.orderNumber || "",
         invoiceDate: order.orderedAt,
         einvoiceStatus: order.einvoiceStatus || 0,
@@ -1417,8 +1346,10 @@ export default function SalesOrders() {
           const fullItemData = orderItems.find((item: any) => item.id === id);
 
           // Get product info to ensure we have the SKU
-          const product = products.find((p: any) => p.id === (changes.productId || fullItemData?.productId));
-          
+          const product = products.find(
+            (p: any) => p.id === (changes.productId || fullItemData?.productId),
+          );
+
           // Merge all available data - prioritize changes from editedOrderItems
           const completeItemData = {
             ...(fullItemData || {}),
@@ -1811,7 +1742,7 @@ export default function SalesOrders() {
       setSelectedInvoice(null);
 
       // Dispatch custom event to force refresh
-      window.dispatchEvent(new CustomEvent('forceRefresh'));
+      window.dispatchEvent(new CustomEvent("forceRefresh"));
 
       toast({
         title: "Lưu thành công",
@@ -3314,10 +3245,15 @@ export default function SalesOrders() {
                         ) : (
                           filteredInvoices.map((item) => {
                             // Get customer info - prioritize customerId from customer table if order has customerId
-                            let customerCode = item.customerCode || item.customerTaxCode || "";
-                            
+                            let customerCode =
+                              item.customerCode || item.customerTaxCode || "";
+
                             // If order has customerId, try to find customer in customers list
-                            if (item.customerId && customers && customers.length > 0) {
+                            if (
+                              item.customerId &&
+                              customers &&
+                              customers.length > 0
+                            ) {
                               const customer = customers.find(
                                 (c: any) =>
                                   c.id === item.customerId ||
@@ -3327,12 +3263,7 @@ export default function SalesOrders() {
                                 customerCode = customer.customerId;
                               }
                             }
-                            
-                            // Fallback to generated code if still empty
-                            if (!customerCode) {
-                              customerCode = `KH${String(item.id).padStart(6, "0")}`;
-                            }
-                            
+
                             const customerName = item.customerName || "";
                             const discount = parseFloat(item.discount || "0");
                             const tax = parseFloat(item.tax || "0");
@@ -3656,7 +3587,8 @@ export default function SalesOrders() {
 
                                                                   // Nếu xóa hoàn toàn (rỗng)
                                                                   if (
-                                                                    inputValue === ""
+                                                                    inputValue ===
+                                                                    ""
                                                                   ) {
                                                                     updateEditableInvoiceField(
                                                                       "customerPhone",
@@ -3692,10 +3624,13 @@ export default function SalesOrders() {
                                                                           c: any,
                                                                         ) =>
                                                                           c.name ===
-                                                                          inputValue ||
-                                                                          c.phone === inputValue ||
-                                                                          c.customerId === inputValue ||
-                                                                          c.customerTaxCode === inputValue,
+                                                                            inputValue ||
+                                                                          c.phone ===
+                                                                            inputValue ||
+                                                                          c.customerId ===
+                                                                            inputValue ||
+                                                                          c.customerTaxCode ===
+                                                                            inputValue,
                                                                       );
 
                                                                     if (
@@ -3744,36 +3679,38 @@ export default function SalesOrders() {
                                                                     : "Tìm theo tên, SĐT, mã KH"
                                                                 }
                                                               />
-                                                              {editableInvoice.customerName && selectedInvoice.displayStatus !== 1 && (
-                                                                <button
-                                                                  type="button"
-                                                                  onClick={() => {
-                                                                    updateEditableInvoiceField(
-                                                                      "customerName",
-                                                                      "",
-                                                                    );
-                                                                    updateEditableInvoiceField(
-                                                                      "customerPhone",
-                                                                      "",
-                                                                    );
-                                                                    updateEditableInvoiceField(
-                                                                      "customerTaxCode",
-                                                                      "",
-                                                                    );
-                                                                    updateEditableInvoiceField(
-                                                                      "customerAddress",
-                                                                      "",
-                                                                    );
-                                                                    updateEditableInvoiceField(
-                                                                      "customerEmail",
-                                                                      "",
-                                                                    );
-                                                                  }}
-                                                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                                                >
-                                                                  <X className="w-4 h-4" />
-                                                                </button>
-                                                              )}
+                                                              {editableInvoice.customerName &&
+                                                                selectedInvoice.displayStatus !==
+                                                                  1 && (
+                                                                  <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                      updateEditableInvoiceField(
+                                                                        "customerName",
+                                                                        "",
+                                                                      );
+                                                                      updateEditableInvoiceField(
+                                                                        "customerPhone",
+                                                                        "",
+                                                                      );
+                                                                      updateEditableInvoiceField(
+                                                                        "customerTaxCode",
+                                                                        "",
+                                                                      );
+                                                                      updateEditableInvoiceField(
+                                                                        "customerAddress",
+                                                                        "",
+                                                                      );
+                                                                      updateEditableInvoiceField(
+                                                                        "customerEmail",
+                                                                        "",
+                                                                      );
+                                                                    }}
+                                                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                                  >
+                                                                    <X className="w-4 h-4" />
+                                                                  </button>
+                                                                )}
                                                               {Array.isArray(
                                                                 customers,
                                                               ) &&
@@ -4375,7 +4312,8 @@ export default function SalesOrders() {
                                                                               editedOrderItems[
                                                                                 it
                                                                                   .id
-                                                                              ] || {};
+                                                                              ] ||
+                                                                              {};
                                                                             const itPrice =
                                                                               parseFloat(
                                                                                 editedIt.unitPrice !==
@@ -4597,7 +4535,8 @@ export default function SalesOrders() {
                                                                       </div>
                                                                     ) : (
                                                                       <div className="truncate text-base">
-                                                                        {sku || "-"}
+                                                                        {sku ||
+                                                                          "-"}
                                                                       </div>
                                                                     )}
                                                                   </td>
@@ -5683,7 +5622,9 @@ export default function SalesOrders() {
                                                               variant="outline"
                                                               size="sm"
                                                             >
-                                                              {t("common.cancel")}
+                                                              {t(
+                                                                "common.cancel",
+                                                              )}
                                                             </Button>
                                                           </>
                                                         );
