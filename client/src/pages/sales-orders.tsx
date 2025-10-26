@@ -4467,6 +4467,7 @@ export default function SalesOrders() {
                                                                             1
                                                                           }
                                                                           data-field={`orderitem-sku-${index}`}
+                                                                          onFocus={(e) => e.target.select()}
                                                                           onChange={(
                                                                             e,
                                                                           ) => {
