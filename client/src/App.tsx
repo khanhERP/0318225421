@@ -157,7 +157,7 @@ function App() {
 
   const handleLogout = () => {
     // Xóa tất cả thông tin đăng nhập
-    sessionStorage.removeItem("pinAuthenticated");
+    sessionStorage.clear();
     localStorage.removeItem("authToken");
     localStorage.removeItem("storeInfo");
     localStorage.removeItem("currentDomain");
@@ -169,21 +169,26 @@ function App() {
 
   // Check for existing authentication on mount
   useEffect(() => {
-    const pinAuth = sessionStorage.getItem("pinAuthenticated");
-    const token = localStorage.getItem("authToken");
     const currentDomain = window.location.hostname;
     const storedDomain = localStorage.getItem("currentDomain");
 
-    // Check if domain has changed
+    // Check if domain has changed - MUST clear everything
     if (storedDomain && storedDomain !== currentDomain) {
-      console.log(`🔄 Domain changed from ${storedDomain} to ${currentDomain} - forcing re-login`);
-      sessionStorage.removeItem("pinAuthenticated");
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("storeInfo");
-      localStorage.removeItem("currentDomain");
+      console.log(`🔄 Domain changed from ${storedDomain} to ${currentDomain} - forcing complete logout`);
+      
+      // Clear ALL storage to ensure clean state
+      sessionStorage.clear();
+      localStorage.clear();
+      
+      // Force re-authentication
       setIsAuthenticated(false);
+      
+      console.log("✅ All auth data cleared - user must login again");
       return;
     }
+
+    const pinAuth = sessionStorage.getItem("pinAuthenticated");
+    const token = localStorage.getItem("authToken");
 
     if (pinAuth === "true" && token) {
       setIsAuthenticated(true);

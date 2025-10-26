@@ -33,12 +33,16 @@ export function PinAuth({ onAuthSuccess }: PinAuthProps) {
     const storedDomain = localStorage.getItem("currentDomain");
 
     if (storedDomain && storedDomain !== currentDomain) {
-      console.log(`🔄 Domain changed from ${storedDomain} to ${currentDomain} - clearing auth data`);
-      // Clear all authentication data
-      sessionStorage.removeItem("pinAuthenticated");
+      console.log(`🔄 Domain changed from ${storedDomain} to ${currentDomain} - clearing all auth data`);
+      // Clear all authentication data from both localStorage and sessionStorage
+      sessionStorage.clear();
       localStorage.removeItem("authToken");
       localStorage.removeItem("storeInfo");
       localStorage.removeItem("currentDomain");
+      
+      // Force reload to ensure clean state
+      console.log("✅ Auth data cleared - forcing page reload");
+      window.location.reload();
     }
   }, []);
 
