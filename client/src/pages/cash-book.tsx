@@ -1095,9 +1095,33 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
               {filteredData.transactions.length === 0 ? (
                 <div className="text-center py-12">
                   <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-600">
+                  <p className="text-gray-600 mb-4">
                     {t("common.noTransactionsInPeriod")}
                   </p>
+                  <div className="flex justify-center gap-3">
+                    <Button
+                      onClick={() => {
+                        setSelectedVoucher(null);
+                        setVoucherMode("create");
+                        setShowIncomeVoucherModal(true);
+                      }}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      {t("common.createIncomeVoucher")}
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setSelectedVoucher(null);
+                        setVoucherMode("create");
+                        setShowExpenseVoucherModal(true);
+                      }}
+                      className="bg-red-600 hover:bg-red-700 text-white"
+                    >
+                      <Minus className="w-4 h-4 mr-2" />
+                      {t("common.createExpenseVoucher")}
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
