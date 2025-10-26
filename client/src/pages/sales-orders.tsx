@@ -328,6 +328,7 @@ export default function SalesOrders() {
       customerSearch,
       orderNumberSearch,
       customerCodeSearch,
+      searchTerm,
       salesChannelFilter,
       orderStatusFilter,
       einvoiceStatusFilter,
@@ -345,7 +346,8 @@ export default function SalesOrders() {
         if (customerSearch) params.append("customerName", customerSearch);
         if (orderNumberSearch) params.append("orderNumber", orderNumberSearch);
         if (customerCodeSearch)
-          params.append("customerCode", customerCodeSearch);
+          params.append("productSearch", customerCodeSearch);
+        if (searchTerm) params.append("productSearch", searchTerm);
         if (salesChannelFilter && salesChannelFilter !== "all") {
           params.append("salesChannel", salesChannelFilter);
         }
@@ -2675,7 +2677,7 @@ export default function SalesOrders() {
 
         toast({
           title: "Thanh toán thành công",
-          description: "Đơn hàng đã được cập nhật trạng thái thanh toán",
+          description: "Đơn hàng đã được cập nhật trạng thái thanh to �n",
         });
 
         // For laundry business, show receipt modal after payment
@@ -2915,8 +2917,8 @@ export default function SalesOrders() {
                   </label>
                   <Input
                     placeholder={t("common.customerCodeSearchPlaceholder")}
-                    value={customerCodeSearch}
-                    onChange={(e) => setCustomerCodeSearch(e.target.value)}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full"
                   />
                 </div>
