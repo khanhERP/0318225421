@@ -3318,7 +3318,11 @@ export default function SalesOrders() {
                             
                             // If order has customerId, try to find customer in customers list
                             if (item.customerId && customers && customers.length > 0) {
-                              const customer = customers.find((c: any) => c.id === item.customerId);
+                              const customer = customers.find(
+                                (c: any) =>
+                                  c.id === item.customerId ||
+                                  c.name == item.customerName,
+                              );
                               if (customer && customer.customerId) {
                                 customerCode = customer.customerId;
                               }
