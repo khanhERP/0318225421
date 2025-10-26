@@ -160,6 +160,7 @@ function App() {
     sessionStorage.removeItem("pinAuthenticated");
     localStorage.removeItem("authToken");
     localStorage.removeItem("storeInfo");
+    localStorage.removeItem("currentDomain");
     setIsAuthenticated(false);
   };
 
@@ -170,6 +171,19 @@ function App() {
   useEffect(() => {
     const pinAuth = sessionStorage.getItem("pinAuthenticated");
     const token = localStorage.getItem("authToken");
+    const currentDomain = window.location.hostname;
+    const storedDomain = localStorage.getItem("currentDomain");
+
+    // Check if domain has changed
+    if (storedDomain && storedDomain !== currentDomain) {
+      console.log(`🔄 Domain changed from ${storedDomain} to ${currentDomain} - forcing re-login`);
+      sessionStorage.removeItem("pinAuthenticated");
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("storeInfo");
+      localStorage.removeItem("currentDomain");
+      setIsAuthenticated(false);
+      return;
+    }
 
     if (pinAuth === "true" && token) {
       setIsAuthenticated(true);
@@ -178,6 +192,7 @@ function App() {
       sessionStorage.removeItem("pinAuthenticated");
       localStorage.removeItem("authToken");
       localStorage.removeItem("storeInfo");
+      localStorage.removeItem("currentDomain");
       setIsAuthenticated(false);
     }
   }, []);

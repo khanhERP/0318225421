@@ -27,6 +27,21 @@ export function PinAuth({ onAuthSuccess }: PinAuthProps) {
   const { toast } = useToast();
 
 
+  // Check if domain has changed and clear storage if needed
+  useEffect(() => {
+    const currentDomain = window.location.hostname;
+    const storedDomain = localStorage.getItem("currentDomain");
+
+    if (storedDomain && storedDomain !== currentDomain) {
+      console.log(`🔄 Domain changed from ${storedDomain} to ${currentDomain} - clearing auth data`);
+      // Clear all authentication data
+      sessionStorage.removeItem("pinAuthenticated");
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("storeInfo");
+      localStorage.removeItem("currentDomain");
+    }
+  }, []);
+
   // Fetch store settings để lấy PIN
   const { data: storeData } = useQuery({
     queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings"],
@@ -71,13 +86,13 @@ export function PinAuth({ onAuthSuccess }: PinAuthProps) {
     try {
       // Lấy domain hiện tại từ window.location
       const currentDomain = window.location.hostname;
-      
+
       console.log("Submitting PIN with domain:", {
         pin,
         domain: currentDomain,
         fullUrl: window.location.href,
       });
-      
+
       // Gọi API đăng nhập bằng PIN
       const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/auth/login-pin", {
         method: "POST",
@@ -95,10 +110,15 @@ export function PinAuth({ onAuthSuccess }: PinAuthProps) {
       if (response.ok && result.success) {
         // Lưu token vào localStorage
         localStorage.setItem("authToken", result.data.token);
-        
+
+        // Lưu domain hiện tại để check sau này
+        const currentDomain = window.location.hostname;
+        localStorage.setItem("currentDomain", currentDomain);
+        console.log(`💾 Saved current domain: ${currentDomain}`);
+
         // Lưu thông tin store vào localStorage
         localStorage.setItem("storeInfo", JSON.stringify(result.data.store));
-        
+
         // Lưu trạng thái đăng nhập vào sessionStorage
         sessionStorage.setItem("pinAuthenticated", "true");
 
