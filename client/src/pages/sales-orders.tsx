@@ -82,6 +82,7 @@ interface Invoice {
   exactDiscount?: string; // Added missing exactDiscount field
   priceIncludeTax?: boolean; // Added priceIncludeTax field
   isPaid?: boolean; // Added isPaid field
+  customerId?: number; // Added customerId field
 }
 
 interface InvoiceItem {
@@ -95,6 +96,7 @@ interface InvoiceItem {
   taxRate: string;
   discount?: string; // Added discount field
   sku?: string; // Added sku field
+  productSku?: string; // Added productSku field
 }
 
 interface Order {
@@ -104,6 +106,7 @@ interface Order {
   employeeId?: number;
   status: string;
   customerName?: string;
+  customerPhone?: string; // Added customerPhone
   customerCount: number;
   subtotal: string;
   tax: string;
@@ -116,7 +119,6 @@ interface Order {
   salesChannel?: string;
   invoiceNumber?: string;
   invoiceDate?: string;
-  customerPhone?: string;
   customerAddress?: string;
   customerTaxCode?: string;
   symbol?: string;
@@ -130,6 +132,7 @@ interface Order {
   discount?: string; // Added discount field
   priceIncludeTax?: boolean; // Added priceIncludeTax field
   isPaid?: boolean; // Added isPaid field
+  customerId?: number; // Added customerId field
 }
 
 // Helper function to safely determine item type
@@ -218,9 +221,9 @@ export default function SalesOrders() {
   useEffect(() => {
     const handleOrderUpdate = async () => {
       console.log("🔄 Sales Orders: Order updated, refetching data...");
-      await queryClient.refetchQueries({ 
+      await queryClient.refetchQueries({
         queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"],
-        exact: false 
+        exact: false,
       });
     };
 
@@ -330,6 +333,8 @@ export default function SalesOrders() {
       einvoiceStatusFilter,
       currentPage,
       itemsPerPage,
+      sortField, // Include sort parameters in query key
+      sortOrder,
     ],
     queryFn: async () => {
       try {
@@ -353,6 +358,11 @@ export default function SalesOrders() {
         params.append("page", currentPage.toString());
         if (itemsPerPage) {
           params.append("limit", itemsPerPage.toString());
+        }
+        // Add sorting parameters to the query
+        if (sortField) {
+          params.append("sortBy", sortField);
+          params.append("sortOrder", sortOrder);
         }
 
         const url = `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list?${params.toString()}`;
@@ -379,7 +389,7 @@ export default function SalesOrders() {
     retryDelay: 500,
     staleTime: 0, // Không cache
     gcTime: 0, // Không giữ trong memory
-    refetchOnMount: false, // Không tự động refetch khi mount
+    refetchOnMount: true, // Refetch when component mounts or queryKey changes
     refetchOnWindowFocus: false, // Không tự động refetch khi focus
     refetchInterval: false, // Không auto-refresh
     refetchIntervalInBackground: false, // Không background polling
@@ -525,6 +535,11 @@ export default function SalesOrders() {
         invoiceNumber: updatedOrder.invoiceNumber,
         symbol: updatedOrder.symbol,
         einvoiceStatus: updatedOrder.einvoiceStatus,
+        // Add other fields that might be updated
+        orderNumber: updatedOrder.orderNumber,
+        date: updatedOrder.date, // If date is editable
+        customerId: updatedOrder.customerId, // If customer selection is implemented
+        priceIncludeTax: updatedOrder.priceIncludeTax, // If this field is editable
       };
 
       console.log("📝 Update payload:", updatePayload);
@@ -545,12 +560,12 @@ export default function SalesOrders() {
     onSuccess: async (data, updatedOrder) => {
       console.log("✅ Order updated successfully:", data);
 
-      // Chỉ refetch orders list và order items cụ thể
-      await queryClient.refetchQueries({ 
+      // Only refetch orders list and order items for the specific order
+      await queryClient.refetchQueries({
         queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"],
-        exact: false 
+        exact: false,
       });
-      
+
       await queryClient.refetchQueries({
         queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", updatedOrder.id],
       });
@@ -619,7 +634,7 @@ export default function SalesOrders() {
       setShowBulkCancelDialog(false);
       setSelectedOrderIds(new Set());
 
-      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
 
       // Update selected order if it was cancelled
       if (selectedInvoice) {
@@ -726,7 +741,7 @@ export default function SalesOrders() {
           setPrintReceiptData(receiptData);
           setShowPrintDialog(true);
 
-          queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+          queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
 
           setShowPublishDialog(false);
           setSelectedInvoice(null);
@@ -802,10 +817,10 @@ export default function SalesOrders() {
 
       setShowCancelDialog(false);
 
-      // Chỉ refetch orders list
-      await queryClient.refetchQueries({ 
+      // Only refetch orders list
+      await queryClient.refetchQueries({
         queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"],
-        exact: false 
+        exact: false,
       });
 
       // Update selected order if it was cancelled
@@ -1004,9 +1019,8 @@ export default function SalesOrders() {
                 : order.status === "cancelled"
                   ? 3
                   : 2,
-        customerPhone: order.customerPhone || "",
+        customerPhone: order.customerPhone || "", // Ensure customerPhone is mapped
         customerAddress: order.customerAddress || "",
-        customerTaxCode: order.customerTaxCode || "",
         symbol: order.symbol || order.templateNumber || "",
         invoiceNumber: order.orderNumber || ``,
         tradeNumber: order.orderNumber || "",
@@ -1024,12 +1038,13 @@ export default function SalesOrders() {
         updatedAt: order.updatedAt, // Keep updatedAt for cancellation/completion time
         discount: order.discount || "0", // Map discount field
         priceIncludeTax: order.priceIncludeTax || false, // Map priceIncludeTax field
+        customerId: order.customerId, // Map customerId field
       }))
     : [];
 
   const filteredInvoices = Array.isArray(combinedData)
     ? combinedData.sort((a: any, b: any) => {
-        // Apply custom sorting if a field is selected
+        // Apply sorting if a field is selected
         if (sortField) {
           let aValue: any;
           let bValue: any;
@@ -1059,6 +1074,10 @@ export default function SalesOrders() {
               aValue = a.customerName || "";
               bValue = b.customerName || "";
               break;
+            case "customerPhone": // Added for sorting customer phone
+              aValue = a.customerPhone || "";
+              bValue = b.customerPhone || "";
+              break;
             case "subtotal":
               aValue = parseFloat(a.subtotal || "0");
               bValue = parseFloat(b.subtotal || "0");
@@ -1075,14 +1094,7 @@ export default function SalesOrders() {
               aValue = parseFloat(a.total || "0");
               bValue = parseFloat(b.total || "0");
               break;
-            case "employeeCode":
-              aValue = a.employeeId || 0;
-              bValue = b.employeeId || 0;
-              break;
-            case "employeeName":
-              aValue = "";
-              bValue = "";
-              break;
+            // Removed employeeCode and employeeName from sorting
             case "symbol":
               aValue = a.symbol || a.templateNumber || "";
               bValue = b.symbol || b.templateNumber || "";
@@ -1685,6 +1697,10 @@ export default function SalesOrders() {
         invoiceNumber: editableInvoice.invoiceNumber,
         symbol: editableInvoice.symbol,
         einvoiceStatus: editableInvoice.einvoiceStatus,
+        // Ensure other potential fields are passed if they are editable
+        orderNumber: editableInvoice.orderNumber,
+        date: editableInvoice.date,
+        customerId: editableInvoice.customerId,
       };
 
       console.log("💾 Saving order with recalculated totals:", orderData);
@@ -1780,7 +1796,9 @@ export default function SalesOrders() {
       | "invoiceNumber"
       | "notes"
       | "discount" // Added discount field
-      | "priceIncludeTax", // Added priceIncludeTax field
+      | "priceIncludeTax"
+      | "templateNumber" // Added templateNumber field
+      | "customerId", // Added customerId field
     value: any,
   ) => {
     if (editableInvoice) {
@@ -1805,6 +1823,8 @@ export default function SalesOrders() {
       notes?: string; // Add notes field
       tax?: string; // Add tax to edited item state
       _isNew?: boolean; // Flag for new unsaved items
+      priceBeforeTax?: string; // Add priceBeforeTax to edited item state
+      taxRate?: string; // Add taxRate to edited item state
     };
   }>({});
 
@@ -1823,21 +1843,52 @@ export default function SalesOrders() {
     // Calculate totals from visible items
     visibleItems.forEach((item: any) => {
       const edited = editedOrderItems[item.id] || {};
-      const currentItemUnitPrice = parseFloat(
-        edited.unitPrice !== undefined
-          ? edited.unitPrice
-          : item.unitPrice || "0",
-      );
-      const currentItemQuantity = parseFloat(
-        edited.quantity !== undefined ? edited.quantity : item.quantity || "0",
-      );
-      const currentItemSubtotal = currentItemUnitPrice * currentItemQuantity;
-      const currentItemTax = parseFloat(
-        edited.tax !== undefined ? edited.tax : item.tax || "0",
-      );
+      // Use tax from editedOrderItems if available (already calculated)
+      if (edited.tax !== undefined) {
+        totalTax += parseFloat(edited.tax);
 
-      totalSubtotal += currentItemSubtotal;
-      totalTax += currentItemTax;
+        // Calculate subtotal from unitPrice and quantity
+        const unitPrice = parseFloat(
+          edited.unitPrice !== undefined
+            ? edited.unitPrice
+            : item.unitPrice || "0",
+        );
+        const quantity = parseFloat(
+          edited.quantity !== undefined
+            ? edited.quantity
+            : item.quantity || "0",
+        );
+        totalSubtotal += unitPrice * quantity;
+      } else {
+        // Fallback to original calculation if tax not in editedOrderItems
+        const product = products.find((p: any) => p.id === item.productId);
+        const taxRate = product?.taxRate
+          ? parseFloat(product.taxRate) / 100
+          : 0;
+
+        const unitPrice = parseFloat(
+          edited.unitPrice !== undefined
+            ? edited.unitPrice
+            : item.unitPrice || "0",
+        );
+        const quantity = parseFloat(
+          edited.quantity !== undefined
+            ? edited.quantity
+            : item.quantity || "0",
+        );
+
+        const itemSubtotal = unitPrice * quantity;
+
+        if (editableInvoice?.priceIncludeTax && taxRate > 0) {
+          const priceBeforeTax = itemSubtotal / (1 + taxRate);
+          const itemTax = itemSubtotal - priceBeforeTax;
+          totalSubtotal += priceBeforeTax;
+          totalTax += itemTax;
+        } else {
+          totalSubtotal += itemSubtotal;
+          totalTax += itemSubtotal * taxRate;
+        }
+      }
     });
 
     const orderDiscount = parseFloat(editableInvoice.discount || "0");
@@ -2408,12 +2459,12 @@ export default function SalesOrders() {
       t("orders.table"),
       t("orders.customerCode"),
       t("orders.customerName"),
+      t("common.phone"), // Added phone header
       t("common.subtotalAmount"),
       t("common.discount"),
       t("common.tax"),
       t("common.paid"),
-      t("common.employeeCode"),
-      t("common.employeeName"),
+      // Removed Employee Code and Name headers
       t("orders.invoiceSymbol"),
       t("orders.invoiceNumber"),
       t("common.notes"),
@@ -2427,20 +2478,19 @@ export default function SalesOrders() {
         item.invoiceNumber ||
         item.orderNumber ||
         `ORD-${String(item.id).padStart(8, "0")}`;
-      const orderDate = formatDate(item.date);
+      const orderDate = formatDate(item.date); // Use 'date' field for order date
       const table =
         item.type === "order" && item.tableId
           ? getTableNumber(item.tableId)
           : "";
       const customerCode = item.customerTaxCode;
       const customerName = item.customerName || "";
+      const customerPhone = item.customerPhone || ""; // Get customer phone
       const subtotal = parseFloat(item.subtotal || "0");
       const discount = parseFloat(item.discount || "0");
       const tax = parseFloat(item.tax || "0");
       const total = parseFloat(item.total || "0");
       const paid = total;
-      const employeeCode = item.employeeId || "NV0001";
-      const employeeName = "";
       const symbol = item.symbol || "";
       const invoiceNumber =
         item.invoiceNumber || String(item.id).padStart(8, "0");
@@ -2457,12 +2507,12 @@ export default function SalesOrders() {
         table,
         customerCode,
         customerName,
+        customerPhone, // Add customer phone data
         subtotal,
         discount,
         tax,
         paid,
-        employeeCode,
-        employeeName,
+        // Removed Employee Code and Name data
         symbol,
         invoiceNumber,
         item.notes || "",
@@ -2478,12 +2528,12 @@ export default function SalesOrders() {
       { wch: 8 },
       { wch: 12 },
       { wch: 15 },
+      { wch: 12 }, // Column for phone number
       { wch: 12 },
       { wch: 10 },
       { wch: 10 },
       { wch: 12 },
-      { wch: 12 },
-      { wch: 15 },
+      // Removed Employee Code and Name columns
       { wch: 12 },
       { wch: 12 },
       { wch: 20 },
@@ -2510,7 +2560,8 @@ export default function SalesOrders() {
       };
     }
 
-    for (let col = 0; col <= 14; col++) {
+    for (let col = 0; col <= 13; col++) {
+      // Adjusted loop to match new header count (0-13)
       const cellAddress = XLSX.utils.encode_cell({ r: 2, c: col });
       if (ws[cellAddress]) {
         ws[cellAddress].s = {
@@ -2536,9 +2587,10 @@ export default function SalesOrders() {
       const isEven = (row - 3) % 2 === 0;
       const bgColor = isEven ? "FFFFFF" : "F2F2F2";
 
-      for (let col = 0; col <= 14; col++) {
+      for (let col = 0; col <= 13; col++) {
+        // Adjusted loop to match new header count
         const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-        const isCurrency = [5, 6, 7, 8].includes(col);
+        const isCurrency = [6, 7, 8, 9].includes(col); // Indices for subtotal, discount, tax, paid
 
         if (ws[cellAddress]) {
           ws[cellAddress].s = {
@@ -2618,7 +2670,7 @@ export default function SalesOrders() {
         console.log("✅ Order payment status updated successfully");
 
         // Refresh orders list
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
         queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"] });
 
         toast({
@@ -2705,7 +2757,7 @@ export default function SalesOrders() {
 
       // Refresh orders list after a delay to avoid interfering with receipt modal
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
         queryClient.invalidateQueries({
           queryKey: [
             "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range",
@@ -2859,7 +2911,7 @@ export default function SalesOrders() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    {t("orders.productSearch")}
+                    {t("common.product")}
                   </label>
                   <Input
                     placeholder={t("common.customerCodeSearchPlaceholder")}
@@ -2985,7 +3037,7 @@ export default function SalesOrders() {
                   <Button
                     onClick={() => {
                       queryClient.invalidateQueries({
-                        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"],
+                        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"],
                       });
                     }}
                   >
@@ -3103,6 +3155,19 @@ export default function SalesOrders() {
                               )}
                             </div>
                           </th>
+                          <th // Added header for customer phone
+                            className="w-[120px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
+                            onClick={() => handleSort("customerPhone")}
+                          >
+                            <div className="leading-tight flex items-center gap-1">
+                              {t("common.phone")}
+                              {sortField === "customerPhone" && (
+                                <span className="text-blue-600">
+                                  {sortOrder === "asc" ? "↑" : "↓"}
+                                </span>
+                              )}
+                            </div>
+                          </th>
                           <th
                             className="w-[120px] px-3 py-3 text-right font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("subtotal")}
@@ -3156,32 +3221,6 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[110px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
-                            onClick={() => handleSort("employeeCode")}
-                          >
-                            <div className="leading-tight flex items-center gap-1">
-                              {t("common.employeeCode")}
-                              {sortField === "employeeCode" && (
-                                <span className="text-blue-600">
-                                  {sortOrder === "asc" ? "↑" : "↓"}
-                                </span>
-                              )}
-                            </div>
-                          </th>
-                          <th
-                            className="w-[120px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
-                            onClick={() => handleSort("employeeName")}
-                          >
-                            <div className="leading-tight flex items-center gap-1">
-                              {t("common.employeeName")}
-                              {sortField === "employeeName" && (
-                                <span className="text-blue-600">
-                                  {sortOrder === "asc" ? "↑" : "↓"}
-                                </span>
-                              )}
-                            </div>
-                          </th>
-                          <th
                             className="w-[120px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("symbol")}
                           >
@@ -3228,8 +3267,8 @@ export default function SalesOrders() {
                             <td
                               colSpan={
                                 storeSettings?.businessType === "laundry"
-                                  ? 18
-                                  : 17
+                                  ? 16 // Adjusted colspan
+                                  : 15 // Adjusted colspan
                               }
                               className="p-8 text-center text-sm text-gray-500"
                             >
@@ -3265,13 +3304,12 @@ export default function SalesOrders() {
                             }
 
                             const customerName = item.customerName || "";
+                            const customerPhone = item.customerPhone || ""; // Get customer phone
                             const discount = parseFloat(item.discount || "0");
                             const tax = parseFloat(item.tax || "0");
                             const subtotal = parseFloat(item.subtotal || "0");
                             const total = parseFloat(item.total || "0");
                             const paid = total;
-                            const employeeCode = item.employeeId || "";
-                            const employeeName = "";
                             const symbol = item.symbol || "";
                             const invoiceNumber =
                               item.invoiceNumber ||
@@ -3415,6 +3453,16 @@ export default function SalesOrders() {
                                       {customerName}
                                     </div>
                                   </td>
+                                  <td className="px-3 py-3">
+                                    {" "}
+                                    {/* Added cell for customer phone */}
+                                    <div
+                                      className="text-[16px] truncate"
+                                      title={customerPhone}
+                                    >
+                                      {customerPhone || "-"}
+                                    </div>
+                                  </td>
                                   <td className="px-3 py-3 text-right">
                                     <div className="text-[16px] font-medium">
                                       {formatCurrency(subtotal)}
@@ -3436,21 +3484,8 @@ export default function SalesOrders() {
                                     </div>
                                   </td>
                                   <td className="px-3 py-3">
-                                    <div className="text-[16px] font-mono">
-                                      {employeeCode}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 py-3">
-                                    <div
-                                      className="text-[16px] truncate"
-                                      title={employeeName}
-                                    >
-                                      {employeeName}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 py-3">
                                     <div className="text-[16px]">
-                                      {itemSymbol || "-"}
+                                      {symbol || "-"}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3">
@@ -3475,8 +3510,8 @@ export default function SalesOrders() {
                                         colSpan={
                                           storeSettings?.businessType ===
                                           "laundry"
-                                            ? 18
-                                            : 17
+                                            ? 16 // Adjusted colspan
+                                            : 15 // Adjusted colspan
                                         }
                                         className="p-0"
                                       >
@@ -3661,6 +3696,10 @@ export default function SalesOrders() {
                                                                         matchingCustomer.email ||
                                                                           "",
                                                                       );
+                                                                      updateEditableInvoiceField(
+                                                                        "customerId",
+                                                                        matchingCustomer.id,
+                                                                      );
                                                                     }
                                                                   }
                                                                 }}
@@ -3704,6 +3743,10 @@ export default function SalesOrders() {
                                                                       updateEditableInvoiceField(
                                                                         "customerEmail",
                                                                         "",
+                                                                      );
+                                                                      updateEditableInvoiceField(
+                                                                        "customerId",
+                                                                        null,
                                                                       );
                                                                     }}
                                                                     className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
@@ -4142,7 +4185,7 @@ export default function SalesOrders() {
                                                             return (
                                                               <tr className="border-t">
                                                                 <td
-                                                                  colSpan={11}
+                                                                  colSpan={10} // Adjusted colspan
                                                                   className="text-center py-4 text-gray-500"
                                                                 >
                                                                   {t(
@@ -5972,7 +6015,7 @@ export default function SalesOrders() {
             setShowReceiptModal(false);
             setSelectedReceipt(null);
 
-            queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+            queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
           }}
           receipt={selectedReceipt}
           isPreview={false}
