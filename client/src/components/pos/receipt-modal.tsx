@@ -95,7 +95,7 @@ export function ReceiptModal({
     },
     {
       bankId: "970423",
-      bankAccountNo: "00004129426",
+      bankAccountNo: "00004129448",
       bankAccountName: "SHIN INSUNG",
       domain: "0108670987-007.edpos.vn",
     },
