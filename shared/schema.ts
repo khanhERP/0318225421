@@ -332,15 +332,19 @@ export const insertProductSchema = createInsertSchema(products)
     id: true,
   })
   .extend({
-    price: z.union([z.string(), z.number()]).refine(
-      (val) => {
-        const numVal = typeof val === "string" ? parseFloat(val) : Number(val);
-        return !isNaN(numVal) && numVal > 0 && numVal < 100000000;
-      },
-      {
-        message: "Price must be a positive number less than 100,000,000",
-      },
-    ),
+    price: z
+      .union([z.string(), z.number()])
+      .refine(
+        (val) => {
+          const numVal =
+            typeof val === "string" ? parseFloat(val) : Number(val);
+          return !isNaN(numVal) && numVal >= 0 && numVal < 100000000;
+        },
+        {
+          message: "Price must be a non-negative number less than 100,000,000",
+        },
+      )
+      .default("0"),
     stock: z.number().min(0, "Stock cannot be negative"),
     productType: z.number().min(1).max(4, "Product type is required"),
     taxRate: z.union([z.string(), z.number()]).transform((val) => {
@@ -372,10 +376,10 @@ export const insertProductSchema = createInsertSchema(products)
             typeof val === "string"
               ? parseFloat(val.replace(/[^0-9.-]/g, ""))
               : val;
-          return !isNaN(numVal) && numVal > 0;
+          return !isNaN(numVal) && numVal >= 0;
         },
         {
-          message: "After tax price must be a positive number",
+          message: "After tax price must be a non-negative number",
         },
       ),
     beforeTaxPrice: z
@@ -1180,6 +1184,8 @@ export const priceLists = pgTable("price_lists", {
   description: text("description"),
   isActive: boolean("is_active").notNull().default(true),
   isDefault: boolean("is_default").notNull().default(false),
+  validFrom: timestamp("valid_from", { withTimezone: true }),
+  validTo: timestamp("valid_to", { withTimezone: true }),
   storeCode: varchar("store_code", { length: 50 }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
@@ -1219,6 +1225,24 @@ export const insertPriceListSchema = createInsertSchema(priceLists)
     name: z.string().min(1, "Tên bảng giá là bắt buộc"),
     isActive: z.boolean().optional().default(true),
     isDefault: z.boolean().optional().default(false),
+    validFrom: z
+      .union([z.string(), z.date()])
+      .optional()
+      .nullable()
+      .transform((val) => {
+        if (!val) return null;
+        if (typeof val === "string") return new Date(val);
+        return val;
+      }),
+    validTo: z
+      .union([z.string(), z.date()])
+      .optional()
+      .nullable()
+      .transform((val) => {
+        if (!val) return null;
+        if (typeof val === "string") return new Date(val);
+        return val;
+      }),
   });
 
 export const insertPriceListItemSchema = createInsertSchema(priceListItems)

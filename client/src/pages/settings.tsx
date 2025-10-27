@@ -241,6 +241,8 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
   const [selectedCategoryFilter, setSelectedCategoryFilter] =
     useState<string>("all");
   const [productSearchTerm, setProductSearchTerm] = useState("");
+  const [productPage, setProductPage] = useState(1);
+  const [productPageSize] = useState(20);
   const [categoryForm, setCategoryForm] = useState({
     id: "", // Added for the new ID field
     name: "",
@@ -1119,7 +1121,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
   };
 
   // Filter products based on category and search term
-  const filteredProducts = productsData
+  const allFilteredProducts = productsData
     ? productsData.filter((product: any) => {
         const matchesCategory =
           selectedCategoryFilter === "all" ||
@@ -1132,6 +1134,18 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
         return matchesCategory && matchesSearch;
       })
     : [];
+
+  // Pagination
+  const totalProductPages = Math.ceil(allFilteredProducts.length / productPageSize);
+  const filteredProducts = allFilteredProducts.slice(
+    (productPage - 1) * productPageSize,
+    productPage * productPageSize
+  );
+
+  // Reset to page 1 when search/filter changes
+  useEffect(() => {
+    setProductPage(1);
+  }, [productSearchTerm, selectedCategoryFilter]);
 
   // Fetch E-invoice connections
   const { data: eInvoiceConnections = [], isLoading: eInvoiceLoading } =
@@ -3310,22 +3324,26 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                               </div>
                                             </td>
                                             <td className="px-4 py-3 text-center">
-                                              <Badge
-                                                variant={
-                                                  product.stock > 0
-                                                    ? "default"
-                                                    : "destructive"
-                                                }
-                                                className={`text-xs ${
-                                                  product.stock > 0
-                                                    ? "bg-green-100 text-green-800"
-                                                    : ""
-                                                }`}
-                                              >
-                                                {product.stock > 0
-                                                  ? t("common.inStock")
-                                                  : t("common.outOfStock")}
-                                              </Badge>
+                                              {product.trackInventory !== false ? (
+                                                <Badge
+                                                  variant={
+                                                    product.stock > 0
+                                                      ? "default"
+                                                      : "destructive"
+                                                  }
+                                                  className={`text-xs ${
+                                                    product.stock > 0
+                                                      ? "bg-green-100 text-green-800"
+                                                      : ""
+                                                  }`}
+                                                >
+                                                  {product.stock > 0
+                                                    ? t("common.inStock")
+                                                    : t("common.outOfStock")}
+                                                </Badge>
+                                              ) : (
+                                                <span className="text-xs text-gray-400">-</span>
+                                              )}
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                               <Badge
@@ -3387,9 +3405,34 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
 
                             <div className="flex justify-between items-center mt-6">
                               <div className="text-sm text-gray-600">
-                                {t("settings.total")} {filteredProducts.length}{" "}
+                                {t("settings.total")} {allFilteredProducts.length}{" "}
                                 {t("settings.productsShowing")}
+                                {allFilteredProducts.length > 0 && (
+                                  <span className="ml-2">
+                                    (Trang {productPage}/{totalProductPages})
+                                  </span>
+                                )}
                               </div>
+                              {totalProductPages > 1 && (
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setProductPage(prev => Math.max(1, prev - 1))}
+                                    disabled={productPage === 1}
+                                  >
+                                    {t("common.previous") || "Trước"}
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setProductPage(prev => Math.min(totalProductPages, prev + 1))}
+                                    disabled={productPage === totalProductPages}
+                                  >
+                                    {t("common.next") || "Sau"}
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           </CardContent>
                         </Card>

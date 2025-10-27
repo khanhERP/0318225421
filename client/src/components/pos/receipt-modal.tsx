@@ -61,7 +61,19 @@ export function ReceiptModal({
       bankId: "970423",
       bankAccountNo: "00004128635",
       bankAccountName: "SHIN INSUNG",
-      domain: "",
+      domain: "0108670987-001.edpos.vn",
+    },
+    {
+      bankId: "970423",
+      bankAccountNo: "00004129101",
+      bankAccountName: "SHIN INSUNG",
+      domain: "0108670987-002.edpos.vn",
+    },
+    {
+      bankId: "970423",
+      bankAccountNo: "00004129330",
+      bankAccountName: "SHIN INSUNG",
+      domain: "0108670987-003.edpos.vn",
     },
     {
       bankId: "970424",
@@ -74,6 +86,18 @@ export function ReceiptModal({
       bankAccountNo: "6868568185",
       bankAccountName: "NGUYEN THUY CHI",
       domain: "0108670987-004.edpos.vn",
+    },
+    {
+      bankId: "970423",
+      bankAccountNo: "00004129426",
+      bankAccountName: "SHIN INSUNG",
+      domain: "0108670987-006.edpos.vn",
+    },
+    {
+      bankId: "970423",
+      bankAccountNo: "00004129426",
+      bankAccountName: "SHIN INSUNG",
+      domain: "0108670987-007.edpos.vn",
     },
   ];
 
@@ -1303,18 +1327,46 @@ export function ReceiptModal({
                 {storeSettings?.businessType === "laundry" ? (
                   <>
                     <tr>
-                      <td style={{ padding: "2px 0", width: "45%", whiteSpace: "nowrap" }}>
+                      <td
+                        style={{
+                          padding: "2px 0",
+                          width: "45%",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {t("common.customerNameLabel")}:
                       </td>
-                      <td style={{ padding: "2px 0", textAlign: "right", width: "55%", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <td
+                        style={{
+                          padding: "2px 0",
+                          textAlign: "right",
+                          width: "55%",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
                         {receipt?.customerName || ""}
                       </td>
                     </tr>
                     <tr>
-                      <td style={{ padding: "2px 0", width: "45%", whiteSpace: "nowrap" }}>
+                      <td
+                        style={{
+                          padding: "2px 0",
+                          width: "45%",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {t("common.customerPhoneLabel")}:
                       </td>
-                      <td style={{ padding: "2px 0", textAlign: "right", width: "55%", whiteSpace: "nowrap" }}>
+                      <td
+                        style={{
+                          padding: "2px 0",
+                          textAlign: "right",
+                          width: "55%",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
                         {receipt?.customerPhone || receipt?.phone || "-"}
                       </td>
                     </tr>

@@ -240,8 +240,10 @@ export default function SalesOrders() {
   const urlParams = new URLSearchParams(window.location.search);
   const orderParam = urlParams.get("order");
 
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  // Set default dates to today
+  const today = new Date().toISOString().split('T')[0];
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
   const [customerSearch, setCustomerSearch] = useState("");
   const [orderNumberSearch, setOrderNumberSearch] = useState(orderParam || "");
   const [customerCodeSearch, setCustomerCodeSearch] = useState("");
@@ -341,8 +343,13 @@ export default function SalesOrders() {
       try {
         const params = new URLSearchParams();
 
-        if (startDate) params.append("startDate", startDate);
-        if (endDate) params.append("endDate", endDate);
+        // Add date filters - ensure proper format
+        if (startDate && startDate.trim() !== "") {
+          params.append("startDate", startDate);
+        }
+        if (endDate && endDate.trim() !== "") {
+          params.append("endDate", endDate);
+        }
         if (customerSearch) params.append("customerName", customerSearch);
         if (orderNumberSearch) params.append("orderNumber", orderNumberSearch);
         if (customerCodeSearch)
@@ -375,8 +382,10 @@ export default function SalesOrders() {
         }
 
         const data = await response.json();
-        console.log("Sales Orders - Orders loaded with storeCode filter:", {
+        console.log("Sales Orders - Orders loaded with date filter:", {
           url: url,
+          startDate,
+          endDate,
           total: data?.orders?.length || 0,
           hasStoreCodeFilter: true,
         });
@@ -4599,6 +4608,7 @@ export default function SalesOrders() {
                                                                             1
                                                                           }
                                                                           data-field={`orderitem-productName-${index}`}
+                                                                          onFocus={(e) => e.target.select()}
                                                                           onChange={(
                                                                             e,
                                                                           ) => {

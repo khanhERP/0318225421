@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { UserCheck, Users, CreditCard, Plus, Edit, Trash2, Search, ShoppingCart } from "lucide-react";
+import { UserCheck, Users, CreditCard, Plus, Edit, Trash2, Search, ShoppingCart, ChevronLeft, ChevronRight } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/lib/i18n";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -33,6 +34,8 @@ export default function CustomersPage({ onLogout }: CustomersPageProps) {
   const [showPointsModal, setShowPointsModal] = useState(false);
   const [showPointsManagementModal, setShowPointsManagementModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   // Fetch customers
   const { data: customersData, isLoading: customersLoading } = useQuery<Customer[]>({
@@ -91,6 +94,12 @@ export default function CustomersPage({ onLogout }: CustomersPageProps) {
           (customer.phone && customer.phone.includes(customerSearchTerm)),
       )
     : [];
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredCustomers.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex);
 
   return (
     <div className="min-h-screen bg-green-50 grocery-bg">
@@ -250,7 +259,7 @@ export default function CustomersPage({ onLogout }: CustomersPageProps) {
                   </div>
 
                   <div className="divide-y">
-                    {filteredCustomers.map((customer) => (
+                    {paginatedCustomers.map((customer) => (
                       <div key={customer.id} className="grid grid-cols-8 gap-4 p-4 items-center">
                         <div className="font-mono text-sm">{customer.customerId}</div>
                         <div className="font-medium">{customer.name}</div>
@@ -322,9 +331,75 @@ export default function CustomersPage({ onLogout }: CustomersPageProps) {
                 </div>
               )}
 
+              {/* Pagination Controls */}
+              {filteredCustomers.length > 0 && (
+                <div className="flex items-center justify-between space-x-6 py-4 border-t">
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm font-medium">{t("common.show")} </p>
+                    <Select
+                      value={pageSize.toString()}
+                      onValueChange={(value) => {
+                        setPageSize(Number(value));
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[70px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent side="top">
+                        <SelectItem value="15">15</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="30">30</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-sm font-medium"> {t("common.rows")}</p>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm font-medium">
+                      {t("common.page")} {currentPage} / {totalPages}
+                    </p>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                        className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        <ChevronLeft className="h-4 w-4 -ml-3" />
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                        className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                        <ChevronRight className="h-4 w-4 -ml-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-between items-center mt-6">
                 <div className="text-sm text-gray-600">
-                  {t("customers.total")} {customersData ? customersData.length : 0}{" "}
+                  {t("customers.total")} {filteredCustomers.length}{" "}
                   {t("customers.totalCustomersRegistered")}
                 </div>
                 <div className="flex gap-2">
