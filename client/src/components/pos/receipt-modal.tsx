@@ -59,7 +59,7 @@ export function ReceiptModal({
   const lstBank = [
     {
       bankId: "970423",
-      bankAccountNo: "00004128635",
+      bankAccountNo: "00004129365",
       bankAccountName: "SHIN INSUNG",
       domain: "0108670987-001.edpos.vn",
     },
