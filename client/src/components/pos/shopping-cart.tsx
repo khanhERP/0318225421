@@ -1109,7 +1109,7 @@ export function ShoppingCart({
       salesChannel: "pos",
       priceIncludeTax: priceIncludesTax,
       einvoiceStatus: 0,
-      notes: `Đặt hàng tại POS - Khách hàng: ${selectedCustomer?.name || "Khách lẻ"}${selectedCustomer?.phone ? ` - SĐT: ${selectedCustomer.phone}` : ""}${selectedCustomer?.taxCode ? ` - MST: ${selectedCustomer.taxCode}` : ""} - Phương thức: ${getPaymentMethodName(paymentMethod)}`,
+      notes: `Đặt hàng tại POS - Khách hàng: ${selectedCustomer?.name || "Khách lẻ"}${selectedCustomer?.phone ? ` - SĐT: ${selectedCustomer.phone}` : ""}${selectedCustomer?.taxCode ? ` - MST: ${selectedCustomer.taxCode}` : ""}`,
       storeCode: storeCode,
     };
 
