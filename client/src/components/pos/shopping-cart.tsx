@@ -988,7 +988,7 @@ export function ShoppingCart({
       // Get the EDITED price from priceInputValues state (or original if not edited)
       const editedPriceStr = priceInputValues[item.id];
       let unitPrice = parseFloat(item.price);
-      
+
       if (editedPriceStr !== undefined) {
         const cleanPrice = editedPriceStr.replace(/[^\d]/g, "");
         const parsedPrice = parseFloat(cleanPrice);
@@ -1010,10 +1010,11 @@ export function ShoppingCart({
 
       if (orderDiscount > 0) {
         const totalBeforeDiscount = cart.reduce((total, cartItem) => {
-          const cartItemPrice = priceInputValues[cartItem.id] 
-            ? parseFloat(priceInputValues[cartItem.id].replace(/[^\d]/g, "")) || parseFloat(cartItem.price)
+          const cartItemPrice = priceInputValues[cartItem.id]
+            ? parseFloat(priceInputValues[cartItem.id].replace(/[^\d]/g, "")) ||
+              parseFloat(cartItem.price)
             : parseFloat(cartItem.price);
-          return total + (cartItemPrice * cartItem.quantity);
+          return total + cartItemPrice * cartItem.quantity;
         }, 0);
 
         const currentIndex = cart.findIndex(
@@ -1026,7 +1027,9 @@ export function ShoppingCart({
           for (let i = 0; i < cart.length - 1; i++) {
             const prevItem = cart[i];
             const prevItemPrice = priceInputValues[prevItem.id]
-              ? parseFloat(priceInputValues[prevItem.id].replace(/[^\d]/g, "")) || parseFloat(prevItem.price)
+              ? parseFloat(
+                  priceInputValues[prevItem.id].replace(/[^\d]/g, ""),
+                ) || parseFloat(prevItem.price)
               : parseFloat(prevItem.price);
             const prevItemTotal = prevItemPrice * prevItem.quantity;
             const prevItemDiscount =
@@ -1095,7 +1098,8 @@ export function ShoppingCart({
       customerId: selectedCustomer?.id || null, // Ensure customerId is saved
       customerName: selectedCustomer?.name || "",
       customerPhone: selectedCustomer?.phone || null,
-      customerTaxCode: selectedCustomer?.taxCode || selectedCustomer?.address || null,
+      customerTaxCode:
+        selectedCustomer?.taxCode || selectedCustomer?.address || null,
       customerAddress: selectedCustomer?.address || null,
       customerEmail: selectedCustomer?.email || null,
       status: "pending", // Trạng thái: Đặt hàng
@@ -1109,7 +1113,7 @@ export function ShoppingCart({
       salesChannel: "pos",
       priceIncludeTax: priceIncludesTax,
       einvoiceStatus: 0,
-      notes: `Đặt hàng tại POS - Khách hàng: ${selectedCustomer?.name || "Khách lẻ"}${selectedCustomer?.phone ? ` - SĐT: ${selectedCustomer.phone}` : ""}${selectedCustomer?.taxCode ? ` - MST: ${selectedCustomer.taxCode}` : ""}`,
+      notes: `Đặt hàng tại POS - Khách hàng: ${selectedCustomer?.name || ""}${selectedCustomer?.phone ? ` - SĐT: ${selectedCustomer.phone}` : ""}${selectedCustomer?.taxCode ? ` - MST: ${selectedCustomer.taxCode}` : ""}`,
       storeCode: storeCode,
     };
 
@@ -1255,7 +1259,7 @@ export function ShoppingCart({
       // Get the EDITED price from priceInputValues state (or original if not edited)
       const editedPriceStr = priceInputValues[item.id];
       let unitPrice = parseFloat(item.price);
-      
+
       if (editedPriceStr !== undefined) {
         const cleanPrice = editedPriceStr.replace(/[^\d]/g, "");
         const parsedPrice = parseFloat(cleanPrice);
@@ -1272,10 +1276,11 @@ export function ShoppingCart({
       let itemDiscountAmount = 0;
       if (orderDiscount > 0) {
         const totalBeforeDiscount = cart.reduce((total, cartItem) => {
-          const cartItemPrice = priceInputValues[cartItem.id] 
-            ? parseFloat(priceInputValues[cartItem.id].replace(/[^\d]/g, "")) || parseFloat(cartItem.price)
+          const cartItemPrice = priceInputValues[cartItem.id]
+            ? parseFloat(priceInputValues[cartItem.id].replace(/[^\d]/g, "")) ||
+              parseFloat(cartItem.price)
             : parseFloat(cartItem.price);
-          return total + (cartItemPrice * cartItem.quantity);
+          return total + cartItemPrice * cartItem.quantity;
         }, 0);
 
         const currentIndex = cart.findIndex(
@@ -1288,7 +1293,9 @@ export function ShoppingCart({
           for (let i = 0; i < cart.length - 1; i++) {
             const prevItem = cart[i];
             const prevItemPrice = priceInputValues[prevItem.id]
-              ? parseFloat(priceInputValues[prevItem.id].replace(/[^\d]/g, "")) || parseFloat(prevItem.price)
+              ? parseFloat(
+                  priceInputValues[prevItem.id].replace(/[^\d]/g, ""),
+                ) || parseFloat(prevItem.price)
               : parseFloat(prevItem.price);
             const prevItemTotal = prevItemPrice * prevItem.quantity;
             const prevItemDiscount =
@@ -1369,7 +1376,8 @@ export function ShoppingCart({
           customerId: selectedCustomer?.id || null, // Ensure customerId is saved
           customerName: selectedCustomer?.name || "",
           customerPhone: selectedCustomer?.phone || null,
-          customerTaxCode: selectedCustomer?.taxCode || selectedCustomer?.address || null,
+          customerTaxCode:
+            selectedCustomer?.taxCode || selectedCustomer?.address || null,
           customerAddress: selectedCustomer?.address || null,
           customerEmail: selectedCustomer?.email || null,
           status: "paid",
@@ -1459,7 +1467,8 @@ export function ShoppingCart({
       customerId: selectedCustomer?.id || null, // Ensure customerId is saved
       customerName: selectedCustomer?.name || "",
       customerPhone: selectedCustomer?.phone || null,
-      customerTaxCode: selectedCustomer?.taxCode || selectedCustomer?.address || null,
+      customerTaxCode:
+        selectedCustomer?.taxCode || selectedCustomer?.address || null,
       customerAddress: selectedCustomer?.address || null,
       customerEmail: selectedCustomer?.email || null,
       tableId: null,
@@ -1485,7 +1494,8 @@ export function ShoppingCart({
       customerId: selectedCustomer?.id || null, // Ensure customerId is saved
       customerName: selectedCustomer?.name || "",
       customerPhone: selectedCustomer?.phone || null,
-      customerTaxCode: selectedCustomer?.taxCode || selectedCustomer?.address || null,
+      customerTaxCode:
+        selectedCustomer?.taxCode || selectedCustomer?.address || null,
       customerAddress: selectedCustomer?.address || null,
       customerEmail: selectedCustomer?.email || null,
       status: "pending",

@@ -29,6 +29,7 @@ import {
   CreditCard, // Import CreditCard icon
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useTranslation } from "@/lib/i18n";
 import * as XLSX from "xlsx";
 import { EInvoiceModal } from "@/components/pos/einvoice-modal";
@@ -250,6 +251,7 @@ export default function SalesOrders() {
   const [salesChannelFilter, setSalesChannelFilter] = useState("all");
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [einvoiceStatusFilter, setEinvoiceStatusFilter] = useState("all");
+  const [dateFilterMode, setDateFilterMode] = useState<"created" | "completed">("created");
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null); // Renamed to selectedItem for clarity
   const [isEditing, setIsEditing] = useState(false);
   const [editableInvoice, setEditableInvoice] = useState<Invoice | null>(null); // Renamed to editableItem
@@ -327,6 +329,7 @@ export default function SalesOrders() {
       "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list",
       startDate,
       endDate,
+      dateFilterMode,
       customerSearch,
       orderNumberSearch,
       customerCodeSearch,
@@ -350,6 +353,8 @@ export default function SalesOrders() {
         if (endDate && endDate.trim() !== "") {
           params.append("endDate", endDate);
         }
+        // Add date filter mode
+        params.append("dateFilterMode", dateFilterMode);
         if (customerSearch) params.append("customerName", customerSearch);
         if (orderNumberSearch) params.append("orderNumber", orderNumberSearch);
         if (customerCodeSearch)
@@ -2891,6 +2896,28 @@ export default function SalesOrders() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
+                    Chế độ lọc theo ngày
+                  </label>
+                  <ToggleGroup 
+                    type="single" 
+                    value={dateFilterMode} 
+                    onValueChange={(value) => {
+                      if (value) setDateFilterMode(value as "created" | "completed");
+                    }}
+                    className="justify-start"
+                  >
+                    <ToggleGroupItem value="created" aria-label="Ngày tạo đơn">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Ngày tạo đơn
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="completed" aria-label="Ngày hủy/hoàn thành">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Ngày hủy/hoàn thành
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
                     {t("orders.startDate")}
                   </label>
                   <Input
@@ -2907,17 +2934,6 @@ export default function SalesOrders() {
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    {t("orders.customer")}
-                  </label>
-                  <Input
-                    placeholder={t("reports.customerFilterPlaceholder")}
-                    value={customerSearch}
-                    onChange={(e) => setCustomerSearch(e.target.value)}
-                    className="w-full"
                   />
                 </div>
                 <div>
@@ -2941,6 +2957,17 @@ export default function SalesOrders() {
                     placeholder={t("reports.orderNumberPlaceholder")}
                     value={orderNumberSearch}
                     onChange={(e) => setOrderNumberSearch(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    {t("orders.customer")}
+                  </label>
+                  <Input
+                    placeholder={t("reports.customerFilterPlaceholder")}
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
                     className="w-full"
                   />
                 </div>
