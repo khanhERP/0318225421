@@ -869,30 +869,31 @@ export default function SalesOrders() {
   const getPaymentMethodName = (method: number | string | null) => {
     // Handle null/undefined cases explicitly
     if (method === null || method === undefined) {
-      return "Chưa thanh toán";
+      return t("common.unpaid");
     }
 
     switch (method) {
       case 1:
       case "cash":
-        return "Tiền mặt";
+        return t("common.cash");
       case 2:
       case "creditCard":
       case "debitCard":
-        return "Chuyển khoản";
+      case "bankTransfer":
+        return t("common.bankTransfer");
       case 3:
       case "qrCode":
       case "momo":
       case "zalopay":
       case "vnpay":
       case "grabpay":
-        return "QR Code InfoCAMS";
+        return t("common.qrCode");
       case "Đối trừ công nợ":
-        return "Đối trừ công nợ";
+        return t("common.creditNote");
       case "unpaid":
-        return "Chưa thanh toán";
+        return t("common.unpaid");
       default:
-        return "Chưa thanh toán"; // Changed default from "Tiền mặt" to "Chưa thanh toán"
+        return t("common.unpaid"); // Changed default from "Tiền mặt" to "Chưa thanh toán"
     }
   };
 
