@@ -46,7 +46,6 @@ import {
   type StoreSettings,
   type InsertStoreSettings,
   type Customer,
-  type Printer,
 } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -68,11 +67,12 @@ import {
   UserCheck,
   Tag,
   ShoppingCart,
+  Printer,
+  Receipt,
   Upload,
   Link,
   FileImage,
   X,
-  DollarSign,
 } from "lucide-react";
 import { CustomerFormModal } from "@/components/customers/customer-form-modal";
 import { CustomerPointsModal } from "@/components/customers/customer-points-modal";
@@ -83,8 +83,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { PrinterConfigModal } from "@/components/pos/printer-config-modal";
 import { POSHeader } from "@/components/pos/header";
 import { RightSidebar } from "@/components/ui/right-sidebar";
-import { StoreListManagement } from "@/components/settings/store-list-management"; // Import the new component
-import { PriceListManagement } from "@/components/settings/price-list-management"; // Import the new component
+import * as XLSX from "xlsx";
 
 // E-invoice software providers mapping
 const EINVOICE_PROVIDERS = [
@@ -242,6 +241,8 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
   const [selectedCategoryFilter, setSelectedCategoryFilter] =
     useState<string>("all");
   const [productSearchTerm, setProductSearchTerm] = useState("");
+  const [productPage, setProductPage] = useState(1);
+  const [productPageSize] = useState(20);
   const [categoryForm, setCategoryForm] = useState({
     id: "", // Added for the new ID field
     name: "",
@@ -336,18 +337,6 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
       if (!response.ok) throw new Error("Failed to fetch products");
       return response.json();
     },
-  });
-
-  // Fetch printers
-  const { data: printers = [], isLoading: printersLoading } = useQuery<
-    Printer[]
-  >({
-    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/printers"],
-  });
-
-  // Fetch dynamic product units from the API
-  const { data: productUnits = [] } = useQuery<string[]>({
-    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products/units"],
   });
 
   // Store settings state
@@ -1132,7 +1121,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
   };
 
   // Filter products based on category and search term
-  const filteredProducts = productsData
+  const allFilteredProducts = productsData
     ? productsData.filter((product: any) => {
         const matchesCategory =
           selectedCategoryFilter === "all" ||
@@ -1145,6 +1134,18 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
         return matchesCategory && matchesSearch;
       })
     : [];
+
+  // Pagination
+  const totalProductPages = Math.ceil(allFilteredProducts.length / productPageSize);
+  const filteredProducts = allFilteredProducts.slice(
+    (productPage - 1) * productPageSize,
+    productPage * productPageSize
+  );
+
+  // Reset to page 1 when search/filter changes
+  useEffect(() => {
+    setProductPage(1);
+  }, [productSearchTerm, selectedCategoryFilter]);
 
   // Fetch E-invoice connections
   const { data: eInvoiceConnections = [], isLoading: eInvoiceLoading } =
@@ -1608,13 +1609,15 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
           <div className="relative z-10 container mx-auto p-6">
             <div className="mb-8">
               <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
-                    <SettingsIcon className="w-8 h-8 text-green-600" />
-                    {t("settings.title")}
-                  </h1>
-                  <p className="text-gray-600">{t("settings.description")}</p>
-                </div>
+                {storeSettings.businessType !== "laundry" && (
+                  <div>
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+                      <SettingsIcon className="w-8 h-8 text-green-600" />
+                      {t("settings.title")}
+                    </h1>
+                    <p className="text-gray-600">{t("settings.description")}</p>
+                  </div>
+                )}
                 <Button
                   onClick={() => (window.location.href = "/")}
                   variant="outline"
@@ -1692,23 +1695,11 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                         {t("settings.paymentMethods")}
                       </span>
                     </TabsTrigger>
-                    {/* Add price list tab trigger */}
-                    <TabsTrigger
-                      value="price-lists"
-                      className="flex items-center gap-1.5 text-xs sm:text-sm px-2 sm:px-3 py-2 data-[state=active]:bg-green-500 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-green-100 transition-all duration-200 rounded-lg font-medium text-center flex-shrink-0"
-                    >
-                      <DollarSign className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                      <span className="hidden lg:inline">Bảng giá</span>
-                      <span className="lg:hidden">Bảng giá</span>
-                    </TabsTrigger>
                   </TabsList>
                 </div>
 
                 {/* Store Information Tab */}
-                <TabsContent value="store" className="space-y-6">
-                  {/* Store List Management */}
-                  <StoreListManagement />
-
+                <TabsContent value="store">
                   <Tabs defaultValue="basic" className="space-y-6">
                     <TabsList className="flex justify-start md:justify-center gap-2 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl p-2 py-4">
                       <TabsTrigger
@@ -1723,30 +1714,34 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                           {t("settings.basicInfoShort")}
                         </span>
                       </TabsTrigger>
-                      <TabsTrigger
-                        value="einvoice"
-                        className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-green-500 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-green-100 transition-all duration-200 rounded-lg font-medium whitespace-nowrap flex-shrink-0"
-                      >
-                        <SettingsIcon className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                        <span className="hidden md:inline">
-                          {t("settings.einvoiceSetup")}
-                        </span>
-                        <span className="md:hidden">
-                          {t("settings.einvoiceShort")}
-                        </span>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="operations"
-                        className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-green-500 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-green-100 transition-all duration-200 rounded-lg font-medium whitespace-nowrap flex-shrink-0"
-                      >
-                        <Clock className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
-                        <span className="hidden md:inline">
-                          {t("settings.operations")}
-                        </span>
-                        <span className="md:hidden">
-                          {t("settings.operationsShort")}
-                        </span>
-                      </TabsTrigger>
+                      {storeSettings.businessType !== "laundry" && (
+                        <>
+                          <TabsTrigger
+                            value="einvoice"
+                            className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-green-500 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-green-100 transition-all duration-200 rounded-lg font-medium whitespace-nowrap flex-shrink-0"
+                          >
+                            <SettingsIcon className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                            <span className="hidden md:inline">
+                              {t("settings.einvoiceSetup")}
+                            </span>
+                            <span className="md:hidden">
+                              {t("settings.einvoiceShort")}
+                            </span>
+                          </TabsTrigger>
+                          <TabsTrigger
+                            value="operations"
+                            className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4 py-2 data-[state=active]:bg-green-500 data-[state=active]:text-white data-[state=active]:shadow-md hover:bg-green-100 transition-all duration-200 rounded-lg font-medium whitespace-nowrap flex-shrink-0"
+                          >
+                            <Clock className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                            <span className="hidden md:inline">
+                              {t("settings.operations")}
+                            </span>
+                            <span className="md:hidden">
+                              {t("settings.operationsShort")}
+                            </span>
+                          </TabsTrigger>
+                        </>
+                      )}
                     </TabsList>
 
                     <TabsContent value="basic">
@@ -1776,6 +1771,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                   )
                                 }
                                 placeholder={t("settings.storeNamePlaceholder")}
+                                disabled={storeSettings.businessType === "laundry"}
                               />
                             </div>
                             <div className="space-y-2">
@@ -1792,6 +1788,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                   )
                                 }
                                 placeholder={t("settings.storeCodePlaceholder")}
+                                disabled={storeSettings.businessType === "laundry"}
                               />
                             </div>
                             <div className="space-y-2">
@@ -1808,6 +1805,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                   )
                                 }
                                 placeholder={t("settings.taxIdPlaceholder")}
+                                disabled={storeSettings.businessType === "laundry"}
                               />
                             </div>
                             <div className="space-y-2">
@@ -1822,6 +1820,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                     value,
                                   )
                                 }
+                                disabled={storeSettings.businessType === "laundry"}
                               >
                                 <SelectTrigger>
                                   <SelectValue
@@ -1861,6 +1860,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                 placeholder={t("settings.pinCodePlaceholder")}
                                 maxLength={6}
                                 pattern="[0-9]*"
+                                disabled={storeSettings.businessType === "laundry"}
                               />
                               {storeSettings.pinCode &&
                                 storeSettings.pinCode.length < 4 && (
@@ -1882,6 +1882,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                       priceIncludesTax: Boolean(checked),
                                     }))
                                   }
+                                  disabled={storeSettings.businessType === "laundry"}
                                 />
                                 <Label
                                   htmlFor="priceIncludesTax"
@@ -1923,6 +1924,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                 }
                                 placeholder={t("settings.addressPlaceholder")}
                                 rows={3}
+                                disabled={storeSettings.businessType === "laundry"}
                               />
                             </div>
                             <div className="space-y-2">
@@ -1940,6 +1942,7 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                   )
                                 }
                                 placeholder={t("settings.phonePlaceholder")}
+                                disabled={storeSettings.businessType === "laundry"}
                               />
                             </div>
                             <div className="space-y-2">
@@ -1957,23 +1960,26 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                   )
                                 }
                                 placeholder={t("settings.emailPlaceholder")}
+                                disabled={storeSettings.businessType === "laundry"}
                               />
                             </div>
                           </CardContent>
                         </Card>
                       </div>
-                      <div className="flex justify-end mt-6">
-                        <Button
-                          onClick={saveStoreSettings}
-                          disabled={updateStoreSettingsMutation.isPending}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          <Save className="w-4 h-4 mr-2" />
-                          {updateStoreSettingsMutation.isPending
-                            ? t("common.loading")
-                            : t("common.save")}
-                        </Button>
-                      </div>
+                      {storeSettings.businessType !== "laundry" && (
+                        <div className="flex justify-end mt-6">
+                          <Button
+                            onClick={saveStoreSettings}
+                            disabled={updateStoreSettingsMutation.isPending}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <Save className="w-4 h-4 mr-2" />
+                            {updateStoreSettingsMutation.isPending
+                              ? t("common.loading")
+                              : t("common.save")}
+                          </Button>
+                        </div>
+                      )}
                     </TabsContent>
 
                     <TabsContent value="einvoice">
@@ -2858,7 +2864,8 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                           ? "bg-purple-500"
                                           : customer.membershipLevel === "GOLD"
                                             ? "bg-yellow-500"
-                                            : customer.membershipLevel === "SILVER"
+                                            : customer.membershipLevel ===
+                                                "SILVER"
                                               ? "bg-gray-300 text-black"
                                               : "bg-gray-400"
                                       } text-white`}
@@ -2867,7 +2874,8 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                         ? t("customers.vip")
                                         : customer.membershipLevel === "GOLD"
                                           ? t("customers.gold")
-                                          : customer.membershipLevel === "SILVER"
+                                          : customer.membershipLevel ===
+                                              "SILVER"
                                             ? t("customers.silver")
                                             : customer.membershipLevel}
                                     </Badge>
@@ -3080,16 +3088,105 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                   {t("common.search")}
                                 </Button>
                               </div>
-                              <Button
-                                className="bg-green-600 hover:bg-green-700"
-                                onClick={() => {
-                                  resetProductForm();
-                                  setShowProductForm(true);
-                                }}
-                              >
-                                <Plus className="w-4 h-4 mr-2" />
-                                {t("settings.addProduct")}
-                              </Button>
+                              <div className="flex gap-2">
+                                {storeSettings.businessType === "laundry" && (
+                                  <Button
+                                    variant="outline"
+                                    className="border-green-500 text-green-700 hover:bg-green-100"
+                                    onClick={() => {
+                                      if (!filteredProducts || filteredProducts.length === 0) {
+                                        toast({
+                                          title: t("common.error"),
+                                          description: "Không có dữ liệu để xuất",
+                                          variant: "destructive",
+                                        });
+                                        return;
+                                      }
+
+                                      const exportData = [
+                                        ["STT", "Tên sản phẩm", "SKU", "Danh mục", "Giá bán", "% Thuế", "Tồn kho", "Đơn vị", "Trạng thái"]
+                                      ];
+
+                                      filteredProducts.forEach((product: any, index: number) => {
+                                        const category = categoriesData?.find(
+                                          (c: any) => c.id === product.categoryId,
+                                        );
+
+                                        exportData.push([
+                                          (index + 1).toString(),
+                                          product.name,
+                                          product.sku,
+                                          category?.name || "N/A",
+                                          parseFloat(product.price || "0").toString(),
+                                          product.taxRate || "0",
+                                          product.stock?.toString() || "0",
+                                          product.unit || "Cái",
+                                          (product.isActive === true || product.isActive === 1) ? "Đang sử dụng" : "Không sử dụng"
+                                        ]);
+                                      });
+
+                                      const ws = XLSX.utils.aoa_to_sheet(exportData);
+
+                                      const colWidths = [
+                                        { wch: 5 },   // STT
+                                        { wch: 50 },  // Tên sản phẩm
+                                        { wch: 15 },  // SKU
+                                        { wch: 20 },  // Danh mục
+                                        { wch: 12 },  // Giá bán
+                                        { wch: 10 },  // % Thuế
+                                        { wch: 10 },  // Tồn kho
+                                        { wch: 12 },  // Đơn vị
+                                        { wch: 15 },  // Trạng thái
+                                      ];
+                                      ws["!cols"] = colWidths;
+
+                                      const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+                                      for (let col = range.s.c; col <= range.e.c; col++) {
+                                        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+                                        if (!ws[cellAddress]) continue;
+                                        ws[cellAddress].s = {
+                                          font: { bold: true, color: { rgb: "FFFFFF" } },
+                                          fill: { fgColor: { rgb: "16A34A" } },
+                                          alignment: { horizontal: "center" },
+                                        };
+                                      }
+
+                                      const wb = XLSX.utils.book_new();
+                                      XLSX.utils.book_append_sheet(wb, ws, "Sản phẩm");
+
+                                      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+                                      const filename = `danh-sach-san-pham_${timestamp}.xlsx`;
+
+                                      XLSX.writeFile(wb, filename, {
+                                        bookType: "xlsx",
+                                        cellStyles: true,
+                                        sheetStubs: false,
+                                        compression: true,
+                                      });
+
+                                      toast({
+                                        title: t("common.success"),
+                                        description: "Xuất Excel thành công",
+                                      });
+                                    }}
+                                  >
+                                    <Upload className="w-4 h-4 mr-2" />
+                                    Export Excel
+                                  </Button>
+                                )}
+                                {storeSettings.businessType !== "laundry" && (
+                                  <Button
+                                    className="bg-green-600 hover:bg-green-700"
+                                    onClick={() => {
+                                      resetProductForm();
+                                      setShowProductForm(true);
+                                    }}
+                                  >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    {t("settings.addProduct")}
+                                  </Button>
+                                )}
+                              </div>
                             </div>
 
                             {productsLoading ? (
@@ -3148,11 +3245,13 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                           {t("settings.usageStatus")}
                                         </div>
                                       </th>
-                                      <th className="w-[120px] px-4 py-3 text-center font-medium text-sm text-gray-600">
-                                        <div className="leading-tight break-words">
-                                          {t("common.actions")}
-                                        </div>
-                                      </th>
+                                      {storeSettings.businessType !== "laundry" && (
+                                        <th className="w-[120px] px-4 py-3 text-center font-medium text-sm text-gray-600">
+                                          <div className="leading-tight break-words">
+                                            {t("common.actions")}
+                                          </div>
+                                        </th>
+                                      )}
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y">
@@ -3225,22 +3324,26 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                               </div>
                                             </td>
                                             <td className="px-4 py-3 text-center">
-                                              <Badge
-                                                variant={
-                                                  product.stock > 0
-                                                    ? "default"
-                                                    : "destructive"
-                                                }
-                                                className={`text-xs ${
-                                                  product.stock > 0
-                                                    ? "bg-green-100 text-green-800"
-                                                    : ""
-                                                }`}
-                                              >
-                                                {product.stock > 0
-                                                  ? t("common.inStock")
-                                                  : t("common.outOfStock")}
-                                              </Badge>
+                                              {product.trackInventory !== false ? (
+                                                <Badge
+                                                  variant={
+                                                    product.stock > 0
+                                                      ? "default"
+                                                      : "destructive"
+                                                  }
+                                                  className={`text-xs ${
+                                                    product.stock > 0
+                                                      ? "bg-green-100 text-green-800"
+                                                      : ""
+                                                  }`}
+                                                >
+                                                  {product.stock > 0
+                                                    ? t("common.inStock")
+                                                    : t("common.outOfStock")}
+                                                </Badge>
+                                              ) : (
+                                                <span className="text-xs text-gray-400">-</span>
+                                              )}
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                               <Badge
@@ -3263,32 +3366,34 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                                   : t("common.no")}
                                               </Badge>
                                             </td>
-                                            <td className="px-4 py-3">
-                                              <div className="flex items-center justify-center gap-1">
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  onClick={() =>
-                                                    handleEditProduct(product)
-                                                  }
-                                                >
-                                                  <Edit className="w-4 h-4" />
-                                                </Button>
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  className="text-red-500 hover:text-red-700"
-                                                  onClick={() =>
-                                                    handleDeleteProduct(
-                                                      product.id,
-                                                      product.name,
-                                                    )
-                                                  }
-                                                >
-                                                  <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                              </div>
-                                            </td>
+                                            {storeSettings.businessType !== "laundry" && (
+                                              <td className="px-4 py-3">
+                                                <div className="flex items-center justify-center gap-1">
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                      handleEditProduct(product)
+                                                    }
+                                                  >
+                                                    <Edit className="w-4 h-4" />
+                                                  </Button>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-red-500 hover:text-red-700"
+                                                    onClick={() =>
+                                                      handleDeleteProduct(
+                                                        product.id,
+                                                        product.name,
+                                                      )
+                                                    }
+                                                  >
+                                                    <Trash2 className="w-4 h-4" />
+                                                  </Button>
+                                                </div>
+                                              </td>
+                                            )}
                                           </tr>
                                         );
                                       },
@@ -3300,9 +3405,34 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
 
                             <div className="flex justify-between items-center mt-6">
                               <div className="text-sm text-gray-600">
-                                {t("settings.total")} {filteredProducts.length}{" "}
+                                {t("settings.total")} {allFilteredProducts.length}{" "}
                                 {t("settings.productsShowing")}
+                                {allFilteredProducts.length > 0 && (
+                                  <span className="ml-2">
+                                    (Trang {productPage}/{totalProductPages})
+                                  </span>
+                                )}
                               </div>
+                              {totalProductPages > 1 && (
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setProductPage(prev => Math.max(1, prev - 1))}
+                                    disabled={productPage === 1}
+                                  >
+                                    {t("common.previous") || "Trước"}
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setProductPage(prev => Math.min(totalProductPages, prev + 1))}
+                                    disabled={productPage === totalProductPages}
+                                  >
+                                    {t("common.next") || "Sau"}
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           </CardContent>
                         </Card>
@@ -3361,13 +3491,96 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                   {t("common.search")}
                                 </Button>
                               </div>
-                              <Button
-                                onClick={handleOpenCategoryDialog}
-                                className="bg-green-600 hover:bg-green-700"
-                              >
-                                <Plus className="w-4 h-4 mr-2" />
-                                {t("settings.addProductGroup")}
-                              </Button>
+                              <div className="flex gap-2">
+                                {storeSettings.businessType === "laundry" && (
+                                  <Button
+                                    variant="outline"
+                                    className="border-green-500 text-green-700 hover:bg-green-100"
+                                    onClick={() => {
+                                      if (!categoriesData || categoriesData.length === 0) {
+                                        toast({
+                                          title: t("common.error"),
+                                          description: "Không có dữ liệu để xuất",
+                                          variant: "destructive",
+                                        });
+                                        return;
+                                      }
+
+                                      const exportData = [
+                                        ["STT", "Category ID", "Tên nhóm hàng", "Icon", "Số lượng sản phẩm"]
+                                      ];
+
+                                      categoriesData
+                                        .filter((category: any) => category.id !== 15 && category.id !== 17)
+                                        .forEach((category: any, index: number) => {
+                                          const productCount = productsData
+                                            ? productsData.filter((p: any) => p.categoryId === category.id).length
+                                            : 0;
+
+                                          exportData.push([
+                                            (index + 1).toString(),
+                                            category.id.toString(),
+                                            category.name,
+                                            category.icon,
+                                            productCount.toString()
+                                          ]);
+                                        });
+
+                                      const ws = XLSX.utils.aoa_to_sheet(exportData);
+
+                                      const colWidths = [
+                                        { wch: 5 },   // STT
+                                        { wch: 12 },  // Category ID
+                                        { wch: 35 },  // Tên nhóm hàng
+                                        { wch: 20 },  // Icon
+                                        { wch: 18 },  // Số lượng sản phẩm
+                                      ];
+                                      ws["!cols"] = colWidths;
+
+                                      const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
+                                      for (let col = range.s.c; col <= range.e.c; col++) {
+                                        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+                                        if (!ws[cellAddress]) continue;
+                                        ws[cellAddress].s = {
+                                          font: { bold: true, color: { rgb: "FFFFFF" } },
+                                          fill: { fgColor: { rgb: "16A34A" } },
+                                          alignment: { horizontal: "center" },
+                                        };
+                                      }
+
+                                      const wb = XLSX.utils.book_new();
+                                      XLSX.utils.book_append_sheet(wb, ws, "Nhóm hàng");
+
+                                      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, "-");
+                                      const filename = `danh-sach-nhom-hang_${timestamp}.xlsx`;
+
+                                      XLSX.writeFile(wb, filename, {
+                                        bookType: "xlsx",
+                                        cellStyles: true,
+                                        sheetStubs: false,
+                                        compression: true,
+                                      });
+
+                                      toast({
+                                        title: t("common.success"),
+                                        description: "Xuất Excel thành công",
+                                      });
+                                    }}
+                                  >
+                                    <Upload className="w-4 h-4 mr-2" />
+                                    Export Excel
+                                  </Button>
+                                )}
+                                {storeSettings.businessType !== "laundry" && (
+                                  <Button
+                                    onClick={handleOpenCategoryDialog}
+                                    className="bg-green-600 hover:bg-green-700"
+                                  >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    {t("settings.addProductGroup")}
+                                  </Button>
+                                )}
+                              </div>
                             </div>
 
                             {categoriesLoading ? (
@@ -3414,11 +3627,13 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                           {t("settings.totalProducts")}
                                         </div>
                                       </th>
-                                      <th className="w-[120px] px-4 py-3 text-center font-medium text-sm text-gray-600">
-                                        <div className="leading-tight break-words">
-                                          {t("common.actions")}
-                                        </div>
-                                      </th>
+                                      {storeSettings.businessType !== "laundry" && (
+                                        <th className="w-[120px] px-4 py-3 text-center font-medium text-sm text-gray-600">
+                                          <div className="leading-tight break-words">
+                                            {t("common.actions")}
+                                          </div>
+                                        </th>
+                                      )}
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y">
@@ -3433,7 +3648,10 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                           selectedCategoryFilter === "all" ||
                                           category.id.toString() ===
                                             selectedCategoryFilter;
-                                        return matchesSearch && matchesCategory;
+                                          const checkRequired =
+                                            category.id !== 15 &&
+                                            category.id !== 17;
+                                        return matchesSearch && matchesCategory && checkRequired;
                                       })
                                       .map((category: any, index) => {
                                         const productCount = productsData
@@ -3500,31 +3718,33 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                                                 {t("settings.productsCount")}
                                               </Badge>
                                             </td>
-                                            <td className="px-4 py-3">
-                                              <div className="flex items-center justify-center gap-2">
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  onClick={() =>
-                                                    handleEditCategory(category)
-                                                  }
-                                                >
-                                                  <Edit className="w-4 h-4" />
-                                                </Button>
-                                                <Button
-                                                  variant="ghost"
-                                                  size="sm"
-                                                  className="text-red-500 hover:text-red-700"
-                                                  onClick={() =>
-                                                    handleDeleteCategory(
-                                                      category.id,
-                                                    )
-                                                  }
-                                                >
-                                                  <Trash2 className="w-4 h-4" />
-                                                </Button>
-                                              </div>
-                                            </td>
+                                            {storeSettings.businessType !== "laundry" && (
+                                              <td className="px-4 py-3">
+                                                <div className="flex items-center justify-center gap-2">
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                      handleEditCategory(category)
+                                                    }
+                                                  >
+                                                    <Edit className="w-4 h-4" />
+                                                  </Button>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-red-500 hover:text-red-700"
+                                                    onClick={() =>
+                                                      handleDeleteCategory(
+                                                        category.id,
+                                                      )
+                                                    }
+                                                  >
+                                                    <Trash2 className="w-4 h-4" />
+                                                  </Button>
+                                                </div>
+                                              </td>
+                                            )}
                                           </tr>
                                         );
                                       })}
@@ -3838,11 +4058,6 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                       </div>
                     </CardContent>
                   </Card>
-                </TabsContent>
-
-                {/* Price List Tab */}
-                <TabsContent value="price-lists">
-                  <PriceListManagement />
                 </TabsContent>
               </Tabs>
             </div>
@@ -4260,11 +4475,16 @@ export default function SettingsPage({ onLogout }: SettingsPageProps) {
                         <SelectValue placeholder="Chọn đơn vị" />
                       </SelectTrigger>
                       <SelectContent>
-                        {productUnits.map((unit) => (
-                          <SelectItem key={unit} value={unit}>
-                            {unit}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="Cái">Cái</SelectItem>
+                        <SelectItem value="Ly">Ly</SelectItem>
+                        <SelectItem value="Chai">Chai</SelectItem>
+                        <SelectItem value="Lon">Lon</SelectItem>
+                        <SelectItem value="Phần">Phần</SelectItem>
+                        <SelectItem value="Đĩa">Đĩa</SelectItem>
+                        <SelectItem value="Tô">Tô</SelectItem>
+                        <SelectItem value="Kg">Kg</SelectItem>
+                        <SelectItem value="Gói">Gói</SelectItem>
+                        <SelectItem value="Hộp">Hộp</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

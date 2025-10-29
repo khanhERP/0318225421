@@ -116,6 +116,13 @@ export function RightSidebar() {
     ) {
       return false;
     }
+    // Hide settings for laundry business type
+    if (
+      item.href === "/settings" &&
+      storeSettings?.businessType === "laundry"
+    ) {
+      return false;
+    }
     return true;
   });
 
@@ -130,7 +137,7 @@ export function RightSidebar() {
   return (
     <div
       className={cn(
-        "fixed left-0 top-16 bottom-0 bg-white border-r border-green-200 shadow-lg transition-all duration-300 z-40 hidden",
+        "fixed left-0 top-16 bottom-0 bg-white border-r border-green-200 shadow-lg transition-all duration-300 z-40",
         isExpanded ? "w-64" : "w-16",
       )}
     >

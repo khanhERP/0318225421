@@ -58,29 +58,6 @@ export function OrderReport() {
   const [productSearch, setProductSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedEmployee, setSelectedEmployee] = useState("all");
-  const [storeFilter, setStoreFilter] = useState("all");
-
-  // Fetch store settings list
-  const { data: storesData = [] } = useQuery({
-    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings/list"],
-    queryFn: async () => {
-      try {
-        const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings/list", {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-        });
-        if (!response.ok) throw new Error("Failed to fetch stores");
-        const data = await response.json();
-        return Array.isArray(data) ? data : [];
-      } catch (error) {
-        console.error("Error fetching stores:", error);
-        return [];
-      }
-    },
-    retry: 2,
-  });
 
   // Query orders by date range
   const { data: orders = [] } = useQuery({
@@ -137,14 +114,7 @@ export function OrderReport() {
   const getFilteredData = () => {
     if (!orders || !Array.isArray(orders)) return [];
 
-    let filteredOrders = orders;
-
-    // Filter by store
-    if (storeFilter !== "all") {
-      filteredOrders = filteredOrders.filter((order: any) => order.storeCode === storeFilter);
-    }
-
-    filteredOrders = filteredOrders.filter((order: any) => {
+    const filteredOrders = orders.filter((order: any) => {
       const statusMatch =
         orderStatus === "all" ||
         (orderStatus === "draft" && order.status === "pending") ||
@@ -409,28 +379,6 @@ export function OrderReport() {
       <Card>
         <CardContent className="space-y-4 pt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {/* Store Filter */}
-            <div>
-              <Label>Cửa hàng</Label>
-              <Select value={storeFilter} onValueChange={setStoreFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {storesData.filter((store: any) => store.typeUser !== 1).length > 1 && (
-                    <SelectItem value="all">Tất cả</SelectItem>
-                  )}
-                  {storesData
-                    .filter((store: any) => store.typeUser !== 1)
-                    .map((store: any) => (
-                      <SelectItem key={store.id} value={store.storeCode}>
-                        {store.storeName}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {/* Concern Type */}
             <div>
               <Label>Loại báo cáo</Label>

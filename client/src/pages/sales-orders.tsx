@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
 import { apiRequest } from "@/lib/queryClient";
 import { POSHeader } from "@/components/pos/header";
 import { RightSidebar } from "@/components/ui/right-sidebar";
@@ -29,6 +30,7 @@ import {
   CreditCard, // Import CreditCard icon
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useTranslation } from "@/lib/i18n";
 import * as XLSX from "xlsx";
 import { EInvoiceModal } from "@/components/pos/einvoice-modal";
@@ -59,7 +61,7 @@ interface Invoice {
   subtotal: string;
   tax: string;
   total: string;
-  paymentMethod: number | string; // Allow string for new payment methods
+  paymentMethod: number | string | null; // Allow string for new payment methods, null for unpaid
   invoiceDate: string;
   status: string;
   einvoiceStatus: number;
@@ -82,6 +84,7 @@ interface Invoice {
   exactDiscount?: string; // Added missing exactDiscount field
   priceIncludeTax?: boolean; // Added priceIncludeTax field
   isPaid?: boolean; // Added isPaid field
+  customerId?: number; // Added customerId field
 }
 
 interface InvoiceItem {
@@ -95,6 +98,7 @@ interface InvoiceItem {
   taxRate: string;
   discount?: string; // Added discount field
   sku?: string; // Added sku field
+  productSku?: string; // Added productSku field
 }
 
 interface Order {
@@ -104,11 +108,12 @@ interface Order {
   employeeId?: number;
   status: string;
   customerName?: string;
+  customerPhone?: string; // Added customerPhone
   customerCount: number;
   subtotal: string;
   tax: string;
   total: string;
-  paymentMethod?: number | string; // Allow string for new payment methods
+  paymentMethod: number | string | null; // Allow string for new payment methods, null for unpaid
   paymentStatus: string;
   einvoiceStatus: number;
   notes?: string;
@@ -116,7 +121,6 @@ interface Order {
   salesChannel?: string;
   invoiceNumber?: string;
   invoiceDate?: string;
-  customerPhone?: string;
   customerAddress?: string;
   customerTaxCode?: string;
   symbol?: string;
@@ -130,6 +134,7 @@ interface Order {
   discount?: string; // Added discount field
   priceIncludeTax?: boolean; // Added priceIncludeTax field
   isPaid?: boolean; // Added isPaid field
+  customerId?: number; // Added customerId field
 }
 
 // Helper function to safely determine item type
@@ -146,10 +151,14 @@ export default function SalesOrders() {
   const [searchTerm, setSearchTerm] = useState("");
   const [storeSettings, setStoreSettings] = useState<any>(null); // To store store settings for priceIncludesTax
 
+  // Initialize form for react-hook-form
+  const form = useForm();
+
   // State for PaymentMethodModal
   const [showPaymentMethodModal, setShowPaymentMethodModal] = useState(false);
   const [orderForPayment, setOrderForPayment] = useState<any>(null);
   const [showEInvoiceModal, setShowEInvoiceModal] = useState(false); // State for EInvoiceModal
+  const [isTitle, setIsTitle] = useState(true); // State for title visibility
 
   // Listen for print completion and einvoice modal close events
   useEffect(() => {
@@ -213,93 +222,43 @@ export default function SalesOrders() {
     };
   }, [queryClient]);
 
-  // Auto-refresh when new orders are created
+  // Chỉ refetch khi có sự kiện cụ thể từ các action thành công
   useEffect(() => {
-    const handleNewOrder = async () => {
-      console.log("📱 Sales Orders: New order detected, refreshing data...");
-      // Force immediate refresh with all date ranges
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
-
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/invoices"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/transactions"] }),
-        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
-      ]);
-    };
-
     const handleOrderUpdate = async () => {
-      console.log("🔄 Sales Orders: Order updated, refreshing data...");
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
-
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/invoices"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/transactions"] }),
-        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
-      ]);
+      console.log("🔄 Sales Orders: Order updated, refetching data...");
+      await queryClient.refetchQueries({
+        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"],
+        exact: false,
+      });
     };
 
-    const handleRefreshOrders = async () => {
-      console.log("🔄 Sales Orders: Manual refresh triggered...");
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
-
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/invoices"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/transactions"] }),
-        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
-      ]);
-    };
-
-    // Listen for order creation and update events
-    window.addEventListener("newOrderCreated", handleNewOrder);
+    // Chỉ listen các event quan trọng
     window.addEventListener("orderStatusUpdated", handleOrderUpdate);
     window.addEventListener("paymentCompleted", handleOrderUpdate);
-    window.addEventListener("refreshOrders", handleRefreshOrders);
-    window.addEventListener("invoiceCreated", handleNewOrder);
-    window.addEventListener("receiptCreated", handleNewOrder);
-    window.addEventListener("forceRefresh", handleRefreshOrders);
 
     return () => {
-      window.removeEventListener("newOrderCreated", handleNewOrder);
       window.removeEventListener("orderStatusUpdated", handleOrderUpdate);
       window.removeEventListener("paymentCompleted", handleOrderUpdate);
-      window.removeEventListener("refreshOrders", handleRefreshOrders);
-      window.removeEventListener("invoiceCreated", handleNewOrder);
-      window.removeEventListener("receiptCreated", handleNewOrder);
-      window.removeEventListener("forceRefresh", handleRefreshOrders);
     };
   }, [queryClient]);
   // Get URL parameters
   const urlParams = new URLSearchParams(window.location.search);
   const orderParam = urlParams.get("order");
 
-  // Get today's date in YYYY-MM-DD format
-  const getTodayDate = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, "0");
-    const day = String(today.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  const [startDate, setStartDate] = useState(getTodayDate());
-  const [endDate, setEndDate] = useState(getTodayDate());
+  // Set default dates to today
+  const today = new Date().toISOString().split("T")[0];
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(today);
   const [customerSearch, setCustomerSearch] = useState("");
+  const [customerDropdownSearch, setCustomerDropdownSearch] = useState(""); // Separate state for dropdown search
   const [orderNumberSearch, setOrderNumberSearch] = useState(orderParam || "");
   const [customerCodeSearch, setCustomerCodeSearch] = useState("");
   const [salesChannelFilter, setSalesChannelFilter] = useState("all");
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [einvoiceStatusFilter, setEinvoiceStatusFilter] = useState("all");
-  const [storeCodeFilter, setStoreCodeFilter] = useState("all");
-  const [dateSearchType, setDateSearchType] = useState<"created" | "updated">("created"); // New state for date search type
+  const [dateFilterMode, setDateFilterMode] = useState<"created" | "completed">(
+    "created",
+  );
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null); // Renamed to selectedItem for clarity
   const [isEditing, setIsEditing] = useState(false);
   const [editableInvoice, setEditableInvoice] = useState<Invoice | null>(null); // Renamed to editableItem
@@ -338,7 +297,7 @@ export default function SalesOrders() {
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
-        let data = await response.json();
+        const data = await response.json();
         setStoreSettings(data);
       } catch (error) {
         console.error("Error fetching store settings:", error);
@@ -350,28 +309,22 @@ export default function SalesOrders() {
   // Query customers for datalist
   const { data: customers = [] } = useQuery({
     queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/customers"],
-    staleTime: 0,
-    gcTime: 0,
-  });
-
-  // Query store list for filter
-  const { data: storesData = [] } = useQuery({
-    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings/list"],
-    staleTime: 0,
-    gcTime: 0,
-  });
-
-  // Auto-select first store if storeCodeFilter is "all" and there's only one store
-  useEffect(() => {
-    if (storesData && storesData.length > 0) {
-      const filteredStores = storesData.filter(
-        (store: any) => store.typeUser !== 1,
-      );
-      if (filteredStores.length === 1 && storeCodeFilter === "all") {
-        setStoreCodeFilter(filteredStores[0].storeCode);
+    queryFn: async () => {
+      try {
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/customers");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error("Error fetching customers:", error);
+        return [];
       }
-    }
-  }, [storesData]);
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+  });
 
   // Query orders using /api/orders/list with storeCode filter
   const {
@@ -383,44 +336,37 @@ export default function SalesOrders() {
       "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list",
       startDate,
       endDate,
-      customerSearch,
+      dateFilterMode,
+      // customerSearch removed - only used for dropdown filtering, not for API query
       orderNumberSearch,
       customerCodeSearch,
+      searchTerm,
       salesChannelFilter,
       orderStatusFilter,
       einvoiceStatusFilter,
-      storeCodeFilter,
       currentPage,
       itemsPerPage,
-      dateSearchType, // Add dateSearchType to query key
+      sortField, // Include sort parameters in query key
+      sortOrder,
     ],
     queryFn: async () => {
       try {
         const params = new URLSearchParams();
 
-        // Thêm điều kiện tìm kiếm theo ngày dựa trên lựa chọn của người dùng
-        if (startDate && endDate) {
-          if (dateSearchType === "updated") {
-            // Tìm theo ngày hủy/hoàn thành (updatedAt)
-            // Chỉ tìm các đơn đã hủy hoặc hoàn thành
-            params.append("updatedAtStart", startDate);
-            params.append("updatedAtEnd", endDate);
-            
-            // Nếu chưa chọn trạng thái cụ thể, mặc định chỉ lấy đơn hủy hoặc hoàn thành
-            if (orderStatusFilter === "all") {
-              params.append("statusIn", "paid,cancelled");
-            }
-          } else {
-            // Tìm theo ngày tạo đơn (createdAt) - mặc định
-            params.append("startDate", startDate);
-            params.append("endDate", endDate);
-          }
+        // Add date filters - ensure proper format
+        if (startDate && startDate.trim() !== "") {
+          params.append("startDate", startDate);
         }
-
+        if (endDate && endDate.trim() !== "") {
+          params.append("endDate", endDate);
+        }
+        // Add date filter mode
+        params.append("dateFilterMode", dateFilterMode);
         if (customerSearch) params.append("customerName", customerSearch);
         if (orderNumberSearch) params.append("orderNumber", orderNumberSearch);
         if (customerCodeSearch)
-          params.append("customerCode", customerCodeSearch);
+          params.append("productSearch", customerCodeSearch);
+        if (searchTerm) params.append("productSearch", searchTerm);
         if (salesChannelFilter && salesChannelFilter !== "all") {
           params.append("salesChannel", salesChannelFilter);
         }
@@ -430,23 +376,14 @@ export default function SalesOrders() {
         if (einvoiceStatusFilter && einvoiceStatusFilter !== "all") {
           params.append("einvoiceStatus", einvoiceStatusFilter);
         }
-
-        // Handle store filter based on conditions:
-        // 1. If admin and "all" selected -> load all stores (storeFilter = "all")
-        // 2. If non-admin and "all" selected -> load stores from parent field (storeFilter = "all", server will filter by parent)
-        // 3. If specific store selected -> load that store only (storeFilter = storeCode)
-        if (storeCodeFilter === "all") {
-          // Always pass "all" when "Tất cả" is selected
-          // The server will handle whether to show all stores (admin) or parent stores (non-admin)
-          params.append("storeFilter", "all");
-        } else if (storeCodeFilter) {
-          // Specific store selected - load exact data for that storeCode
-          params.append("storeFilter", storeCodeFilter);
-        }
-
         params.append("page", currentPage.toString());
         if (itemsPerPage) {
           params.append("limit", itemsPerPage.toString());
+        }
+        // Add sorting parameters to the query
+        if (sortField) {
+          params.append("sortBy", sortField);
+          params.append("sortOrder", sortOrder);
         }
 
         const url = `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list?${params.toString()}`;
@@ -457,10 +394,12 @@ export default function SalesOrders() {
         }
 
         const data = await response.json();
-        console.log("Sales Orders - Orders loaded with date filter by status:", {
+        console.log("Sales Orders - Orders loaded with date filter:", {
           url: url,
+          startDate,
+          endDate,
           total: data?.orders?.length || 0,
-          dateFilterType: orderStatusFilter === "paid" || orderStatusFilter === "cancelled" ? "updatedAt" : "createdAt",
+          hasStoreCodeFilter: true,
         });
 
         return data;
@@ -470,13 +409,13 @@ export default function SalesOrders() {
       }
     },
     retry: 1,
-    retryDelay: 0,
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchInterval: 0, // Poll every 2 seconds for real-time updates
-    refetchIntervalInBackground: false, // Continue polling in background
+    retryDelay: 500,
+    staleTime: 0, // Không cache
+    gcTime: 0, // Không giữ trong memory
+    refetchOnMount: true, // Refetch when component mounts or queryKey changes
+    refetchOnWindowFocus: false, // Không tự động refetch khi focus
+    refetchInterval: false, // Không auto-refresh
+    refetchIntervalInBackground: false, // Không background polling
   });
 
   const orders = ordersResponse?.orders || [];
@@ -484,11 +423,24 @@ export default function SalesOrders() {
   // Query all products to get tax rates
   const { data: products = [] } = useQuery({
     queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products"],
-    staleTime: 0,
-    gcTime: 0,
+    queryFn: async () => {
+      try {
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error("Error fetching products:", error);
+        return [];
+      }
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes to prevent unnecessary refetches
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
 
-  // Debounce customer search to avoid too many API calls
+  // Debounce customer search to avoid too many API calls (for order list filter)
   useEffect(() => {
     const timer = setTimeout(() => {
       // Customer search will trigger API refetch via queryKey dependency
@@ -499,8 +451,21 @@ export default function SalesOrders() {
   // Query tables to map tableId to table number
   const { data: tables = [] } = useQuery({
     queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"],
-    staleTime: 0,
-    gcTime: 0,
+    queryFn: async () => {
+      try {
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error("Error fetching tables:", error);
+        return [];
+      }
+    },
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
 
   const getTableNumber = (tableId: number): string => {
@@ -582,7 +547,7 @@ export default function SalesOrders() {
         customerAddress: updatedOrder.customerAddress || "",
         customerTaxCode: updatedOrder.customerTaxCode || "",
         customerEmail: updatedOrder.customerEmail || "",
-        isPaid: updatedOrder.isPaid, // Trạng thái đã trả đồ
+        isPaid: updatedOrder.isPaid,
         notes: updatedOrder.notes || "",
         status: updatedOrder.status,
         paymentStatus: updatedOrder.paymentStatus,
@@ -590,9 +555,15 @@ export default function SalesOrders() {
         tax: updatedOrder.tax,
         total: updatedOrder.total,
         discount: updatedOrder.discount,
-        invoiceNumber: updatedOrder.invoiceNumber, // Added invoiceNumber here
-        symbol: updatedOrder.symbol, // Added symbol here
-        einvoiceStatus: updatedOrder.einvoiceStatus, // Added einvoiceStatus here
+        invoiceNumber: updatedOrder.invoiceNumber,
+        symbol: updatedOrder.symbol,
+        einvoiceStatus: updatedOrder.einvoiceStatus,
+        // Add other fields that might be updated
+        orderNumber: updatedOrder.orderNumber,
+        date: updatedOrder.date, // If date is editable
+        customerId: updatedOrder.customerId, // If customer selection is implemented
+        priceIncludeTax: updatedOrder.priceIncludeTax, // If this field is editable
+        paymentMethod: updatedOrder.paymentMethod, // Include paymentMethod in update payload
       };
 
       console.log("📝 Update payload:", updatePayload);
@@ -613,35 +584,26 @@ export default function SalesOrders() {
     onSuccess: async (data, updatedOrder) => {
       console.log("✅ Order updated successfully:", data);
 
-      // Clear cache completely
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
-      queryClient.removeQueries({
-        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", updatedOrder.id],
+      // Only refetch orders list and order items for the specific order
+      await queryClient.refetchQueries({
+        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"],
+        exact: false,
       });
 
-      // Force fresh fetch from server
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
-        queryClient.invalidateQueries({
-          queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", updatedOrder.id],
-        }),
-        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
-        queryClient.refetchQueries({
-          queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", updatedOrder.id],
-        }),
-      ]);
+      await queryClient.refetchQueries({
+        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", updatedOrder.id],
+      });
 
       setIsEditing(false);
       setEditableInvoice(null);
 
-      // Update selected order with fresh data from server
       if (selectedInvoice) {
         setSelectedInvoice({ ...selectedInvoice, ...data });
       }
 
       toast({
         title: "Cập nhật thành công",
-        description: "Đơn hàng đã được cập nhật và danh sách đã được làm mới",
+        description: "Đơn hàng đã được cập nhật",
       });
     },
     onError: (error) => {
@@ -696,7 +658,7 @@ export default function SalesOrders() {
       setShowBulkCancelDialog(false);
       setSelectedOrderIds(new Set());
 
-      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
 
       // Update selected order if it was cancelled
       if (selectedInvoice) {
@@ -803,7 +765,7 @@ export default function SalesOrders() {
           setPrintReceiptData(receiptData);
           setShowPrintDialog(true);
 
-          queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+          queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
 
           setShowPublishDialog(false);
           setSelectedInvoice(null);
@@ -839,57 +801,39 @@ export default function SalesOrders() {
   // Mutation for canceling a single order
   const cancelOrderMutation = useMutation({
     mutationFn: async (orderId: number) => {
-      try {
-        console.log(`🔄 Canceling order ${orderId} with status: cancelled`);
-
-        // Ensure we send the correct payload
-        const payload = {
+      // Changed to accept orderId
+      const response = await apiRequest(
+        "PUT",
+        `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/${orderId}/status`,
+        {
           status: "cancelled",
-        };
+        },
+      );
 
-        console.log(`📤 Sending cancel order payload:`, payload);
-
-        const response = await apiRequest(
-          "PUT",
-          `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/${orderId}/status`,
-          payload,
-        );
-
-        console.log(`📡 Cancel order API response status:`, response.status);
-
-        if (!response.ok) {
-          let errorMessage = `HTTP ${response.status}`;
-          try {
-            const errorData = await response.text();
-            console.error(`❌ Cancel order API error:`, errorData);
-            errorMessage = errorData || errorMessage;
-          } catch (textError) {
-            console.error("Could not parse error response:", textError);
-          }
-          throw new Error(`Không thể hủy đơn hàng: ${errorMessage}`);
-        }
-
-        // Try to parse JSON response
+      if (!response.ok) {
+        let errorMessage = `HTTP ${response.status}`;
         try {
-          const contentType = response.headers.get("content-type");
-          if (contentType && contentType.includes("application/json")) {
-            const result = await response.json();
-            console.log(`✅ Cancel order API success:`, result);
-            return result;
-          } else {
-            console.log(`✅ Cancel order API success (non-JSON response)`);
-            return { success: true, message: "Order cancelled successfully" };
-          }
-        } catch (jsonError) {
-          console.warn(
-            "Response is not valid JSON, but request was successful:",
-            jsonError,
-          );
+          const errorData = await response.text();
+          errorMessage = errorData || errorMessage;
+        } catch (textError) {
+          console.error("Could not parse error response:", textError);
+        }
+        throw new Error(`Không thể hủy đơn hàng: ${errorMessage}`);
+      }
+
+      try {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          return await response.json();
+        } else {
           return { success: true, message: "Order cancelled successfully" };
         }
-      } catch (error) {
-        console.error("Error in cancelOrderMutation:", error);
-        throw error;
+      } catch (jsonError) {
+        console.warn(
+          "Response is not valid JSON, but request was successful:",
+          jsonError,
+        );
+        return { success: true, message: "Order cancelled successfully" };
       }
     },
     onSuccess: async (data, orderId) => {
@@ -897,25 +841,11 @@ export default function SalesOrders() {
 
       setShowCancelDialog(false);
 
-      // Clear cache completely and force fresh fetch
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
-      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range"] });
-
-      // Force immediate refetch with fresh data
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range"] }),
-        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
-        queryClient.refetchQueries({
-          queryKey: [
-            "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range",
-            startDate,
-            endDate,
-            currentPage,
-            itemsPerPage,
-          ],
-        }),
-      ]);
+      // Only refetch orders list
+      await queryClient.refetchQueries({
+        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"],
+        exact: false,
+      });
 
       // Update selected order if it was cancelled
       if (selectedInvoice && selectedInvoice.id === orderId) {
@@ -928,11 +858,9 @@ export default function SalesOrders() {
         setEditableInvoice(null);
       }
 
-      console.log("✅ Order cancelled and list refreshed from database");
-
       toast({
         title: "Đã hủy đơn hàng",
-        description: "Đơn hàng đã được hủy và danh sách đã được cập nhật",
+        description: "Đơn hàng đã được hủy",
       });
     },
     onError: (error) => {
@@ -949,30 +877,31 @@ export default function SalesOrders() {
   const getPaymentMethodName = (method: number | string | null) => {
     // Handle null/undefined cases explicitly
     if (method === null || method === undefined) {
-      return "Chưa thanh toán";
+      return t("common.unpaid");
     }
 
     switch (method) {
       case 1:
       case "cash":
-        return "Tiền mặt";
+        return t("common.cash");
       case 2:
       case "creditCard":
       case "debitCard":
-        return "Chuyển khoản";
+      case "bankTransfer":
+        return t("common.bankTransfer");
       case 3:
       case "qrCode":
       case "momo":
       case "zalopay":
       case "vnpay":
       case "grabpay":
-        return "QR Code InfoCAMS";
+        return t("common.qrCode");
       case "Đối trừ công nợ":
-        return "Đối trừ công nợ";
+        return t("common.creditNote");
       case "unpaid":
-        return "Chưa thanh toán";
+        return t("common.unpaid");
       default:
-        return "Chưa thanh toán"; // Changed default from "Tiền mặt" to "Chưa thanh toán"
+        return t("common.unpaid"); // Changed default from "Tiền mặt" to "Chưa thanh toán"
     }
   };
 
@@ -1049,7 +978,7 @@ export default function SalesOrders() {
   const getInvoiceStatusBadge = (status: number, order?: Order) => {
     const statusLabels = {
       1: t("common.completed"),
-      2: t("orders.status.serving") || t("common.serving"),
+      2: t("common.serving"),
       3: t("common.cancelled"),
     };
 
@@ -1104,7 +1033,7 @@ export default function SalesOrders() {
                 : order.status === "cancelled"
                   ? 3
                   : 2,
-        customerName: order.customerName || "Khách hàng l ",
+        customerName: order.customerName || "",
         invoiceStatus:
           order.status === "paid"
             ? 1
@@ -1115,12 +1044,10 @@ export default function SalesOrders() {
                 : order.status === "cancelled"
                   ? 3
                   : 2,
-        customerPhone: order.customerPhone || "",
+        customerPhone: order.customerPhone || "", // Ensure customerPhone is mapped
         customerAddress: order.customerAddress || "",
-        customerTaxCode: order.customerTaxCode || "",
         symbol: order.symbol || order.templateNumber || "",
-        invoiceNumber:
-          order.orderNumber || `ORD-${String(order.id).padStart(8, "0")}`,
+        invoiceNumber: order.orderNumber || ``,
         tradeNumber: order.orderNumber || "",
         invoiceDate: order.orderedAt,
         einvoiceStatus: order.einvoiceStatus || 0,
@@ -1130,18 +1057,19 @@ export default function SalesOrders() {
         subtotal: order.subtotal || "0",
         tax: order.tax || "0",
         total: order.total || "0",
-        paymentMethod: order.paymentMethod || "cash",
+        paymentMethod: order.paymentMethod || null, // Default to null for unpaid
         notes: order.notes || "",
         createdAt: order.orderedAt || order.createdAt, // Use orderedAt as primary, fallback to createdAt
         updatedAt: order.updatedAt, // Keep updatedAt for cancellation/completion time
         discount: order.discount || "0", // Map discount field
         priceIncludeTax: order.priceIncludeTax || false, // Map priceIncludeTax field
+        customerId: order.customerId, // Map customerId field
       }))
     : [];
 
   const filteredInvoices = Array.isArray(combinedData)
     ? combinedData.sort((a: any, b: any) => {
-        // Apply custom sorting if a field is selected
+        // Apply sorting if a field is selected
         if (sortField) {
           let aValue: any;
           let bValue: any;
@@ -1171,6 +1099,10 @@ export default function SalesOrders() {
               aValue = a.customerName || "";
               bValue = b.customerName || "";
               break;
+            case "customerPhone": // Added for sorting customer phone
+              aValue = a.customerPhone || "";
+              bValue = b.customerPhone || "";
+              break;
             case "subtotal":
               aValue = parseFloat(a.subtotal || "0");
               bValue = parseFloat(b.subtotal || "0");
@@ -1187,14 +1119,7 @@ export default function SalesOrders() {
               aValue = parseFloat(a.total || "0");
               bValue = parseFloat(b.total || "0");
               break;
-            case "employeeCode":
-              aValue = a.employeeId || 0;
-              bValue = b.employeeId || 0;
-              break;
-            case "employeeName":
-              aValue = "";
-              bValue = "";
-              break;
+            // Removed employeeCode and employeeName from sorting
             case "symbol":
               aValue = a.symbol || a.templateNumber || "";
               bValue = b.symbol || b.templateNumber || "";
@@ -1241,17 +1166,6 @@ export default function SalesOrders() {
         return dateB.getTime() - dateA.getTime();
       })
     : [];
-
-  // Handle URL parameter for order filtering and auto-expand
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const orderParam = urlParams.get("order");
-
-    if (orderParam) {
-      console.log("🔍 Sales Orders: Auto-filtering by order:", orderParam);
-      setOrderNumberSearch(orderParam);
-    }
-  }, []);
 
   // Auto-expand matching order when data is available and order param exists
   useEffect(() => {
@@ -1457,6 +1371,11 @@ export default function SalesOrders() {
           // Get data from cache (may be incomplete for new items)
           const fullItemData = orderItems.find((item: any) => item.id === id);
 
+          // Get product info to ensure we have the SKU
+          const product = products.find(
+            (p: any) => p.id === (changes.productId || fullItemData?.productId),
+          );
+
           // Merge all available data - prioritize changes from editedOrderItems
           const completeItemData = {
             ...(fullItemData || {}),
@@ -1468,6 +1387,7 @@ export default function SalesOrders() {
               changes.sku ||
               fullItemData?.sku ||
               fullItemData?.productSku ||
+              product?.sku ||
               "",
             quantity:
               changes.quantity !== undefined
@@ -1502,7 +1422,7 @@ export default function SalesOrders() {
           }
 
           console.log(
-            `✅ Will INSERT new item: ${completeItemData.productName} (Product ID: ${completeItemData.productId})`,
+            `✅ Will INSERT new item: ${completeItemData.productName} (Product ID: ${completeItemData.productId}, SKU: ${completeItemData.sku})`,
           );
           itemsToCreate.push(completeItemData);
         } else {
@@ -1533,6 +1453,7 @@ export default function SalesOrders() {
         console.log(`📝 [INSERT] Creating new order item in database:`, {
           productId: item.productId,
           productName: item.productName,
+          sku: item.sku,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
         });
@@ -1558,6 +1479,7 @@ export default function SalesOrders() {
         console.log(`📊 Item calculation data:`, {
           productId: item.productId,
           productName: item.productName,
+          sku: item.sku,
           unitPrice,
           quantity,
           taxRate: taxRate * 100 + "%",
@@ -1753,14 +1675,15 @@ export default function SalesOrders() {
           : 0;
         const unitPrice = parseFloat(item.unitPrice || "0");
         const quantity = parseInt(item.quantity || "0");
-        const itemSubtotal = unitPrice * quantity;
 
         if (priceIncludeTax && taxRate > 0) {
-          const priceBeforeTax = itemSubtotal / (1 + taxRate);
-          const itemTax = itemSubtotal - priceBeforeTax;
+          const itemSubtotalIncludingTax = unitPrice * quantity;
+          const priceBeforeTax = itemSubtotalIncludingTax / (1 + taxRate);
+          const itemTax = itemSubtotalIncludingTax - priceBeforeTax;
           exactSubtotal += priceBeforeTax;
           exactTax += itemTax;
         } else {
+          const itemSubtotal = unitPrice * quantity;
           exactSubtotal += itemSubtotal;
           exactTax += itemSubtotal * taxRate;
         }
@@ -1789,6 +1712,11 @@ export default function SalesOrders() {
         invoiceNumber: editableInvoice.invoiceNumber,
         symbol: editableInvoice.symbol,
         einvoiceStatus: editableInvoice.einvoiceStatus,
+        // Ensure other potential fields are passed if they are editable
+        orderNumber: editableInvoice.orderNumber,
+        date: editableInvoice.date,
+        customerId: editableInvoice.customerId,
+        paymentMethod: editableInvoice.paymentMethod, // Ensure paymentMethod is saved
       };
 
       console.log("💾 Saving order with recalculated totals:", orderData);
@@ -1806,6 +1734,7 @@ export default function SalesOrders() {
 
       // Clear and refresh all related queries
       queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
       queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items"] });
       queryClient.removeQueries({
         queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range"],
@@ -1813,6 +1742,7 @@ export default function SalesOrders() {
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
         queryClient.invalidateQueries({
           queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", editableInvoice.id],
         }),
@@ -1820,6 +1750,7 @@ export default function SalesOrders() {
           queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range"],
         }),
         queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
         queryClient.refetchQueries({
           queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", editableInvoice.id],
         }),
@@ -1841,6 +1772,9 @@ export default function SalesOrders() {
 
       // Close the selected invoice to show the updated list
       setSelectedInvoice(null);
+
+      // Dispatch custom event to force refresh
+      window.dispatchEvent(new CustomEvent("forceRefresh"));
 
       toast({
         title: "Lưu thành công",
@@ -1878,7 +1812,11 @@ export default function SalesOrders() {
       | "invoiceNumber"
       | "notes"
       | "discount" // Added discount field
-      | "priceIncludeTax", // Added priceIncludeTax field
+      | "priceIncludeTax"
+      | "templateNumber" // Added templateNumber field
+      | "customerId"
+      | "paymentMethod" // Added paymentMethod field
+      | "createdAt", // Added createdAt field
     value: any,
   ) => {
     if (editableInvoice) {
@@ -1903,42 +1841,226 @@ export default function SalesOrders() {
       notes?: string; // Add notes field
       tax?: string; // Add tax to edited item state
       _isNew?: boolean; // Flag for new unsaved items
+      priceBeforeTax?: string; // Add priceBeforeTax to edited item state
+      taxRate?: string; // Add taxRate to edited item state
     };
   }>({});
 
-  // Recalculate order totals whenever editedOrderItems or orderItems change
+  // Query payment methods data
+  const { data: paymentMethodsData = [] } = useQuery({
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/payment-methods"],
+    queryFn: async () => {
+      try {
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/payment-methods");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error("Error fetching payment methods:", error);
+        return [];
+      }
+    },
+    staleTime: 0,
+    gcTime: 0,
+  });
+
+  // Get only enabled payment methods
+  const enabledPaymentMethods = useMemo(() => {
+    return paymentMethodsData.filter((method: any) => method.enabled === true);
+  }, [paymentMethodsData]);
+
+  // Recalculate order totals and item discounts whenever editedOrderItems, orderItems, or discount changes
   useEffect(() => {
     if (!editableInvoice || !isEditing) return;
 
-    let totalSubtotal = 0;
-    let totalTax = 0;
+    const orderDiscount = parseFloat(editableInvoice.discount || "0");
 
     // Get all visible items (not deleted)
     const visibleItems = orderItems.filter(
       (item: any) => !editedOrderItems[item.id]?._deleted,
     );
 
+    // If discount changed, recalculate all item discounts
+    if (orderDiscount >= 0 && visibleItems.length > 0) {
+      // Calculate total before discount
+      const totalBeforeDiscount = visibleItems.reduce(
+        (sum: number, item: any) => {
+          const edited = editedOrderItems[item.id] || {};
+          const unitPrice = parseFloat(
+            edited.unitPrice !== undefined
+              ? edited.unitPrice
+              : item.unitPrice || "0",
+          );
+          const quantity = parseFloat(
+            edited.quantity !== undefined
+              ? edited.quantity
+              : item.quantity || "0",
+          );
+          return sum + unitPrice * quantity;
+        },
+        0,
+      );
+
+      // Recalculate discount allocation for each item
+      if (totalBeforeDiscount > 0) {
+        const newEditedItems: typeof editedOrderItems = {};
+
+        visibleItems.forEach((item: any, index: number) => {
+          const edited = editedOrderItems[item.id] || {};
+          const unitPrice = parseFloat(
+            edited.unitPrice !== undefined
+              ? edited.unitPrice
+              : item.unitPrice || "0",
+          );
+          const quantity = parseFloat(
+            edited.quantity !== undefined
+              ? edited.quantity
+              : item.quantity || "0",
+          );
+          const itemSubtotal = unitPrice * quantity;
+
+          // Calculate proportional discount
+          let itemDiscountAmount = 0;
+          if (orderDiscount > 0) {
+            const isLastItem = index === visibleItems.length - 1;
+            if (isLastItem) {
+              // Last item gets remaining discount
+              const previousDiscounts = visibleItems
+                .slice(0, -1)
+                .reduce((sum, it) => {
+                  const editedIt = editedOrderItems[it.id] || {};
+                  const itPrice = parseFloat(
+                    editedIt.unitPrice !== undefined
+                      ? editedIt.unitPrice
+                      : it.unitPrice || "0",
+                  );
+                  const itQty = parseFloat(
+                    editedIt.quantity !== undefined
+                      ? editedIt.quantity
+                      : it.quantity || "0",
+                  );
+                  const itSubtotal = itPrice * itQty;
+                  return (
+                    sum +
+                    Math.floor(
+                      (orderDiscount * itSubtotal) / totalBeforeDiscount,
+                    )
+                  );
+                }, 0);
+              itemDiscountAmount = Math.max(
+                0,
+                orderDiscount - previousDiscounts,
+              );
+            } else {
+              itemDiscountAmount = Math.floor(
+                (orderDiscount * itemSubtotal) / totalBeforeDiscount,
+              );
+            }
+          }
+
+          // Get product info for tax calculation
+          const product = products.find(
+            (p: any) => p.id === (edited.productId || item.productId),
+          );
+          const taxRate = product?.taxRate
+            ? parseFloat(product.taxRate) / 100
+            : 0;
+          const priceIncludeTax =
+            editableInvoice?.priceIncludeTax ??
+            storeSettings?.priceIncludesTax ??
+            false;
+
+          let itemTax = 0;
+          let priceBeforeTax = 0;
+
+          if (taxRate > 0) {
+            if (priceIncludeTax) {
+              const discountPerUnit = itemDiscountAmount / quantity;
+              const adjustedPrice = Math.max(0, unitPrice - discountPerUnit);
+              const giaGomThue = adjustedPrice * quantity;
+              priceBeforeTax = Math.round(giaGomThue / (1 + taxRate));
+              itemTax = giaGomThue - priceBeforeTax;
+            } else {
+              priceBeforeTax = Math.round(itemSubtotal - itemDiscountAmount);
+              itemTax = Math.round(priceBeforeTax * taxRate);
+            }
+          } else {
+            priceBeforeTax = Math.round(itemSubtotal - itemDiscountAmount);
+          }
+
+          const calculatedTotal = priceBeforeTax + itemTax;
+
+          // Update edited items with recalculated values
+          newEditedItems[item.id] = {
+            ...edited,
+            discount: itemDiscountAmount.toString(),
+            tax: Math.round(itemTax).toString(),
+            priceBeforeTax: Math.round(priceBeforeTax).toString(),
+            total: calculatedTotal.toString(),
+          };
+        });
+
+        // Update all items at once
+        setEditedOrderItems(newEditedItems);
+      }
+    }
+
+    let totalSubtotal = 0;
+    let totalTax = 0;
+
     // Calculate totals from visible items
     visibleItems.forEach((item: any) => {
       const edited = editedOrderItems[item.id] || {};
-      const currentItemUnitPrice = parseFloat(
-        edited.unitPrice !== undefined
-          ? edited.unitPrice
-          : item.unitPrice || "0",
-      );
-      const currentItemQuantity = parseFloat(
-        edited.quantity !== undefined ? edited.quantity : item.quantity || "0",
-      );
-      const currentItemSubtotal = currentItemUnitPrice * currentItemQuantity;
-      const currentItemTax = parseFloat(
-        edited.tax !== undefined ? edited.tax : item.tax || "0",
-      );
+      // Use tax from editedOrderItems if available (already calculated)
+      if (edited.tax !== undefined) {
+        totalTax += parseFloat(edited.tax);
 
-      totalSubtotal += currentItemSubtotal;
-      totalTax += currentItemTax;
+        // Calculate subtotal from unitPrice and quantity
+        const unitPrice = parseFloat(
+          edited.unitPrice !== undefined
+            ? edited.unitPrice
+            : item.unitPrice || "0",
+        );
+        const quantity = parseFloat(
+          edited.quantity !== undefined
+            ? edited.quantity
+            : item.quantity || "0",
+        );
+        totalSubtotal += unitPrice * quantity;
+      } else {
+        // Fallback to original calculation if tax not in editedOrderItems
+        const product = products.find((p: any) => p.id === item.productId);
+        const taxRate = product?.taxRate
+          ? parseFloat(product.taxRate) / 100
+          : 0;
+
+        const unitPrice = parseFloat(
+          edited.unitPrice !== undefined
+            ? edited.unitPrice
+            : item.unitPrice || "0",
+        );
+        const quantity = parseFloat(
+          edited.quantity !== undefined
+            ? edited.quantity
+            : item.quantity || "0",
+        );
+
+        const itemSubtotal = unitPrice * quantity;
+
+        if (editableInvoice?.priceIncludeTax && taxRate > 0) {
+          const priceBeforeTax = itemSubtotal / (1 + taxRate);
+          const itemTax = itemSubtotal - priceBeforeTax;
+          totalSubtotal += priceBeforeTax;
+          totalTax += itemTax;
+        } else {
+          totalSubtotal += itemSubtotal;
+          totalTax += itemSubtotal * taxRate;
+        }
+      }
     });
 
-    const orderDiscount = parseFloat(editableInvoice.discount || "0");
     const totalAmount = totalSubtotal + totalTax - orderDiscount;
 
     // Update editableInvoice with new totals
@@ -1965,14 +2087,21 @@ export default function SalesOrders() {
         total: newTotal,
       };
     });
-  }, [editedOrderItems, orderItems, isEditing]);
+  }, [
+    editedOrderItems,
+    orderItems,
+    isEditing,
+    editableInvoice?.discount,
+    products,
+    storeSettings,
+  ]);
 
   const updateOrderItemField = (itemId: number, field: string, value: any) => {
     setEditedOrderItems((prev) => {
       const currentItem = prev[itemId] || {};
       const originalItem = orderItems.find((item: any) => item.id === itemId);
 
-      // PRESERVE existing edited values - prioritize what user has already entered
+      // PRESERVE ALL existing values - only update the field being changed
       let quantity =
         currentItem.quantity !== undefined
           ? currentItem.quantity
@@ -1997,13 +2126,13 @@ export default function SalesOrders() {
       // Track if product changed (to recalculate tax with new taxRate)
       let productChanged = false;
 
-      // Update ONLY the field that user is editing
+      // Update ONLY the specific field that user is editing
       if (field === "quantity") {
-        quantity = parseFloat(value) || 1; // Allow decimal quantity
-        // KEEP product info unchanged - do NOT reset productId, sku, productName
+        quantity = parseFloat(value) || 1;
+        // ✅ KEEP all product info unchanged (productId, sku, productName)
       } else if (field === "unitPrice") {
         unitPrice = parseFloat(value) || 0;
-        // KEEP product info unchanged - do NOT reset productId, sku, productName
+        // ✅ KEEP all product info unchanged (productId, sku, productName)
       } else if (field === "productId") {
         // User is actively changing productId - update all related fields
         productId = value;
@@ -2117,7 +2246,10 @@ export default function SalesOrders() {
       }
 
       // Calculate tax - ALWAYS get product info to ensure we have latest taxRate
-      const product = products.find((p: any) => p.id === productId);
+      let product = products.find((p: any) => p.id === productId);
+      if (!sku) {
+        sku = product?.sku || "";
+      }
       const taxRate = product?.taxRate ? parseFloat(product.taxRate) / 100 : 0;
       const priceIncludeTax =
         editableInvoice?.priceIncludeTax ??
@@ -2387,9 +2519,12 @@ export default function SalesOrders() {
         }
       });
 
+      // Total = subtotal + tax - discount
       const totalPayment = Math.max(
         0,
-        calculatedSubtotal + calculatedTax - orderDiscount,
+        priceIncludeTax
+          ? calculatedSubtotal + calculatedTax
+          : calculatedSubtotal + calculatedTax - orderDiscount,
       );
 
       console.log("📊 Calculated totals from items:", {
@@ -2503,12 +2638,12 @@ export default function SalesOrders() {
       t("orders.table"),
       t("orders.customerCode"),
       t("orders.customerName"),
+      t("common.phone"), // Added phone header
       t("common.subtotalAmount"),
       t("common.discount"),
       t("common.tax"),
       t("common.paid"),
-      t("common.employeeCode"),
-      t("common.employeeName"),
+      // Removed Employee Code and Name headers
       t("orders.invoiceSymbol"),
       t("orders.invoiceNumber"),
       t("common.notes"),
@@ -2522,20 +2657,19 @@ export default function SalesOrders() {
         item.invoiceNumber ||
         item.orderNumber ||
         `ORD-${String(item.id).padStart(8, "0")}`;
-      const orderDate = formatDate(item.date);
+      const orderDate = formatDate(item.date); // Use 'date' field for order date
       const table =
         item.type === "order" && item.tableId
           ? getTableNumber(item.tableId)
           : "";
       const customerCode = item.customerTaxCode;
       const customerName = item.customerName || "";
+      const customerPhone = item.customerPhone || ""; // Get customer phone
       const subtotal = parseFloat(item.subtotal || "0");
       const discount = parseFloat(item.discount || "0");
       const tax = parseFloat(item.tax || "0");
       const total = parseFloat(item.total || "0");
       const paid = total;
-      const employeeCode = item.employeeId || "NV0001";
-      const employeeName = "";
       const symbol = item.symbol || "";
       const invoiceNumber =
         item.invoiceNumber || String(item.id).padStart(8, "0");
@@ -2552,12 +2686,12 @@ export default function SalesOrders() {
         table,
         customerCode,
         customerName,
+        customerPhone, // Add customer phone data
         subtotal,
         discount,
         tax,
         paid,
-        employeeCode,
-        employeeName,
+        // Removed Employee Code and Name data
         symbol,
         invoiceNumber,
         item.notes || "",
@@ -2573,12 +2707,12 @@ export default function SalesOrders() {
       { wch: 8 },
       { wch: 12 },
       { wch: 15 },
+      { wch: 12 }, // Column for phone number
       { wch: 12 },
       { wch: 10 },
       { wch: 10 },
       { wch: 12 },
-      { wch: 12 },
-      { wch: 15 },
+      // Removed Employee Code and Name columns
       { wch: 12 },
       { wch: 12 },
       { wch: 20 },
@@ -2605,7 +2739,8 @@ export default function SalesOrders() {
       };
     }
 
-    for (let col = 0; col <= 14; col++) {
+    for (let col = 0; col <= 13; col++) {
+      // Adjusted loop to match new header count (0-13)
       const cellAddress = XLSX.utils.encode_cell({ r: 2, c: col });
       if (ws[cellAddress]) {
         ws[cellAddress].s = {
@@ -2631,9 +2766,10 @@ export default function SalesOrders() {
       const isEven = (row - 3) % 2 === 0;
       const bgColor = isEven ? "FFFFFF" : "F2F2F2";
 
-      for (let col = 0; col <= 14; col++) {
+      for (let col = 0; col <= 13; col++) {
+        // Adjusted loop to match new header count
         const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-        const isCurrency = [5, 6, 7, 8].includes(col);
+        const isCurrency = [6, 7, 8, 9].includes(col); // Indices for subtotal, discount, tax, paid
 
         if (ws[cellAddress]) {
           ws[cellAddress].s = {
@@ -2713,12 +2849,12 @@ export default function SalesOrders() {
         console.log("✅ Order payment status updated successfully");
 
         // Refresh orders list
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
         queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"] });
 
         toast({
           title: "Thanh toán thành công",
-          description: "Đơn hàng đã được cập nhật trạng thái thanh toán",
+          description: "Đơn hàng đã được cập nhật trạng thái thanh to n",
         });
 
         // For laundry business, show receipt modal after payment
@@ -2800,7 +2936,7 @@ export default function SalesOrders() {
 
       // Refresh orders list after a delay to avoid interfering with receipt modal
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
         queryClient.invalidateQueries({
           queryKey: [
             "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range",
@@ -2901,7 +3037,7 @@ export default function SalesOrders() {
       <POSHeader />
       {/* Right Sidebar */}
       <RightSidebar />
-      <div className="main-content px-6">
+      <div className="main-content pt-16 px-6">
         <div className="max-w-full mx-auto py-8">
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-4">
@@ -2915,100 +3051,149 @@ export default function SalesOrders() {
             </p>
           </div>
 
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-lg">{t("common.filters")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {/* Row 1: Date Search Type and Date Range */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">
-                    <Calendar className="inline-block w-4 h-4 mr-1" />
-                    Tìm kiếm theo
+          <Card className="mb-6 border-green-200 shadow-sm">
+            <CardContent className="py-3">
+              {/* Compact Filter Layout */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {/* Date Filter Mode */}
+                <div className="lg:col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t("orders.dateFilterMode")}
                   </label>
-                  <select
-                    value={dateSearchType}
-                    onChange={(e) => setDateSearchType(e.target.value as "created" | "updated")}
-                    className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500 hover:border-green-400 transition-colors"
+                  <ToggleGroup
+                    type="single"
+                    value={dateFilterMode}
+                    onValueChange={(value) => {
+                      if (value)
+                        setDateFilterMode(value as "created" | "completed");
+                    }}
+                    className="justify-start gap-1"
                   >
-                    <option value="created">📅 Ngày tạo đơn</option>
-                    <option value="updated">✅ Ngày hủy/hoàn thành</option>
-                  </select>
+                    <ToggleGroupItem
+                      value="created"
+                      aria-label={t("orders.createdDateFilter")}
+                      className="data-[state=on]:bg-blue-600 data-[state=on]:text-white text-sm px-2 h-8"
+                    >
+                      {t("orders.createdDateFilter")}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem
+                      value="completed"
+                      aria-label={t("orders.completedDateFilter")}
+                      className="data-[state=on]:bg-blue-600 data-[state=on]:text-white text-sm px-2 h-8"
+                    >
+                      {t("orders.completedDateFilter")}
+                    </ToggleGroupItem>
+                  </ToggleGroup>
                 </div>
+
+                {/* Start Date */}
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t("orders.startDate")}
                   </label>
                   <Input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="h-10"
+                    className="h-8 text-sm border-green-200 focus:border-green-500 focus:ring-green-500"
                   />
                 </div>
+
+                {/* End Date */}
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t("orders.endDate")}
                   </label>
                   <Input
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="h-10"
+                    className="h-8 text-sm border-green-200 focus:border-green-500 focus:ring-green-500"
                   />
                 </div>
-              </div>
 
-              {/* Row 2: Customer and Product Search */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                {/* Order Number */}
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">
-                    <Search className="inline-block w-4 h-4 mr-1" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t("orders.orderNumber")}
                   </label>
                   <Input
                     placeholder={t("reports.orderNumberPlaceholder")}
                     value={orderNumberSearch}
                     onChange={(e) => setOrderNumberSearch(e.target.value)}
-                    className="w-full h-10"
+                    className="h-8 text-sm border-green-200 focus:border-green-500 focus:ring-green-500"
                   />
                 </div>
+
+                {/* Customer */}
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t("orders.customer")}
                   </label>
                   <Input
                     placeholder={t("reports.customerFilterPlaceholder")}
                     value={customerSearch}
                     onChange={(e) => setCustomerSearch(e.target.value)}
-                    className="w-full h-10"
+                    className="h-8 text-sm border-green-200 focus:border-green-500 focus:ring-green-500"
                   />
                 </div>
+
+                {/* Product Search */}
                 <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">
-                    {t("orders.productSearch")}
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t("common.product")}
                   </label>
                   <Input
                     placeholder={t("common.customerCodeSearchPlaceholder")}
-                    value={customerCodeSearch}
-                    onChange={(e) => setCustomerCodeSearch(e.target.value)}
-                    className="w-full h-10"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="h-8 text-sm border-green-200 focus:border-green-500 focus:ring-green-500"
                   />
                 </div>
-              </div>
 
-              {/* Row 3: Status Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Order Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t("orders.orderStatusFilter")}
+                  </label>
+                  <select
+                    value={orderStatusFilter}
+                    onChange={(e) => setOrderStatusFilter(e.target.value)}
+                    className="w-full h-8 px-2 rounded-md border border-green-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="all">{t("orders.allStatus")}</option>
+                    <option value="paid">{t("orders.paidStatus")}</option>
+                    <option value="pending">{t("orders.pendingStatus")}</option>
+                    <option value="cancelled">{t("orders.cancelledStatus")}</option>
+                  </select>
+                </div>
+
+                {/* E-invoice Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t("common.einvoiceStatusFilter")}
+                  </label>
+                  <select
+                    value={einvoiceStatusFilter}
+                    onChange={(e) => setEinvoiceStatusFilter(e.target.value)}
+                    className="w-full h-8 px-2 rounded-md border border-green-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  >
+                    <option value="all">{t("common.allEinvoiceStatus")}</option>
+                    <option value="0">{t("common.einvoiceStatus.notPublished")}</option>
+                    <option value="1">{t("common.einvoiceStatus.published")}</option>
+                  </select>
+                </div>
+
+                {/* Sales Type - only if not laundry */}
                 {storeSettings?.businessType !== "laundry" && (
                   <div>
-                    <label className="block text-sm font-medium mb-2 text-gray-700">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
                       {t("orders.salesType")}
                     </label>
                     <select
                       value={salesChannelFilter}
                       onChange={(e) => setSalesChannelFilter(e.target.value)}
-                      className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500 hover:border-green-400 transition-colors"
+                      className="w-full h-8 px-2 rounded-md border border-green-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                     >
                       <option value="all">{t("common.all")}</option>
                       <option value="table">{t("orders.eatIn")}</option>
@@ -3018,63 +3203,6 @@ export default function SalesOrders() {
                     </select>
                   </div>
                 )}
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">
-                    {t("orders.orderStatusFilter")}
-                  </label>
-                  <select
-                    value={orderStatusFilter}
-                    onChange={(e) => setOrderStatusFilter(e.target.value)}
-                    className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500 hover:border-green-400 transition-colors"
-                  >
-                    <option value="all">{t("orders.allStatus")}</option>
-                    <option value="paid">{t("orders.paidStatus")}</option>
-                    <option value="pending">{t("orders.pendingStatus")}</option>
-                    <option value="cancelled">
-                      {t("orders.cancelledStatus")}
-                    </option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">
-                    {t("common.einvoiceStatusFilter")}
-                  </label>
-                  <select
-                    value={einvoiceStatusFilter}
-                    onChange={(e) => setEinvoiceStatusFilter(e.target.value)}
-                    className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500 hover:border-green-400 transition-colors"
-                  >
-                    <option value="all">{t("common.allEinvoiceStatus")}</option>
-                    <option value="0">
-                      {t("common.einvoiceStatus.notPublished")}
-                    </option>
-                    <option value="1">
-                      {t("common.einvoiceStatus.published")}
-                    </option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2 text-gray-700">
-                    {t("orders.storeFilter")}
-                  </label>
-                  <select
-                    value={storeCodeFilter}
-                    onChange={(e) => setStoreCodeFilter(e.target.value)}
-                    className="w-full h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500 hover:border-green-400 transition-colors"
-                  >
-                    {storesData.filter((store: any) => store.typeUser !== 1)
-                      .length > 1 && (
-                      <option value="all">{t("common.allStores")}</option>
-                    )}
-                    {storesData
-                      .filter((store: any) => store.typeUser !== 1)
-                      .map((store: any) => (
-                        <option key={store.storeCode} value={store.storeCode}>
-                          {store.storeName || store.storeCode}
-                        </option>
-                      ))}
-                  </select>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -3083,7 +3211,7 @@ export default function SalesOrders() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex gap-2">
-                  {storeSettings?.typeUser === 1 && (
+                  {storeSettings?.businessType !== "laundry" && (
                     <Button
                       size="sm"
                       variant="outline"
@@ -3128,7 +3256,7 @@ export default function SalesOrders() {
                   <Button
                     onClick={() => {
                       queryClient.invalidateQueries({
-                        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"],
+                        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"],
                       });
                     }}
                   >
@@ -3141,7 +3269,7 @@ export default function SalesOrders() {
                     <table className="w-full min-w-[1600px] table-fixed">
                       <thead>
                         <tr className="bg-gray-50 border-b">
-                          <th className="w-[50px] px-3 py-3 text-center font-medium text-sm text-gray-600">
+                          <th className="w-[50px] px-3 py-3 text-center font-medium text-[16px] text-gray-600">
                             <Checkbox
                               checked={isAllSelected}
                               ref={(el) => {
@@ -3151,7 +3279,7 @@ export default function SalesOrders() {
                             />
                           </th>
                           <th
-                            className="w-[180px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[180px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("orderNumber")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3164,12 +3292,12 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           {storeSettings?.businessType === "laundry" && (
-                            <th className="w-[100px] px-3 py-3 text-center font-medium text-sm text-gray-600">
+                            <th className="w-[100px] px-3 py-3 text-center font-medium text-[16px] text-gray-600">
                               {t("common.returned")}
                             </th>
                           )}
                           <th
-                            className="w-[120px] px-3 py-3 text-center font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[120px] px-3 py-3 text-center font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("status")}
                           >
                             <div className="leading-tight flex items-center justify-center gap-1">
@@ -3182,7 +3310,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[180px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[180px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("createdAt")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3195,7 +3323,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[180px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[180px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("updatedAt")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3208,7 +3336,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[80px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[80px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("salesChannel")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3221,7 +3349,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[120px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[120px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("customerCode")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3234,7 +3362,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[150px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[150px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("customerName")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3246,8 +3374,21 @@ export default function SalesOrders() {
                               )}
                             </div>
                           </th>
+                          <th // Added header for customer phone
+                            className="w-[120px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
+                            onClick={() => handleSort("customerPhone")}
+                          >
+                            <div className="leading-tight flex items-center gap-1">
+                              {t("common.phone")}
+                              {sortField === "customerPhone" && (
+                                <span className="text-blue-600">
+                                  {sortOrder === "asc" ? "↑" : "↓"}
+                                </span>
+                              )}
+                            </div>
+                          </th>
                           <th
-                            className="w-[100px] px-3 py-3 text-right font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[120px] px-3 py-3 text-right font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("subtotal")}
                           >
                             <div className="leading-tight flex items-center justify-end gap-1">
@@ -3260,7 +3401,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[80px] px-3 py-3 text-right font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[100px] px-3 py-3 text-right font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("discount")}
                           >
                             <div className="leading-tight flex items-center justify-end gap-1">
@@ -3273,7 +3414,7 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[90px] px-3 py-3 text-right font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[100px] px-3 py-3 text-right font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("tax")}
                           >
                             <div className="leading-tight flex items-center justify-end gap-1">
@@ -3286,11 +3427,11 @@ export default function SalesOrders() {
                             </div>
                           </th>
                           <th
-                            className="w-[110px] px-3 py-3 text-right font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[120px] px-3 py-3 text-right font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("total")}
                           >
                             <div className="leading-tight flex items-center justify-end gap-1">
-                              {t("common.paid")}
+                              {t("common.totalPayment")}
                               {sortField === "total" && (
                                 <span className="text-blue-600">
                                   {sortOrder === "asc" ? "↑" : "↓"}
@@ -3298,34 +3439,13 @@ export default function SalesOrders() {
                               )}
                             </div>
                           </th>
-                          <th
-                            className="w-[110px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
-                            onClick={() => handleSort("employeeCode")}
-                          >
-                            <div className="leading-tight flex items-center gap-1">
-                              {t("common.employeeCode")}
-                              {sortField === "employeeCode" && (
-                                <span className="text-blue-600">
-                                  {sortOrder === "asc" ? "↑" : "↓"}
-                                </span>
-                              )}
+                          <th className="w-[150px] px-3 py-3 text-left font-medium text-[16px] text-gray-600">
+                            <div className="leading-tight">
+                              {t("common.paymentMethodLabel")}
                             </div>
                           </th>
                           <th
-                            className="w-[120px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
-                            onClick={() => handleSort("employeeName")}
-                          >
-                            <div className="leading-tight flex items-center gap-1">
-                              {t("common.employeeName")}
-                              {sortField === "employeeName" && (
-                                <span className="text-blue-600">
-                                  {sortOrder === "asc" ? "↑" : "↓"}
-                                </span>
-                              )}
-                            </div>
-                          </th>
-                          <th
-                            className="w-[120px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[120px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("symbol")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3337,21 +3457,9 @@ export default function SalesOrders() {
                               )}
                             </div>
                           </th>
+
                           <th
-                            className="w-[110px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
-                            onClick={() => handleSort("invoiceNumber")}
-                          >
-                            <div className="leading-tight flex items-center gap-1">
-                              {t("orders.invoiceNumber")}
-                              {sortField === "invoiceNumber" && (
-                                <span className="text-blue-600">
-                                  {sortOrder === "asc" ? "↑" : "↓"}
-                                </span>
-                              )}
-                            </div>
-                          </th>
-                          <th
-                            className="w-[200px] px-3 py-3 text-left font-medium text-sm text-gray-600 cursor-pointer hover:bg-gray-100"
+                            className="w-[200px] px-3 py-3 text-left font-medium text-[16px] text-gray-600 cursor-pointer hover:bg-gray-100"
                             onClick={() => handleSort("notes")}
                           >
                             <div className="leading-tight flex items-center gap-1">
@@ -3371,8 +3479,8 @@ export default function SalesOrders() {
                             <td
                               colSpan={
                                 storeSettings?.businessType === "laundry"
-                                  ? 18
-                                  : 17
+                                  ? 16
+                                  : 15
                               }
                               className="p-8 text-center text-sm text-gray-500"
                             >
@@ -3387,18 +3495,33 @@ export default function SalesOrders() {
                           </tr>
                         ) : (
                           filteredInvoices.map((item) => {
-                            const customerCode =
-                              item.customerCode ||
-                              item.customerTaxCode ||
-                              `KH000${String(item.id).padStart(3, "0")}`;
+                            // Get customer info - prioritize customerId from customer table if order has customerId
+                            let customerCode =
+                              item.customerCode || item.customerTaxCode || "";
+
+                            // If order has customerId, try to find customer in customers list
+                            if (
+                              item.customerId &&
+                              customers &&
+                              customers.length > 0
+                            ) {
+                              const customer = customers.find(
+                                (c: any) =>
+                                  c.id === item.customerId ||
+                                  c.name == item.customerName,
+                              );
+                              if (customer && customer.customerId) {
+                                customerCode = customer.customerId;
+                              }
+                            }
+
                             const customerName = item.customerName || "";
+                            const customerPhone = item.customerPhone || ""; // Get customer phone
                             const discount = parseFloat(item.discount || "0");
                             const tax = parseFloat(item.tax || "0");
                             const subtotal = parseFloat(item.subtotal || "0");
                             const total = parseFloat(item.total || "0");
                             const paid = total;
-                            const employeeCode = item.employeeId || "";
-                            const employeeName = "";
                             const symbol = item.symbol || "";
                             const invoiceNumber =
                               item.invoiceNumber ||
@@ -3448,7 +3571,7 @@ export default function SalesOrders() {
                                   </td>
                                   <td className="px-3 py-3">
                                     <div
-                                      className="font-medium text-xs"
+                                      className="font-medium text-[16px]"
                                       title={
                                         item.orderNumber || item.displayNumber
                                       }
@@ -3479,12 +3602,12 @@ export default function SalesOrders() {
                                     )}
                                   </td>
                                   <td className="px-3 py-3">
-                                    <div className="text-sm truncate">
+                                    <div className="text-[16px] truncate">
                                       {formatDate(item.createdAt)}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3">
-                                    <div className="text-sm truncate">
+                                    <div className="text-[16px] truncate">
                                       {(() => {
                                         // Show completion/cancellation date based on status
                                         if (
@@ -3505,7 +3628,7 @@ export default function SalesOrders() {
                                     </div>
                                   </td>
                                   <td className="px-3 py-3">
-                                    <div className="text-sm">
+                                    <div className="text-[16px]">
                                       {(() => {
                                         if (item.salesChannel === "table") {
                                           return t("orders.eatIn");
@@ -3527,67 +3650,192 @@ export default function SalesOrders() {
                                     </div>
                                   </td>
                                   <td className="px-3 py-3">
-                                    <div
-                                      className="text-sm font-mono truncate"
-                                      title={customerCode}
-                                    >
-                                      {customerCode}
-                                    </div>
+                                    {isEditing && editableInvoice ? (
+                                      <div className="relative">
+                                        <Input
+                                          list={`customer-code-list-${item.id}`}
+                                          value={
+                                            editableInvoice.customerCode ||
+                                            editableInvoice.customerTaxCode ||
+                                            ""
+                                          }
+                                          onChange={(e) => {
+                                            const inputValue = e.target.value;
+
+                                            // Extract customer code from datalist value (part before " - ")
+                                            const selectedCode =
+                                              inputValue.includes(" - ")
+                                                ? inputValue
+                                                    .split(" - ")[0]
+                                                    .trim()
+                                                : inputValue;
+
+                                            updateEditableInvoiceField(
+                                              "customerCode",
+                                              selectedCode,
+                                            );
+
+                                            // Find customer by code
+                                            const selectedCustomer =
+                                              customers.find(
+                                                (c: any) =>
+                                                  c.customerId ===
+                                                    selectedCode ||
+                                                  c.customerTaxCode ===
+                                                    selectedCode,
+                                              );
+
+                                            if (selectedCustomer) {
+                                              updateEditableInvoiceField(
+                                                "customerName",
+                                                selectedCustomer.name,
+                                              );
+                                              updateEditableInvoiceField(
+                                                "customerPhone",
+                                                selectedCustomer.phone || "",
+                                              );
+                                              updateEditableInvoiceField(
+                                                "customerTaxCode",
+                                                selectedCustomer.customerTaxCode ||
+                                                  "",
+                                              );
+                                              updateEditableInvoiceField(
+                                                "customerAddress",
+                                                selectedCustomer.address || "",
+                                              );
+                                              updateEditableInvoiceField(
+                                                "customerEmail",
+                                                selectedCustomer.email || "",
+                                              );
+                                              updateEditableInvoiceField(
+                                                "customerId",
+                                                selectedCustomer.id,
+                                              );
+                                            }
+                                          }}
+                                          className="w-32"
+                                          disabled={true}
+                                          placeholder="Chọn mã KH"
+                                        />
+                                        <datalist
+                                          id={`customer-code-list-${item.id}`}
+                                        >
+                                          {customers
+                                            .filter(
+                                              (c: any) =>
+                                                c.customerId ||
+                                                c.customerTaxCode,
+                                            )
+                                            .map((c: any) => (
+                                              <option
+                                                key={c.id}
+                                                value={
+                                                  c.customerId ||
+                                                  c.customerTaxCode
+                                                }
+                                              >
+                                                {c.customerId ||
+                                                  c.customerTaxCode}{" "}
+                                                - {c.name} ({c.phone || "N/A"})
+                                              </option>
+                                            ))}
+                                        </datalist>
+                                      </div>
+                                    ) : (
+                                      <div
+                                        className="text-[16px] font-mono truncate"
+                                        title={customerCode}
+                                      >
+                                        {customerCode}
+                                      </div>
+                                    )}
                                   </td>
                                   <td className="px-3 py-3">
                                     <div
-                                      className="text-sm truncate"
+                                      className="text-[16px] truncate"
                                       title={customerName}
                                     >
                                       {customerName}
                                     </div>
                                   </td>
+                                  <td className="px-3 py-3">
+                                    {" "}
+                                    {/* Added cell for customer phone */}
+                                    <div
+                                      className="text-[16px] truncate"
+                                      title={customerPhone}
+                                    >
+                                      {customerPhone || "-"}
+                                    </div>
+                                  </td>
                                   <td className="px-3 py-3 text-right">
-                                    <div className="text-sm font-medium">
+                                    <div className="text-[16px] font-medium">
                                       {formatCurrency(subtotal)}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3 text-right">
-                                    <div className="text-sm">
-                                      {formatCurrency(discount)}
+                                    <div className="text-[16px]">
+                                      {(() => {
+                                        // If order discount is 0, calculate from order items
+                                        if (discount === 0 && item.id) {
+                                          // Get order items for this order from cache
+                                          const cachedItems =
+                                            queryClient.getQueryData([
+                                              "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items",
+                                              item.id,
+                                            ]) as any[];
+                                          if (
+                                            cachedItems &&
+                                            cachedItems.length > 0
+                                          ) {
+                                            const totalItemDiscount =
+                                              cachedItems.reduce(
+                                                (sum, orderItem) => {
+                                                  return (
+                                                    sum +
+                                                    parseFloat(
+                                                      orderItem.discount || "0",
+                                                    )
+                                                  );
+                                                },
+                                                0,
+                                              );
+                                            // Only show if there's actually item discount
+                                            if (totalItemDiscount > 0) {
+                                              return formatCurrency(
+                                                totalItemDiscount,
+                                              );
+                                            }
+                                          }
+                                        }
+                                        return formatCurrency(discount);
+                                      })()}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3 text-right">
-                                    <div className="text-sm">
+                                    <div className="text-[16px]">
                                       {formatCurrency(tax)}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3 text-right">
-                                    <div className="text-sm font-medium">
+                                    <div className="text-[16px] font-medium">
                                       {formatCurrency(total)}
                                     </div>
                                   </td>
                                   <td className="px-3 py-3">
-                                    <div className="text-sm font-mono">
-                                      {employeeCode}
+                                    <div className="text-[16px]">
+                                      {getPaymentMethodName(item.paymentMethod)}
                                     </div>
                                   </td>
+                                  <td className="px-3 py-3">
+                                    <div className="text-[16px]">
+                                      {symbol || "-"}
+                                    </div>
+                                  </td>
+
                                   <td className="px-3 py-3">
                                     <div
-                                      className="text-sm truncate"
-                                      title={employeeName}
-                                    >
-                                      {employeeName}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 py-3">
-                                    <div className="text-sm">
-                                      {itemSymbol || "-"}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 py-3">
-                                    <div className="text-sm font-mono">
-                                      {invoiceNumber}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 py-3">
-                                    <div
-                                      className="text-sm truncate"
+                                      className="text-[16px] truncate"
                                       title={notes || "-"}
                                     >
                                       {notes || "-"}
@@ -3602,8 +3850,8 @@ export default function SalesOrders() {
                                         colSpan={
                                           storeSettings?.businessType ===
                                           "laundry"
-                                            ? 18
-                                            : 17
+                                            ? 16
+                                            : 15
                                         }
                                         className="p-0"
                                       >
@@ -3617,62 +3865,75 @@ export default function SalesOrders() {
                                             <CardContent className="space-y-4">
                                               <div className="bg-white p-4 rounded-lg overflow-x-auto">
                                                 <div className="min-w-[1200px]">
-                                                  <table className="w-full text-sm border-collapse">
+                                                  <table className="w-full text-base border-collapse">
                                                     <tbody>
                                                       <tr>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t(
                                                             "orders.orderNumberLabel",
                                                           )}
                                                           :
                                                         </td>
-                                                        <td className="py-1 pr-6 text-blue-600 font-medium">
+                                                        <td className="py-2 pr-6 text-blue-600 font-semibold text-base">
                                                           {isEditing &&
                                                           editableInvoice ? (
                                                             <Input
+                                                              {...form.register(
+                                                                "orderNumber",
+                                                              )}
                                                               value={
                                                                 editableInvoice.orderNumber ||
                                                                 ""
                                                               }
-                                                              onChange={(e) =>
+                                                              onChange={(e) => {
                                                                 updateEditableInvoiceField(
                                                                   "orderNumber",
                                                                   e.target
                                                                     .value,
-                                                                )
-                                                              }
+                                                                );
+                                                                form.setValue(
+                                                                  "orderNumber",
+                                                                  e.target
+                                                                    .value,
+                                                                );
+                                                              }}
                                                               className="w-32"
-                                                              disabled={
-                                                                selectedInvoice.displayStatus ===
-                                                                1
-                                                              }
+                                                              disabled={true}
                                                             />
                                                           ) : (
                                                             selectedInvoice.orderNumber ||
                                                             selectedInvoice.displayNumber
                                                           )}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t("common.date")}:
                                                         </td>
-                                                        <td className="py-1 pr-6">
+                                                        <td className="py-2 pr-6 text-base">
                                                           {isEditing &&
                                                           editableInvoice ? (
                                                             <Input
                                                               type="datetime-local"
+                                                              {...form.register(
+                                                                "createdAt",
+                                                              )}
                                                               value={
                                                                 editableInvoice.createdAt?.slice(
                                                                   0,
                                                                   16,
                                                                 ) || ""
                                                               }
-                                                              onChange={(e) =>
+                                                              onChange={(e) => {
                                                                 updateEditableInvoiceField(
                                                                   "createdAt",
                                                                   e.target
                                                                     .value,
-                                                                )
-                                                              }
+                                                                );
+                                                                form.setValue(
+                                                                  "createdAt",
+                                                                  e.target
+                                                                    .value,
+                                                                );
+                                                              }}
                                                               className="w-44"
                                                               disabled={
                                                                 selectedInvoice.displayStatus ===
@@ -3685,16 +3946,16 @@ export default function SalesOrders() {
                                                             )
                                                           )}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t("orders.customer")}
                                                           :
                                                         </td>
-                                                        <td className="py-1 pr-6 text-blue-600 font-medium">
+                                                        <td className="py-2 pr-6 text-blue-600 font-semibold text-base">
                                                           {isEditing &&
                                                           editableInvoice ? (
-                                                            <>
+                                                            <div className="relative">
                                                               <Input
-                                                                list="customer-list-datalist"
+                                                                list={`customer-name-list-${selectedInvoice.id}`}
                                                                 value={
                                                                   editableInvoice.customerName ||
                                                                   ""
@@ -3706,233 +3967,143 @@ export default function SalesOrders() {
                                                                     e.target
                                                                       .value;
 
-                                                                  // Luôn cập nhật tên khách hàng trước
+                                                                  // Always update customer name as user types
                                                                   updateEditableInvoiceField(
                                                                     "customerName",
                                                                     inputValue,
                                                                   );
 
-                                                                  // Nếu xóa hoàn toàn (rỗng hoặc chỉ có khoảng trắng)
-                                                                  if (
-                                                                    inputValue.trim() ===
-                                                                    ""
-                                                                  ) {
-                                                                    updateEditableInvoiceField(
-                                                                      "customerPhone",
-                                                                      "",
-                                                                    );
-                                                                    updateEditableInvoiceField(
-                                                                      "customerTaxCode",
-                                                                      "",
-                                                                    );
-                                                                    updateEditableInvoiceField(
-                                                                      "customerAddress",
-                                                                      "",
-                                                                    );
-                                                                    updateEditableInvoiceField(
-                                                                      "customerEmail",
-                                                                      "",
-                                                                    );
-                                                                    return;
-                                                                  }
-
-                                                                  // Chỉ tìm khách hàng nếu dữ liệu đã được load
-                                                                  if (
-                                                                    Array.isArray(
-                                                                      customers,
-                                                                    ) &&
-                                                                    customers.length >
-                                                                      0
-                                                                  ) {
-                                                                    // Tìm khách hàng khớp chính xác
-                                                                    const matchingCustomer =
-                                                                      customers.find(
-                                                                        (
-                                                                          c: any,
-                                                                        ) =>
+                                                                  // Try to find exact match in customers list
+                                                                  const selectedCustomer =
+                                                                    customers.find(
+                                                                      (
+                                                                        c: any,
+                                                                      ) => {
+                                                                        // Check for exact name match
+                                                                        if (
                                                                           c.name ===
-                                                                          inputValue,
-                                                                      );
+                                                                          inputValue
+                                                                        )
+                                                                          return true;
 
-                                                                    if (
-                                                                      matchingCustomer
-                                                                    ) {
-                                                                      // Cập nhật tất cả thông tin khách hàng
-                                                                      updateEditableInvoiceField(
-                                                                        "customerPhone",
-                                                                        matchingCustomer.phone ||
-                                                                          "",
-                                                                      );
-                                                                      updateEditableInvoiceField(
-                                                                        "customerTaxCode",
-                                                                        matchingCustomer.customerTaxCode ||
-                                                                          "",
-                                                                      );
-                                                                      updateEditableInvoiceField(
-                                                                        "customerAddress",
-                                                                        matchingCustomer.address ||
-                                                                          "",
-                                                                      );
-                                                                      updateEditableInvoiceField(
-                                                                        "customerEmail",
-                                                                        matchingCustomer.email ||
-                                                                          "",
-                                                                      );
-                                                                    }
-                                                                  }
-                                                                }}
-                                                                onBlur={(e) => {
-                                                                  const inputValue =
-                                                                    e.target.value.trim();
+                                                                        // Check if input matches datalist format: "Name - Phone (Code)"
+                                                                        const datalistValue = `${c.name} - ${c.phone || "N/A"} (${c.customerId || "N/A"})`;
+                                                                        if (
+                                                                          datalistValue ===
+                                                                          inputValue
+                                                                        )
+                                                                          return true;
 
-                                                                  // Nếu rỗng sau khi blur, xóa hết
+                                                                        return false;
+                                                                      },
+                                                                    );
+
                                                                   if (
-                                                                    inputValue ===
-                                                                    ""
+                                                                    selectedCustomer
                                                                   ) {
+                                                                    // Auto-fill customer information
                                                                     updateEditableInvoiceField(
                                                                       "customerName",
-                                                                      "",
+                                                                      selectedCustomer.name,
                                                                     );
                                                                     updateEditableInvoiceField(
                                                                       "customerPhone",
-                                                                      "",
+                                                                      selectedCustomer.phone ||
+                                                                        "",
                                                                     );
                                                                     updateEditableInvoiceField(
                                                                       "customerTaxCode",
-                                                                      "",
+                                                                      selectedCustomer.customerTaxCode ||
+                                                                        selectedCustomer.taxCode ||
+                                                                        "",
                                                                     );
                                                                     updateEditableInvoiceField(
                                                                       "customerAddress",
-                                                                      "",
+                                                                      selectedCustomer.address ||
+                                                                        "",
                                                                     );
                                                                     updateEditableInvoiceField(
                                                                       "customerEmail",
-                                                                      "",
+                                                                      selectedCustomer.email ||
+                                                                        "",
                                                                     );
-                                                                    return;
-                                                                  }
-
-                                                                  // Chỉ kiểm tra lại khách hàng nếu dữ liệu đã load
-                                                                  if (
-                                                                    Array.isArray(
-                                                                      customers,
-                                                                    ) &&
-                                                                    customers.length >
-                                                                      0
-                                                                  ) {
-                                                                    // Tìm khách hàng khớp chính xác
-                                                                    const matchingCustomer =
-                                                                      customers.find(
-                                                                        (
-                                                                          c: any,
-                                                                        ) =>
-                                                                          c.name ===
-                                                                          inputValue,
-                                                                      );
-
-                                                                    if (
-                                                                      matchingCustomer
-                                                                    ) {
-                                                                      updateEditableInvoiceField(
-                                                                        "customerName",
-                                                                        matchingCustomer.name,
-                                                                      );
-                                                                      updateEditableInvoiceField(
-                                                                        "customerPhone",
-                                                                        matchingCustomer.phone ||
-                                                                          "",
-                                                                      );
-                                                                      updateEditableInvoiceField(
-                                                                        "customerTaxCode",
-                                                                        matchingCustomer.customerTaxCode ||
-                                                                          "",
-                                                                      );
-                                                                      updateEditableInvoiceField(
-                                                                        "customerAddress",
-                                                                        matchingCustomer.address ||
-                                                                          "",
-                                                                      );
-                                                                      updateEditableInvoiceField(
-                                                                        "customerEmail",
-                                                                        matchingCustomer.email ||
-                                                                          "",
-                                                                      );
-                                                                    }
+                                                                    updateEditableInvoiceField(
+                                                                      "customerId",
+                                                                      selectedCustomer.id,
+                                                                    );
+                                                                    updateEditableInvoiceField(
+                                                                      "customerCode",
+                                                                      selectedCustomer.customerId ||
+                                                                        selectedCustomer.customerTaxCode ||
+                                                                        "",
+                                                                    );
                                                                   }
                                                                 }}
-                                                                className="w-40"
+                                                                className="w-60"
                                                                 disabled={
                                                                   selectedInvoice.displayStatus ===
                                                                   1
                                                                 }
-                                                                placeholder={
-                                                                  !Array.isArray(
-                                                                    customers,
-                                                                  ) ||
-                                                                  customers.length ===
-                                                                    0
-                                                                    ? "Đang tải..."
-                                                                    : "Chọn hoặc nhập tên"
-                                                                }
+                                                                placeholder="Nhập tên khách hàng..."
                                                               />
-                                                              {Array.isArray(
-                                                                customers,
-                                                              ) &&
-                                                                customers.length >
-                                                                  0 && (
-                                                                  <datalist id="customer-list-datalist">
-                                                                    {customers.map(
+                                                              <datalist
+                                                                id={`customer-name-list-${selectedInvoice.id}`}
+                                                              >
+                                                                {customers.map(
+                                                                  (c: any) => (
+                                                                    <option
+                                                                      key={c.id}
+                                                                      value={`${c.name} - ${c.phone || "N/A"} (${c.customerId || "N/A"})`}
+                                                                    >
+                                                                      {c.name} -{" "}
+                                                                      {c.phone ||
+                                                                        "N/A"}{" "}
                                                                       (
-                                                                        customer: any,
-                                                                      ) => (
-                                                                        <option
-                                                                          key={
-                                                                            customer.id
-                                                                          }
-                                                                          value={
-                                                                            customer.name
-                                                                          }
-                                                                        >
-                                                                          {
-                                                                            customer.customerId
-                                                                          }{" "}
-                                                                          -{" "}
-                                                                          {
-                                                                            customer.name
-                                                                          }{" "}
-                                                                          (
-                                                                          {
-                                                                            customer.phone
-                                                                          }
-                                                                          )
-                                                                        </option>
-                                                                      ),
-                                                                    )}
-                                                                  </datalist>
+                                                                      {c.customerId ||
+                                                                        "N/A"}
+                                                                      )
+                                                                    </option>
+                                                                  ),
                                                                 )}
-                                                            </>
+                                                              </datalist>
+                                                            </div>
                                                           ) : (
-                                                            selectedInvoice.customerName ||
-                                                            "Khách hàng"
+                                                            <>
+                                                              {(isEditing
+                                                                ? editableInvoice?.customerName
+                                                                : selectedInvoice.customerName) ||
+                                                                "Khách hàng"}
+                                                              {(isEditing
+                                                                ? editableInvoice?.customerPhone
+                                                                : selectedInvoice.customerPhone) &&
+                                                                ` - ${isEditing ? editableInvoice?.customerPhone : selectedInvoice.customerPhone}`}
+                                                            </>
                                                           )}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t(
                                                             "orders.phoneNumber",
                                                           )}
                                                           :
                                                         </td>
-                                                        <td className="py-1 pr-6">
+                                                        <td className="py-2 pr-6 text-base">
                                                           {isEditing &&
                                                           editableInvoice ? (
                                                             <Input
+                                                              {...form.register(
+                                                                "customerPhone",
+                                                              )}
                                                               value={
                                                                 editableInvoice.customerPhone ||
                                                                 ""
                                                               }
                                                               onChange={(e) => {
                                                                 updateEditableInvoiceField(
+                                                                  "customerPhone",
+                                                                  e.target
+                                                                    .value,
+                                                                );
+                                                                form.setValue(
                                                                   "customerPhone",
                                                                   e.target
                                                                     .value,
@@ -3952,10 +4123,10 @@ export default function SalesOrders() {
                                                             </span>
                                                           )}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t("orders.table")}:
                                                         </td>
-                                                        <td className="py-1 pr-6">
+                                                        <td className="py-2 pr-6 text-base">
                                                           {selectedInvoice.salesChannel ===
                                                             "table" &&
                                                           selectedInvoice.tableId
@@ -3964,10 +4135,10 @@ export default function SalesOrders() {
                                                               )
                                                             : "-"}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t("common.status")}:
                                                         </td>
-                                                        <td className="py-1">
+                                                        <td className="py-2 text-base">
                                                           {(() => {
                                                             const statusLabels =
                                                               {
@@ -3989,16 +4160,19 @@ export default function SalesOrders() {
                                                         {storeSettings?.businessType ===
                                                           "laundry" && (
                                                           <>
-                                                            <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                            <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                               {t(
                                                                 "common.returned",
                                                               )}
                                                               :
                                                             </td>
-                                                            <td className="py-1 pr-6">
+                                                            <td className="py-2 pr-6 text-base">
                                                               {isEditing &&
                                                               editableInvoice ? (
                                                                 <Checkbox
+                                                                  {...form.register(
+                                                                    "isPaid",
+                                                                  )}
                                                                   checked={
                                                                     editableInvoice.isPaid ||
                                                                     false
@@ -4007,12 +4181,16 @@ export default function SalesOrders() {
                                                                     checked,
                                                                   ) => {
                                                                     console.log(
-                                                                      "   isPaid checkbox changed to:",
+                                                                      "✅ isPaid checkbox changed to:",
                                                                       checked,
                                                                     );
                                                                     updateEditableInvoiceField(
                                                                       "isPaid",
                                                                       checked as boolean,
+                                                                    );
+                                                                    form.setValue(
+                                                                      "isPaid",
+                                                                      checked,
                                                                     );
                                                                   }}
                                                                 />
@@ -4036,13 +4214,13 @@ export default function SalesOrders() {
                                                             </td>
                                                           </>
                                                         )}
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t(
                                                             "orders.salesType",
                                                           )}
                                                           :
                                                         </td>
-                                                        <td className="py-1 pr-6">
+                                                        <td className="py-2 pr-6 text-base">
                                                           {(() => {
                                                             const salesChannel =
                                                               selectedInvoice.salesChannel;
@@ -4079,16 +4257,19 @@ export default function SalesOrders() {
                                                             );
                                                           })()}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t(
                                                             "orders.invoiceSymbol",
                                                           )}
                                                           :
                                                         </td>
-                                                        <td className="py-1 pr-6">
+                                                        <td className="py-2 pr-6 text-base">
                                                           {isEditing &&
                                                           editableInvoice ? (
                                                             <Input
+                                                              {...form.register(
+                                                                "symbol",
+                                                              )}
                                                               value={
                                                                 editableInvoice.symbol ||
                                                                 ""
@@ -4114,18 +4295,21 @@ export default function SalesOrders() {
                                                             </span>
                                                           )}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t(
                                                             "orders.invoiceNumber",
                                                           )}
                                                           :
                                                         </td>
-                                                        <td className="py-1 pr-6">
+                                                        <td className="py-2 pr-6 text-base">
                                                           {isEditing &&
                                                           editableInvoice &&
                                                           selectedInvoice.displayStatus !==
                                                             1 ? (
                                                             <Input
+                                                              {...form.register(
+                                                                "templateNumber",
+                                                              )}
                                                               value={
                                                                 editableInvoice.templateNumber ||
                                                                 ""
@@ -4150,12 +4334,12 @@ export default function SalesOrders() {
                                                             </span>
                                                           )}
                                                         </td>
-                                                        <td className="py-1 pr-4 font-medium whitespace-nowrap">
+                                                        <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
                                                           {t(
                                                             "common.einvoiceStatusLabel",
                                                           )}
                                                         </td>
-                                                        <td className="py-1 pr-6">
+                                                        <td className="py-2 pr-6 text-base">
                                                           {getEInvoiceStatusBadge(
                                                             selectedInvoice.einvoiceStatus,
                                                           )}
@@ -4221,49 +4405,49 @@ export default function SalesOrders() {
                                                     <table className="w-full text-sm min-w-[1200px]">
                                                       <thead>
                                                         <tr className="bg-gray-50 border-b">
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-left sticky left-0 bg-green-50 z-10 w-12">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-left sticky left-0 bg-green-50 z-10 w-12">
                                                             {t("common.no")}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-left min-w-[100px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-left min-w-[100px]">
                                                             {t(
                                                               "orders.itemCode",
                                                             )}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-left min-w-[250px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-left min-w-[180px] max-w-[220px]">
                                                             {t(
                                                               "orders.itemName",
                                                             )}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-center min-w-[60px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-center min-w-[60px]">
                                                             {t("orders.unit")}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-center min-w-[80px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-center min-w-[80px]">
                                                             {t(
                                                               "common.quantity",
                                                             )}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-right min-w-[100px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-right min-w-[100px]">
                                                             {t(
                                                               "orders.unitPrice",
                                                             )}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-right min-w-[100px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-right min-w-[100px]">
                                                             {t(
                                                               "common.subtotalAmount",
                                                             )}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-right min-w-[100px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-right min-w-[100px]">
                                                             {t(
                                                               "common.discount",
                                                             )}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-right min-w-[100px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-right min-w-[100px]">
                                                             {t("common.tax")}
                                                           </th>
-                                                          <th className="border-r px-2 py-2 font-medium text-xs text-right min-w-[100px]">
+                                                          <th className="border-r px-2 py-2 font-medium text-base text-right min-w-[100px]">
                                                             {t("common.total")}
                                                           </th>
-                                                          <th className="text-center px-3 py-2 font-medium text-xs whitespace-nowrap w-[80px]">
+                                                          <th className="text-center px-3 py-2 font-medium text-base whitespace-nowrap w-[80px]">
                                                             {isEditing &&
                                                             selectedInvoice?.displayStatus !==
                                                               1 &&
@@ -4307,7 +4491,7 @@ export default function SalesOrders() {
                                                             return (
                                                               <tr className="border-t">
                                                                 <td
-                                                                  colSpan={11}
+                                                                  colSpan={10} // Adjusted colspan
                                                                   className="text-center py-4 text-gray-500"
                                                                 >
                                                                   {t(
@@ -4359,6 +4543,7 @@ export default function SalesOrders() {
                                                                 undefined
                                                                   ? editedItem.sku
                                                                   : item.sku ||
+                                                                    item.productSku ||
                                                                     product?.sku ||
                                                                     "";
 
@@ -4393,7 +4578,11 @@ export default function SalesOrders() {
                                                                 );
 
                                                               // Get discount from editedOrderItems if available, otherwise calculate
-                                                              let itemDiscountAmount = 0;
+                                                              let itemDiscountAmount =
+                                                                Number(
+                                                                  item.discount ||
+                                                                    "0",
+                                                                );
 
                                                               if (
                                                                 editedItem.discount !==
@@ -4570,10 +4759,10 @@ export default function SalesOrders() {
                                                                   key={item.id}
                                                                   className="border-b hover:bg-gray-50"
                                                                 >
-                                                                  <td className="text-center py-2 px-3 border-r text-xs w-[50px]">
+                                                                  <td className="text-center py-2 px-3 border-r text-sm w-[50px]">
                                                                     {index + 1}
                                                                   </td>
-                                                                  <td className="text-left py-2 px-3 border-r text-xs w-[120px]">
+                                                                  <td className="text-left py-2 px-3 border-r text-base w-[120px]">
                                                                     {isEditing ? (
                                                                       <div className="relative">
                                                                         <Input
@@ -4586,13 +4775,31 @@ export default function SalesOrders() {
                                                                             1
                                                                           }
                                                                           data-field={`orderitem-sku-${index}`}
+                                                                          onFocus={(
+                                                                            e,
+                                                                          ) =>
+                                                                            e.target.select()
+                                                                          }
                                                                           onChange={(
                                                                             e,
                                                                           ) => {
-                                                                            const selectedSku =
+                                                                            const inputValue =
                                                                               e
                                                                                 .target
                                                                                 .value;
+
+                                                                            // Trích xuất chỉ SKU từ giá trị datalist (phần trước " - ")
+                                                                            const selectedSku =
+                                                                              inputValue.includes(
+                                                                                " - ",
+                                                                              )
+                                                                                ? inputValue
+                                                                                    .split(
+                                                                                      " - ",
+                                                                                    )[0]
+                                                                                    .trim()
+                                                                                : inputValue;
+
                                                                             updateOrderItemField(
                                                                               item.id,
                                                                               "sku",
@@ -4639,7 +4846,7 @@ export default function SalesOrders() {
                                                                               "sku",
                                                                             )
                                                                           }
-                                                                          className="w-full h-8 text-xs"
+                                                                          className="w-full h-8 text-base"
                                                                           placeholder="Chọn mã hàng"
                                                                         />
                                                                         <datalist
@@ -4685,13 +4892,13 @@ export default function SalesOrders() {
                                                                         </datalist>
                                                                       </div>
                                                                     ) : (
-                                                                      <div className="truncate">
+                                                                      <div className="truncate text-base">
                                                                         {sku ||
                                                                           "-"}
                                                                       </div>
                                                                     )}
                                                                   </td>
-                                                                  <td className="text-left py-2 px-3 border-r text-xs w-[150px]">
+                                                                  <td className="text-left py-2 px-3 border-r text-base w-[180px] max-w-[220px]">
                                                                     {isEditing ? (
                                                                       <div className="relative">
                                                                         <Input
@@ -4704,13 +4911,32 @@ export default function SalesOrders() {
                                                                             1
                                                                           }
                                                                           data-field={`orderitem-productName-${index}`}
+                                                                          onFocus={(
+                                                                            e,
+                                                                          ) =>
+                                                                            e.target.select()
+                                                                          }
                                                                           onChange={(
                                                                             e,
                                                                           ) => {
-                                                                            const selectedName =
+                                                                            const inputValue =
                                                                               e
                                                                                 .target
                                                                                 .value;
+
+                                                                            // Trích xuất chỉ tên sản phẩm từ giá trị datalist
+                                                                            // Format: "Tên - SKU (Giá)" -> lấy phần trước " - "
+                                                                            const selectedName =
+                                                                              inputValue.includes(
+                                                                                " - ",
+                                                                              )
+                                                                                ? inputValue
+                                                                                    .split(
+                                                                                      " - ",
+                                                                                    )[0]
+                                                                                    .trim()
+                                                                                : inputValue;
+
                                                                             updateOrderItemField(
                                                                               item.id,
                                                                               "productName",
@@ -4757,7 +4983,7 @@ export default function SalesOrders() {
                                                                               "productName",
                                                                             )
                                                                           }
-                                                                          className="w-full h-8 text-xs"
+                                                                          className="w-full h-8 text-base"
                                                                           placeholder="Chọn tên hàng"
                                                                         />
                                                                         <datalist
@@ -4803,17 +5029,17 @@ export default function SalesOrders() {
                                                                         </datalist>
                                                                       </div>
                                                                     ) : (
-                                                                      <div className="truncate">
+                                                                      <div className="truncate text-base font-semibold">
                                                                         {productName ||
                                                                           "-"}
                                                                       </div>
                                                                     )}
                                                                   </td>
-                                                                  <td className="text-center py-2 px-3 border-r text-xs w-[80px]">
+                                                                  <td className="text-center py-2 px-3 border-r text-base w-[60px]">
                                                                     {product?.unit ||
-                                                                      "Cái"}
+                                                                      "pcs"}
                                                                   </td>
-                                                                  <td className="text-center py-2 px-3 border-r text-xs w-[100px]">
+                                                                  <td className="text-center py-2 px-3 border-r text-base w-[100px]">
                                                                     {isEditing ? (
                                                                       <NumericFormat
                                                                         value={
@@ -4899,7 +5125,7 @@ export default function SalesOrders() {
                                                                           selectedInvoice.displayStatus ===
                                                                           1
                                                                         }
-                                                                        className="w-full h-8 text-xs text-right"
+                                                                        className="w-full h-8 text-base text-center"
                                                                       />
                                                                     ) : (
                                                                       quantity.toLocaleString(
@@ -4911,7 +5137,7 @@ export default function SalesOrders() {
                                                                       )
                                                                     )}
                                                                   </td>
-                                                                  <td className="text-right py-2 px-3 border-r text-xs w-[120px]">
+                                                                  <td className="text-right py-2 px-3 border-r text-base w-[120px]">
                                                                     {isEditing ? (
                                                                       <Input
                                                                         type="text"
@@ -4963,7 +5189,7 @@ export default function SalesOrders() {
                                                                       )
                                                                     )}
                                                                   </td>
-                                                                  <td className="text-right py-2 px-3 border-r text-xs w-[120px]">
+                                                                  <td className="text-right py-2 px-3 border-r text-base w-[120px]">
                                                                     {Math.floor(
                                                                       unitPrice *
                                                                         quantity,
@@ -4971,14 +5197,14 @@ export default function SalesOrders() {
                                                                       "vi-VN",
                                                                     )}
                                                                   </td>
-                                                                  <td className="text-red-600 text-right py-2 px-3 border-r text-xs w-[100px]">
+                                                                  <td className="text-red-600 text-right py-2 px-3 border-r text-base w-[100px]">
                                                                     {Math.floor(
                                                                       itemDiscountAmount,
                                                                     ).toLocaleString(
                                                                       "vi-VN",
                                                                     )}
                                                                   </td>
-                                                                  <td className="text-right py-2 px-3 border-r text-xs w-[100px]">
+                                                                  <td className="text-right py-2 px-3 border-r text-base w-[100px]">
                                                                     {(() => {
                                                                       // ALWAYS use edited tax if available from state
                                                                       const editedItem =
@@ -5006,7 +5232,7 @@ export default function SalesOrders() {
                                                                       );
                                                                     })()}
                                                                   </td>
-                                                                  <td className="text-right py-2 px-3 font-medium text-blue-600 text-xs w-[120px]">
+                                                                  <td className="text-right py-2 px-3 border-r text-base w-[100px]">
                                                                     {(() => {
                                                                       const editedItem =
                                                                         editedOrderItems[
@@ -5029,7 +5255,7 @@ export default function SalesOrders() {
                                                                       );
                                                                     })()}
                                                                   </td>
-                                                                  <td className="text-center py-2 px-3 text-xs w-[80px]">
+                                                                  <td className="text-center py-2 px-3 text-sm w-[80px]">
                                                                     {isEditing &&
                                                                       selectedInvoice.displayStatus !==
                                                                         1 && (
@@ -5078,8 +5304,8 @@ export default function SalesOrders() {
                                               </div>
 
                                               <div>
-                                                <h4 className="font-medium mb-3">
-                                                  {t("common.summary")}
+                                                <h4 className="font-semibold text-lg mb-3">
+                                                  {t("orders.summary")}
                                                 </h4>
                                                 <div className="bg-blue-50 p-4 rounded-lg">
                                                   <div className="grid grid-cols-2 gap-8">
@@ -5125,6 +5351,9 @@ export default function SalesOrders() {
                                                           <Input
                                                             type="text"
                                                             inputMode="numeric"
+                                                            {...form.register(
+                                                              "discount",
+                                                            )}
                                                             value={parseFloat(
                                                               editableInvoice.discount ||
                                                                 "0",
@@ -5161,6 +5390,10 @@ export default function SalesOrders() {
                                                                 "discount",
                                                                 newDiscount.toString(),
                                                               );
+                                                              form.setValue(
+                                                                "discount",
+                                                                newDiscount.toString(),
+                                                              ); // Sync with react-hook-form
 
                                                               // Phân bổ chiết khấu vào từng mặt hàng theo tỷ lệ thành tiền
                                                               const visibleItems =
@@ -5197,7 +5430,6 @@ export default function SalesOrders() {
                                                                         );
                                                                       const quantity =
                                                                         parseFloat(
-                                                                          // Use parseFloat for quantity
                                                                           editedItem.quantity !==
                                                                             undefined
                                                                             ? editedItem.quantity
@@ -5255,7 +5487,11 @@ export default function SalesOrders() {
                                                                       unitPrice *
                                                                       quantity;
 
-                                                                    let itemDiscount = 0;
+                                                                    let itemDiscount =
+                                                                      Number(
+                                                                        item.discount ||
+                                                                          "0",
+                                                                      );
                                                                     if (
                                                                       index ===
                                                                       visibleItems.length -
@@ -5326,7 +5562,7 @@ export default function SalesOrders() {
                                                                 );
                                                               }
                                                             }}
-                                                            className="h-7 text-xs w-32 text-right font-bold text-red-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                            className="h-7 text-sm w-32 text-right font-bold text-red-600 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                             disabled={
                                                               selectedInvoice.displayStatus ===
                                                               1
@@ -5334,11 +5570,34 @@ export default function SalesOrders() {
                                                           />
                                                         ) : (
                                                           <span className="font-bold">
-                                                            -
-                                                            {formatCurrency(
-                                                              Math.floor(
-                                                                displayTotals.discount,
-                                                              ),
+                                                            {displayTotals.discount >
+                                                            0 ? (
+                                                              <>
+                                                                -
+                                                                {formatCurrency(
+                                                                  Math.floor(
+                                                                    displayTotals.discount,
+                                                                  ),
+                                                                )}
+                                                              </>
+                                                            ) : (
+                                                              <>
+                                                                -
+                                                                {formatCurrency(
+                                                                  orderItems.reduce(
+                                                                    (
+                                                                      sum: number,
+                                                                      item: any,
+                                                                    ) =>
+                                                                      sum +
+                                                                      parseFloat(
+                                                                        item.discount ||
+                                                                          "0",
+                                                                      ),
+                                                                    0,
+                                                                  ),
+                                                                )}
+                                                              </>
                                                             )}
                                                           </span>
                                                         )}
@@ -5386,36 +5645,119 @@ export default function SalesOrders() {
                                                           :
                                                         </span>
                                                         <span className="font-bold text-blue-600">
-                                                          {(() => {
-                                                            const paymentMethod =
-                                                              selectedInvoice.paymentMethod;
-                                                            try {
-                                                              if (
-                                                                paymentMethod &&
-                                                                typeof paymentMethod ===
-                                                                  "string"
-                                                              ) {
-                                                                const parsed =
-                                                                  JSON.parse(
-                                                                    paymentMethod,
-                                                                  );
+                                                          {isEditing ? (
+                                                            <Select
+                                                              value={
+                                                                editableInvoice.paymentMethod !==
+                                                                  null &&
+                                                                editableInvoice.paymentMethod !==
+                                                                  undefined &&
+                                                                String(
+                                                                  editableInvoice.paymentMethod,
+                                                                ).trim() !== ""
+                                                                  ? String(
+                                                                      editableInvoice.paymentMethod,
+                                                                    )
+                                                                  : "unpaid"
+                                                              }
+                                                              onValueChange={(
+                                                                value,
+                                                              ) => {
+                                                                console.log(
+                                                                  "💳 Payment method changed to:",
+                                                                  value,
+                                                                  "Type:",
+                                                                  typeof value,
+                                                                );
+                                                                // Nếu chọn "unpaid", set về null
                                                                 if (
-                                                                  Array.isArray(
-                                                                    parsed,
-                                                                  ) &&
-                                                                  parsed.length >
-                                                                    0
+                                                                  value ===
+                                                                  "unpaid"
                                                                 ) {
-                                                                  return t(
-                                                                    "common.multiplePaymentMethods",
+                                                                  updateEditableInvoiceField(
+                                                                    "paymentMethod",
+                                                                    null,
+                                                                  );
+                                                                } else {
+                                                                  updateEditableInvoiceField(
+                                                                    "paymentMethod",
+                                                                    value,
                                                                   );
                                                                 }
-                                                              }
-                                                            } catch (e) {}
-                                                            return getPaymentMethodName(
-                                                              selectedInvoice.paymentMethod,
-                                                            );
-                                                          })()}
+                                                              }}
+                                                            >
+                                                              <SelectTrigger className="h-8 w-[180px] text-sm">
+                                                                <SelectValue
+                                                                  placeholder={t(
+                                                                    "common.selectPaymentMethod",
+                                                                  )}
+                                                                />
+                                                              </SelectTrigger>
+                                                              <SelectContent>
+                                                                {/* Chưa thanh toán option */}
+                                                                <SelectItem value="unpaid">
+                                                                  {t(
+                                                                    "common.unpaid",
+                                                                  )}
+                                                                </SelectItem>
+
+                                                                {enabledPaymentMethods.map(
+                                                                  (
+                                                                    method: any,
+                                                                  ) => (
+                                                                    <SelectItem
+                                                                      key={
+                                                                        method.id
+                                                                      }
+                                                                      value={
+                                                                        method.nameKey
+                                                                      }
+                                                                    >
+                                                                      {
+                                                                        method.icon
+                                                                      }{" "}
+                                                                      {getPaymentMethodName(
+                                                                        method.nameKey,
+                                                                      )}
+                                                                    </SelectItem>
+                                                                  ),
+                                                                )}
+                                                              </SelectContent>
+                                                            </Select>
+                                                          ) : (
+                                                            <span className="font-bold text-blue-600">
+                                                              {(() => {
+                                                                const paymentMethod =
+                                                                  selectedInvoice.paymentMethod;
+                                                                try {
+                                                                  if (
+                                                                    paymentMethod &&
+                                                                    typeof paymentMethod ===
+                                                                      "string"
+                                                                  ) {
+                                                                    const parsed =
+                                                                      JSON.parse(
+                                                                        paymentMethod,
+                                                                      );
+                                                                    if (
+                                                                      Array.isArray(
+                                                                        parsed,
+                                                                      ) &&
+                                                                      parsed.length >
+                                                                        0
+                                                                    ) {
+                                                                      return t(
+                                                                        "common.multiplePaymentMethods",
+                                                                      );
+                                                                    }
+                                                                  }
+                                                                } catch (e) {}
+                                                                return getPaymentMethodName(
+                                                                  selectedInvoice.paymentMethod,
+                                                                );
+                                                              })()}
+                                                            </span>
+                                                          )}
                                                         </span>
                                                       </div>
                                                     </div>
@@ -5430,16 +5772,21 @@ export default function SalesOrders() {
                                                 {isEditing &&
                                                 editableInvoice ? (
                                                   <textarea
+                                                    {...form.register("notes")}
                                                     value={
                                                       editableInvoice.notes ||
                                                       ""
                                                     }
-                                                    onChange={(e) =>
+                                                    onChange={(e) => {
                                                       updateEditableInvoiceField(
                                                         "notes",
                                                         e.target.value,
-                                                      )
-                                                    }
+                                                      );
+                                                      form.setValue(
+                                                        "notes",
+                                                        e.target.value,
+                                                      );
+                                                    }}
                                                     className="w-full p-3 border rounded min-h-[80px] resize-none"
                                                     placeholder={t(
                                                       "common.enterNotes",
@@ -5462,22 +5809,26 @@ export default function SalesOrders() {
                                                   <>
                                                     {/* Nút Hủy đơn: hiển thị khi order.status != 'cancelled' && order.status != 'paid' */}
                                                     {selectedInvoice.status !==
-                                                      "cancelled" && (
-                                                      <Button
-                                                        variant="destructive"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                          setShowCancelDialog(
-                                                            true,
-                                                          )
-                                                        }
-                                                      >
-                                                        <X className="w-4 h-4 mr-2" />
-                                                        {t(
-                                                          "common.cancelOrder",
-                                                        )}
-                                                      </Button>
-                                                    )}
+                                                      "cancelled" &&
+                                                      selectedInvoice.status !==
+                                                        "paid" &&
+                                                      storeSettings?.businessType !==
+                                                        "laundry" && (
+                                                        <Button
+                                                          variant="destructive"
+                                                          size="sm"
+                                                          onClick={() =>
+                                                            setShowCancelDialog(
+                                                              true,
+                                                            )
+                                                          }
+                                                        >
+                                                          <X className="w-4 h-4 mr-2" />
+                                                          {t(
+                                                            "common.cancelOrder",
+                                                          )}
+                                                        </Button>
+                                                      )}
 
                                                     {/* Nút Sửa đơn: logic phức tạp dựa vào businessType và isPaid */}
                                                     {(() => {
@@ -5490,12 +5841,8 @@ export default function SalesOrders() {
                                                         storeSettings?.businessType ===
                                                         "laundry";
                                                       const canEditLaundry =
-                                                        (selectedInvoice.status !==
-                                                          "cancelled" ||
-                                                          selectedInvoice.status ===
-                                                            "paid") &&
-                                                        selectedInvoice.isPaid ===
-                                                          false;
+                                                        selectedInvoice.status !==
+                                                        "cancelled";
 
                                                       if (isLaundry) {
                                                         // Với laundry: cho phép sửa nếu chưa cancelled và chưa paid
@@ -5653,11 +6000,9 @@ export default function SalesOrders() {
                                                         </Button>
                                                       )}
 
-                                                    {/* Nút Phát hành hóa đơn: hiển thị khi order.status != 'cancelled' && order.status == 'paid' && einvoiceStatus == 0 */}
-                                                    {selectedInvoice.status !==
-                                                      "cancelled" &&
-                                                      selectedInvoice.status ===
-                                                        "paid" &&
+                                                    {/* Nút Phát hành hóa đơn: hiển thị khi order.status != 'paid' */}
+                                                    {selectedInvoice.status ===
+                                                      "paid" &&
                                                       selectedInvoice.einvoiceStatus ===
                                                         0 &&
                                                       storeSettings?.businessType !==
@@ -5678,7 +6023,7 @@ export default function SalesOrders() {
                                                         </Button>
                                                       )}
 
-                                                    {/* Nút In hóa đơn: hiển thị khi order.status != 'cancelled' */}
+                                                    {/* Nút In hóa đơn: hiển thị khi order.status != 'paid' */}
                                                     {selectedInvoice.status !==
                                                       "cancelled" && (
                                                       <Button
@@ -5689,6 +6034,12 @@ export default function SalesOrders() {
                                                             ...selectedInvoice,
                                                             items: orderItems,
                                                           });
+                                                          setIsTitle(
+                                                            selectedInvoice.status ===
+                                                              "paid"
+                                                              ? true
+                                                              : false,
+                                                          );
                                                           setShowReceiptModal(
                                                             true,
                                                           );
@@ -6103,10 +6454,11 @@ export default function SalesOrders() {
             setShowReceiptModal(false);
             setSelectedReceipt(null);
 
-            queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+            queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
           }}
           receipt={selectedReceipt}
           isPreview={false}
+          isTitle={isTitle}
         />
       )}
     </div>

@@ -432,37 +432,45 @@ export function EInvoiceModal({
               customerName: taxInfo.tenCty || prev.customerName,
               address: taxInfo.diaChi || prev.address,
             }));
-            toast({
-              title: "Thành công",
-              description: "Đã lấy thông tin từ mã số thuế thành công",
-            });
           } else {
-            // Trạng thái không hợp lệ - cho phép nhập thủ công
+            // Trạng thái không hợp lệ - hiển thị thông tin trạng thái
             toast({
-              title: "Cảnh báo",
-              description: `Mã số thuế không hợp lệ. Trạng thái: ${taxInfo.trangThaiHoatDong || "Không xác định"}. Vui lòng nhập thông tin thủ công.`,
+              title: "Lỗi",
+              description: `Mã số thuế không hợp lệ! Trạng thái: ${taxInfo.trangThaiHoatDong || "Không xác định"}`,
               variant: "destructive",
             });
           }
         } else {
           toast({
-            title: "Thông báo",
-            description: "Không tìm thấy thông tin. Vui lòng nhập thủ công.",
+            title: "Lỗi",
+            description: "Không tìm thấy thông tin cho mã số thuế này",
+            variant: "destructive",
           });
         }
       } else {
         toast({
-          title: "Thông báo",
-          description: "Không tìm thấy thông tin. Vui lòng nhập thủ công.",
+          title: "Lỗi",
+          description:
+            result.message || "Không tìm thấy thông tin cho mã số thuế này",
+          variant: "destructive",
         });
       }
     } catch (error) {
       console.error("Error fetching tax code info:", error);
-      // Cho phép nhập thủ công khi có lỗi
-      toast({
-        title: "Không thể tra cứu",
-        description: "Không thể kết nối đến dịch vụ tra cứu. Vui lòng nhập thông tin thủ công.",
-      });
+      if (error === "TypeError" && error.includes("fetch")) {
+        toast({
+          title: "Lỗi kết nối",
+          description:
+            "Không thể kết nối đến dịch vụ tra cứu mã số thuế. Vui lòng thử lại sau.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Lỗi",
+          description: `Có lỗi xảy ra khi lấy thông tin mã số thuế: ${error}`,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsTaxCodeLoading(false);
     }
@@ -1877,6 +1885,8 @@ export function EInvoiceModal({
                     }
                     onFocus={() => handleInputFocus("taxCode")}
                     placeholder="0123456789"
+                    disabled={false}
+                    readOnly={false}
                   />
                   <Button
                     variant="outline"
@@ -1911,6 +1921,8 @@ export function EInvoiceModal({
                   }
                   onFocus={() => handleInputFocus("customerName")}
                   placeholder="Công ty TNHH ABC"
+                  disabled={false}
+                  readOnly={false}
                 />
               </div>
               <div>
@@ -1924,6 +1936,8 @@ export function EInvoiceModal({
                   onChange={(e) => handleInputChange("address", e.target.value)}
                   onFocus={() => handleInputFocus("address")}
                   placeholder="Cầu Giấy, Hà Nội"
+                  disabled={false}
+                  readOnly={false}
                 />
               </div>
               <div>
@@ -1941,6 +1955,8 @@ export function EInvoiceModal({
                   }
                   onFocus={() => handleInputFocus("phoneNumber")}
                   placeholder="0123456789"
+                  disabled={false}
+                  readOnly={false}
                 />
               </div>
 
@@ -1956,6 +1972,8 @@ export function EInvoiceModal({
                   onChange={(e) => handleInputChange("email", e.target.value)}
                   onFocus={() => handleInputFocus("email")}
                   placeholder="ngocnv@gmail.com"
+                  disabled={false}
+                  readOnly={false}
                 />
               </div>
             </div>

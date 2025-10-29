@@ -44,50 +44,19 @@ export function TableReport() {
   const [endDate, setEndDate] = useState<string>(
     new Date().toISOString().split("T")[0],
   );
-  const [storeFilter, setStoreFilter] = useState<string>("all");
 
-  // Fetch stores list for filter dropdown
-  const { data: storesData = [] } = useQuery({
-    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings/list"],
-    queryFn: async () => {
-      try {
-        const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings/list", {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-        });
-        if (!response.ok) throw new Error("Failed to fetch stores");
-        const data = await response.json();
-        return Array.isArray(data) ? data : [];
-      } catch (error) {
-        console.error("Error fetching stores:", error);
-        return [];
-      }
-    },
-    retry: 2,
-  });
-
-  // Query orders by date range with store filter
+  // Fetch data using EXACT same pattern as other reports
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
-    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range", startDate, endDate, storeFilter],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"],
     queryFn: async () => {
       try {
-        const response = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range/${startDate}/${endDate}/all`);
+        const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
         console.log("Table Report - Orders loaded:", data?.length || 0);
-
-        // Filter by store if not "all"
-        let filteredData = Array.isArray(data) ? data : [];
-        if (storeFilter !== "all") {
-          filteredData = filteredData.filter((order: any) => order.storeCode === storeFilter);
-          console.log(`Table Report - Filtered to ${filteredData.length} orders for store ${storeFilter}`);
-        }
-
-        return filteredData;
+        return Array.isArray(data) ? data : [];
       } catch (error) {
         console.error("Table Report - Error fetching orders:", error);
         return [];
@@ -551,8 +520,7 @@ export function TableReport() {
     transactionsLoading ||
     tablesLoading ||
     orderItemsLoading ||
-    transactionItemsLoading ||
-    !storesData;
+    transactionItemsLoading;
 
   if (isLoading) {
     return (
@@ -578,77 +546,56 @@ export function TableReport() {
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Utensils className="w-5 h-5" />
-            {t("reports.tableAnalysis")}
-          </CardTitle>
-          <CardDescription>
-            {t("reports.analyzeTableRevenueTrend")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-center gap-4">
-            {storesData && storesData.length > 0 && (
-              <div className="flex items-center gap-2">
-                <Label className="whitespace-nowrap text-sm font-medium">{t("common.storeFilterLabel")}</Label>
-                <Select value={storeFilter} onValueChange={setStoreFilter}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder={t("common.allStores")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {storesData.filter((store: any) => store.typeUser !== 1).length > 1 && (
-                      <SelectItem value="all">Tất cả</SelectItem>
-                    )}
-                    {storesData
-                      .filter((store: any) => store.typeUser !== 1)
-                      .map((store: any) => (
-                        <SelectItem key={store.id} value={store.storeCode}>
-                          {store.storeName}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Utensils className="w-5 h-5" />
+                {t("reports.tableAnalysis")}
+              </CardTitle>
+              <CardDescription>
+                {t("reports.analyzeTableRevenueTrend")}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-4">
+              <Select value={dateRange} onValueChange={handleDateRangeChange}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">{t("reports.toDay")}</SelectItem>
+                  <SelectItem value="week">{t("reports.lastWeek")}</SelectItem>
+                  <SelectItem value="month">
+                    {t("reports.lastMonth")}
+                  </SelectItem>
+                  <SelectItem value="custom">{t("reports.custom")}</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={dateRange} onValueChange={handleDateRangeChange}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">{t("reports.toDay")}</SelectItem>
-                <SelectItem value="week">{t("reports.lastWeek")}</SelectItem>
-                <SelectItem value="month">
-                  {t("reports.lastMonth")}
-                </SelectItem>
-                <SelectItem value="custom">{t("reports.custom")}</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {dateRange === "custom" && (
-              <>
-                <div className="flex items-center gap-2">
-                  <Label>{t("reports.startDate")}:</Label>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-auto"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <Label>{t("reports.endDate")}:</Label>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-auto"
-                  />
-                </div>
-              </>
-            )}
+              {dateRange === "custom" && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Label>{t("reports.startDate")}:</Label>
+                    <Input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-auto"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label>{t("reports.endDate")}:</Label>
+                    <Input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-auto"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </CardContent>
+        </CardHeader>
       </Card>
 
       {/* Overview Cards */}

@@ -136,15 +136,84 @@ export function OrderManagement() {
       queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"] });
     };
 
+    const handlePaymentCompleted = async (event: CustomEvent) => {
+      console.log(
+        "📋 Order Management: Payment completed event received, refreshing orders",
+        event.detail
+      );
+
+      // Force immediate refresh
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"] }),
+      ]);
+    };
+
+    const handleOrderStatusUpdated = async (event: CustomEvent) => {
+      console.log(
+        "📋 Order Management: Order status updated event received, refreshing orders",
+        event.detail
+      );
+
+      // Force immediate refresh
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"] }),
+      ]);
+    };
+
+    const handleForceRefresh = async (event: CustomEvent) => {
+      console.log(
+        "📋 Order Management: Force refresh event received",
+        event.detail
+      );
+
+      // Force immediate refresh
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"] }),
+      ]);
+    };
+
     window.addEventListener(
       "printCompleted",
       handlePrintCompleted as EventListener,
+    );
+    window.addEventListener(
+      "paymentCompleted",
+      handlePaymentCompleted as EventListener,
+    );
+    window.addEventListener(
+      "orderStatusUpdated",
+      handleOrderStatusUpdated as EventListener,
+    );
+    window.addEventListener(
+      "forceRefresh",
+      handleForceRefresh as EventListener,
     );
 
     return () => {
       window.removeEventListener(
         "printCompleted",
         handlePrintCompleted as EventListener,
+      );
+      window.removeEventListener(
+        "paymentCompleted",
+        handlePaymentCompleted as EventListener,
+      );
+      window.removeEventListener(
+        "orderStatusUpdated",
+        handleOrderStatusUpdated as EventListener,
+      );
+      window.removeEventListener(
+        "forceRefresh",
+        handleForceRefresh as EventListener,
       );
     };
   }, [queryClient]);
@@ -216,9 +285,10 @@ export function OrderManagement() {
   // Query orders by date range - filter only table orders
   const { data: orders, isLoading: ordersLoading } = useQuery({
     queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders", "table"],
-    refetchInterval: 2000, // Faster polling - every 2 seconds
+    refetchInterval: 1000, // Very fast polling - every 1 second for real-time updates
     refetchOnWindowFocus: true, // Refetch when window regains focus
     refetchIntervalInBackground: true, // Continue refetching in background
+    refetchOnMount: true, // Always refetch on mount
     staleTime: 0, // Always consider data fresh to force immediate updates
     queryFn: async () => {
       const response = await apiRequest(
