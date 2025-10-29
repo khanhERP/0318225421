@@ -847,8 +847,7 @@ export function PaymentMethodModal({
           orderNumber: `ORD-${Date.now()}`,
           tableId: null, // POS orders don't have tables
           salesChannel: "pos", // Mark as POS order
-          customerName: orderInfo.customerName || receipt?.customerName || "Khách hàng lẻ",
-          customerPhone: orderInfo.customerPhone || receipt?.customerPhone || null,
+          customerName: orderInfo.customerName || "Khách hàng lẻ",
           customerCount: 1,
           status: "paid", // Mark as paid immediately
           paymentMethod: method, // Explicitly set payment method
@@ -883,60 +882,17 @@ export function PaymentMethodModal({
             createdOrder,
           );
 
-          // Update orderInfo with the real order ID
+          // Update orderInfo with the real order ID for E-Invoice
           orderInfo.id = createdOrder.id;
           receipt.id = createdOrder.id;
           orderForPayment.id = createdOrder.id;
           orderInfo.orderNumber = createdOrder.orderNumber;
 
-          // CHECK BUSINESS TYPE - if laundry, show receipt modal directly
-          const businessType = storeSettings?.businessType;
+          setSelectedPaymentMethod(method);
+          setShowEInvoice(true);
           console.log(
-            `🔍 ${method} Payment (POS Order): Business type is "${businessType}"`,
+            `🔥 SHOWING E-INVOICE MODAL for created POS ${method} order ${createdOrder.id}`,
           );
-
-          if (businessType === "laundry") {
-            console.log(
-              `🧺 LAUNDRY BUSINESS - showing receipt modal directly for ${method} payment`,
-            );
-
-            // Prepare receipt data from created order
-            const receiptData = {
-              ...createdOrder,
-              items: orderItems.map((item: any) => ({
-                ...item,
-                productName: item.productName || getProductName?.(item.productId) || "Unknown",
-                sku: item.sku || `ITEM-${item.productId}`,
-              })),
-              exactSubtotal: receiptSubtotal,
-              exactTax: receiptTax,
-              exactTotal: receiptTotal,
-              exactDiscount: discountAmount,
-              paymentMethod: method,
-              isPreview: false,
-              isInvoice: true,
-            };
-
-            // Set receipt data for modal and show it
-            setReceiptDataForModal(receiptData);
-            setShowReceiptModal(true);
-
-            // Show success toast
-            toast({
-              title: "Thanh toán thành công",
-              description: `Đã thanh toán bằng ${getPaymentMethodName(method)}`,
-            });
-          } else {
-            console.log(
-              `🏪 RESTAURANT BUSINESS - showing E-Invoice modal for ${method} payment`,
-            );
-
-            setSelectedPaymentMethod(method);
-            setShowEInvoice(true);
-            console.log(
-              `🔥 SHOWING E-INVOICE MODAL for created POS ${method} order ${createdOrder.id}`,
-            );
-          }
         } else {
           const errorText = await createResponse.text();
           console.error(`❌ Failed to create POS ${method} order:`, errorText);
@@ -1104,69 +1060,18 @@ export function PaymentMethodModal({
               );
             }
 
-            // CHECK BUSINESS TYPE - if laundry, show receipt modal directly
-            const businessType = storeSettings?.businessType;
+            // Show success toast
+            toast({
+              title: "Thanh toán thành công",
+              description: `Đã thanh toán bằng ${getPaymentMethodName(method)}`,
+            });
+
+            // Set payment method and show E-Invoice modal
+            setSelectedPaymentMethod(method);
+            setShowEInvoice(true);
             console.log(
-              `🔍 ${method} Payment (Real Order): Business type is "${businessType}"`,
+              `🔥 SHOWING E-INVOICE MODAL after successful ${method} payment`,
             );
-
-            if (businessType === "laundry") {
-              console.log(
-                `🧺 LAUNDRY BUSINESS - showing receipt modal directly for ${method} payment`,
-              );
-
-              // Prepare receipt data from updated order
-              const receiptData = {
-                ...updatedOrder,
-                items: orderInfo.items || receipt?.items || [],
-                exactSubtotal:
-                  receipt?.exactSubtotal ||
-                  orderInfo?.exactSubtotal ||
-                  parseFloat(updatedOrder.subtotal || "0"),
-                exactTax:
-                  receipt?.exactTax ||
-                  orderInfo?.exactTax ||
-                  parseFloat(updatedOrder.tax || "0"),
-                exactTotal:
-                  receipt?.exactTotal ||
-                  orderInfo?.exactTotal ||
-                  parseFloat(updatedOrder.total || "0"),
-                exactDiscount:
-                  receipt?.exactDiscount ||
-                  orderInfo?.exactDiscount ||
-                  parseFloat(updatedOrder.discount || "0"),
-                paymentMethod: method,
-                isPreview: false,
-                isInvoice: true,
-              };
-
-              // Set receipt data for modal and show it
-              setReceiptDataForModal(receiptData);
-              setShowReceiptModal(true);
-
-              // Show success toast
-              toast({
-                title: "Thanh toán thành công",
-                description: `Đã thanh toán bằng ${getPaymentMethodName(method)}`,
-              });
-            } else {
-              console.log(
-                `🏪 RESTAURANT BUSINESS - showing E-Invoice modal for ${method} payment`,
-              );
-
-              // Show success toast
-              toast({
-                title: "Thanh toán thành công",
-                description: `Đã thanh toán bằng ${getPaymentMethodName(method)}`,
-              });
-
-              // Set payment method and show E-Invoice modal
-              setSelectedPaymentMethod(method);
-              setShowEInvoice(true);
-              console.log(
-                `🔥 SHOWING E-INVOICE MODAL after successful ${method} payment`,
-              );
-            }
           } else {
             const errorText = await updateResponse.text();
             console.error(
@@ -1297,8 +1202,7 @@ export function PaymentMethodModal({
         orderNumber: `ORD-${Date.now()}`,
         tableId: null, // POS orders don't have tables
         salesChannel: "pos", // Mark as POS order
-        customerName: orderInfo.customerName || receipt?.customerName || "Khách hàng lẻ",
-        customerPhone: orderInfo.customerPhone || receipt?.customerPhone || null,
+        customerName: orderInfo.customerName || "Khách hàng lẻ",
         customerCount: 1,
         status: "paid", // Mark as paid immediately for QR
         paymentMethod: "qrCode",
@@ -1336,63 +1240,13 @@ export function PaymentMethodModal({
         orderForPayment.id = createdOrder.id;
         orderInfo.orderNumber = createdOrder.orderNumber;
 
-        // CHECK BUSINESS TYPE - if laundry, show receipt modal directly
-        const businessType = storeSettings?.businessType;
+        setShowQRCode(false);
+        setQrCodeUrl("");
+        setSelectedPaymentMethod("qrCode");
+        setShowEInvoice(true);
         console.log(
-          `🔍 QR Payment (POS Order): Business type is "${businessType}"`,
+          `🔥 SHOWING E-INVOICE MODAL for created POS QR order ${createdOrder.id}`,
         );
-
-        if (businessType === "laundry") {
-          console.log(
-            `🧺 LAUNDRY BUSINESS - showing receipt modal directly for QR payment`,
-          );
-
-          // Prepare receipt data from created order
-          const receiptData = {
-            ...createdOrder,
-            items: orderItems.map((item: any) => ({
-              ...item,
-              productName:
-                item.productName ||
-                getProductName?.(item.productId) ||
-                "Unknown",
-              sku: item.sku || `ITEM-${item.productId}`,
-            })),
-            exactSubtotal: receiptSubtotal,
-            exactTax: receiptTax,
-            exactTotal: receiptTotal,
-            exactDiscount: discountAmount,
-            paymentMethod: "qrCode",
-            isPreview: false,
-            isInvoice: true,
-          };
-
-          // Set receipt data for modal and show it
-          setReceiptDataForModal(receiptData);
-          setShowReceiptModal(true);
-
-          // Hide QR code display
-          setShowQRCode(false);
-          setQrCodeUrl("");
-
-          // Show success toast
-          toast({
-            title: "Thanh toán thành công",
-            description: "Đã thanh toán bằng QR Code",
-          });
-        } else {
-          console.log(
-            `🏪 RESTAURANT BUSINESS - showing E-Invoice modal for QR payment`,
-          );
-
-          setShowQRCode(false);
-          setQrCodeUrl("");
-          setSelectedPaymentMethod("qrCode");
-          setShowEInvoice(true);
-          console.log(
-            `🔥 SHOWING E-INVOICE MODAL for created POS QR order ${createdOrder.id}`,
-          );
-        }
       } else {
         const errorText = await createResponse.text();
         console.error(`❌ Failed to create POS QR order:`, errorText);
@@ -1426,12 +1280,6 @@ export function PaymentMethodModal({
 
           setShowQRCode(false);
           setQrCodeUrl("");
-
-          // CHECK BUSINESS TYPE - if laundry, show receipt modal directly
-          const businessType = storeSettings?.businessType;
-          console.log(
-            `🔍 QR Payment (Real Order): Business type is "${businessType}"`,
-          );
 
           // ALWAYS update table status if order has a table after QR payment
           if (data.tableId) {
@@ -1518,57 +1366,10 @@ export function PaymentMethodModal({
             }
           }
 
-          if (businessType === "laundry") {
-            console.log(
-              `🧺 LAUNDRY BUSINESS - showing receipt modal directly for real order QR payment`,
-            );
-
-            // Prepare receipt data from updated order
-            const receiptData = {
-              ...data,
-              items: orderInfo.items || receipt?.items || [],
-              exactSubtotal:
-                receipt?.exactSubtotal ||
-                orderInfo?.exactSubtotal ||
-                parseFloat(data.subtotal || "0"),
-              exactTax:
-                receipt?.exactTax ||
-                orderInfo?.exactTax ||
-                parseFloat(data.tax || "0"),
-              exactTotal:
-                receipt?.exactTotal ||
-                orderInfo?.exactTotal ||
-                parseFloat(data.total || "0"),
-              exactDiscount:
-                receipt?.exactDiscount ||
-                orderInfo?.exactDiscount ||
-                parseFloat(data.discount || "0"),
-              paymentMethod: "qrCode",
-              isPreview: false,
-              isInvoice: true,
-            };
-
-            // Set receipt data for modal and show it
-            setReceiptDataForModal(receiptData);
-            setShowReceiptModal(true);
-
-            // Show success toast
-            toast({
-              title: "Thanh toán thành công",
-              description: "Đã thanh toán bằng QR Code",
-            });
-          } else {
-            console.log(
-              `🏪 RESTAURANT BUSINESS - showing E-Invoice modal for QR payment`,
-            );
-
-            // Set payment method and show E-Invoice modal
-            setSelectedPaymentMethod("qrCode");
-            setShowEInvoice(true);
-            console.log(
-              `🔥 SHOWING E-INVOICE MODAL after successful QR payment`,
-            );
-          }
+          // Set payment method and show E-Invoice modal
+          setSelectedPaymentMethod("qrCode");
+          setShowEInvoice(true);
+          console.log(`🔥 SHOWING E-INVOICE MODAL after successful QR payment`);
         } else {
           const errorText = await statusResponse.text();
           console.error(`❌ Failed to update order status:`, errorText);
@@ -1714,8 +1515,7 @@ export function PaymentMethodModal({
         orderNumber: `ORD-${Date.now()}`,
         tableId: null,
         salesChannel: "pos",
-        customerName: orderInfo.customerName || receipt?.customerName || "Khách hàng lẻ",
-        customerPhone: orderInfo.customerPhone || receipt?.customerPhone || null,
+        customerName: orderInfo.customerName || "Khách hàng lẻ",
         customerCount: 1,
         status: "paid",
         paymentMethod: JSON.stringify(selectedPaymentMethods), // Store as JSON
@@ -1876,68 +1676,16 @@ export function PaymentMethodModal({
           console.log("ℹ️ Order has no table, skipping table status update");
         }
 
+        // Show success toast
+        toast({
+          title: "Thanh toán thành công",
+          description: "Đã thanh toán bằng nhiều phương thức",
+        });
+
         setShowMultiPayment(false);
         setSelectedPaymentMethods([]);
         setSelectedPaymentMethod("multi");
-
-        // CHECK BUSINESS TYPE - if laundry, show receipt modal directly
-        const businessType = storeSettings?.businessType;
-        console.log(
-          `🔍 Multi-payment (Real Order): Business type is "${businessType}"`,
-        );
-
-        if (businessType === "laundry") {
-          console.log(
-            `🧺 LAUNDRY BUSINESS - showing receipt modal directly for multi-payment`,
-          );
-
-          // Prepare receipt data from updated order
-          const receiptData = {
-            ...updatedOrder,
-            items: orderInfo.items || receipt?.items || [],
-            exactSubtotal:
-              receipt?.exactSubtotal ||
-              orderInfo?.exactSubtotal ||
-              parseFloat(updatedOrder.subtotal || "0"),
-            exactTax:
-              receipt?.exactTax ||
-              orderInfo?.exactTax ||
-              parseFloat(updatedOrder.tax || "0"),
-            exactTotal:
-              receipt?.exactTotal ||
-              orderInfo?.exactTotal ||
-              parseFloat(updatedOrder.total || "0"),
-            exactDiscount:
-              receipt?.exactDiscount ||
-              orderInfo?.exactDiscount ||
-              parseFloat(updatedOrder.discount || "0"),
-            paymentMethod: "multi",
-            isPreview: false,
-            isInvoice: true,
-          };
-
-          // Set receipt data for modal and show it
-          setReceiptDataForModal(receiptData);
-          setShowReceiptModal(true);
-
-          // Show success toast
-          toast({
-            title: "Thanh toán thành công",
-            description: "Đã thanh toán bằng nhiều phương thức",
-          });
-        } else {
-          console.log(
-            `🏪 RESTAURANT BUSINESS - showing E-Invoice modal for multi-payment`,
-          );
-
-          // Show success toast
-          toast({
-            title: "Thanh toán thành công",
-            description: "Đã thanh toán bằng nhiều phương thức",
-          });
-
-          setShowEInvoice(true);
-        }
+        setShowEInvoice(true);
       }
     }
   };
@@ -2093,7 +1841,6 @@ export function PaymentMethodModal({
         tableId: null, // POS orders don't have tables
         salesChannel: "pos", // Mark as POS order
         customerName: orderInfo.customerName || "Khách hàng lẻ",
-        customerPhone: orderInfo.customerPhone || null, // Add customer phone
         customerCount: 1,
         status: "paid", // Mark as paid immediately for cash
         paymentMethod: "cash",
@@ -2104,7 +1851,7 @@ export function PaymentMethodModal({
         notes: t("common.comboValues.posPaymentNote")
           .replace("{amount}", cashAmountInput)
           .replace("{change}", finalChange.toString()),
-        paidAt: new Date().toISOString(),
+        paidAt: new Date(),
         discount: discountAmount.toString(),
       };
 

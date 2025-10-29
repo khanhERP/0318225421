@@ -60,7 +60,7 @@ import { Button } from "@/components/ui/button";
 // Import the ProductManagerModal component
 import { ProductManagerModal } from "../pos/product-manager-modal"; // Assuming the path
 
-export function SalesChartReport() {
+export function SalesChartReport({ isAdmin }: { isAdmin?: boolean }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
@@ -78,6 +78,9 @@ export function SalesChartReport() {
   const [salesMethod, setSalesMethod] = useState("all");
   const [salesChannel, setSalesChannel] = useState("all");
 
+  // State for store filter
+  const [storeFilter, setStoreFilter] = useState<string>("all");
+
   // Additional filters from legacy reports
   const [selectedEmployee, setSelectedEmployee] = useState<string>("all");
   const [customerSearch, setCustomerSearch] = useState("");
@@ -88,6 +91,7 @@ export function SalesChartReport() {
   const [customerStatus, setCustomerStatus] = useState("all");
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [selectedFloor, setSelectedFloor] = useState<string>("all"); // State for floor filter
+  const [selectedShop, setSelectedShop] = useState<string>("all"); // State for floor filter
 
   // Pagination state for product report
   const [productCurrentPage, setProductCurrentPage] = useState(1);
@@ -106,7 +110,7 @@ export function SalesChartReport() {
   const [searchSKU, setSearchSKU] = useState("");
 
   // Query store settings for priceIncludesTax
-  const { data: storeSettings } = useQuery({
+  const { data: storeSettings, isLoading: storesLoading } = useQuery({
     queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings"],
     queryFn: async () => {
       const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings");
@@ -123,6 +127,7 @@ export function SalesChartReport() {
     data: orders = [],
     isLoading: ordersLoading,
     error: ordersError,
+    refetch: refetchOrders,
   } = useQuery({
     queryKey: [
       "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range",
@@ -132,6 +137,9 @@ export function SalesChartReport() {
       endTime,
       selectedFloor, // Include floor filter in query key
       orderStatusFilter, // Include status filter in query key
+      storeFilter, // Include store filter in query key - this will trigger refetch when changed
+      storeSettings?.isAdmin, // Include admin status in query key
+      storeSettings?.parent, // Include parent stores in query key
     ],
     queryFn: async () => {
       try {
@@ -147,6 +155,17 @@ export function SalesChartReport() {
         const startDateTimeISO = startDateTimeLocal.toISOString();
         const endDateTimeISO = endDateTimeLocal.toISOString();
 
+        // Construct URL with floor filter if it's not 'all'
+        const floorFilter =
+          selectedFloor !== "all" ? `/${selectedFloor}` : "/all";
+
+        // Add storeFilter query parameter - ALWAYS include it
+        const params = new URLSearchParams();
+        params.append("storeFilter", storeFilter || "all");
+
+        const queryString = params.toString();
+        const url = `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range/${startDateTimeISO}/${endDateTimeISO}${floorFilter}?${queryString}`;
+
         console.log("Sales Chart - Fetching orders with date range:", {
           startDate,
           endDate,
@@ -160,15 +179,14 @@ export function SalesChartReport() {
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           selectedFloor,
           orderStatusFilter,
+          storeFilter,
+          isAdmin: storeSettings?.isAdmin,
+          parentStores: storeSettings?.parent,
+          floorFilter,
+          finalURL: url,
         });
 
-        // Construct URL with floor filter if it's not 'all'
-        const floorFilter =
-          selectedFloor !== "all" ? `/${selectedFloor}` : "/all";
-
-        const response = await fetch(
-          `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range/${startDateTimeISO}/${endDateTimeISO}${floorFilter}`,
-        );
+        const response = await fetch(url);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -196,32 +214,108 @@ export function SalesChartReport() {
           });
         }
 
+        // Apply store filter logic based on admin status and selection
+        console.log("Sales Chart - Store filter logic:", {
+          storeFilter,
+          isAdmin: storeSettings?.isAdmin,
+          parentStores: storeSettings?.parent,
+          beforeFilterCount: filteredData.length,
+        });
+
+        if (storeFilter === "all") {
+          // Case: "Tất cả" (All) selected
+          if (storeSettings?.isAdmin === true) {
+            // Case 1: isAdmin = true + "all" selected => Load ALL orders
+            console.log("Sales Chart - Admin 'All' filter: Loading all orders");
+            // No filtering needed - use all data
+          } else {
+            // Case 2: isAdmin = false + "all" selected => Load orders from parent stores only
+            const parentStores =
+              storeSettings?.parent?.split(",").map((s: string) => s.trim()) ||
+              [];
+            if (parentStores.length > 0) {
+              filteredData = filteredData.filter((order: any) =>
+                parentStores.includes(order.storeCode),
+              );
+              console.log(
+                "Sales Chart - Non-admin 'All' filter: Loading parent store orders only:",
+                {
+                  parentStores,
+                  filteredCount: filteredData.length,
+                },
+              );
+            } else {
+              console.log(
+                "Sales Chart - Non-admin 'All' filter: No parent stores defined, returning empty",
+              );
+              filteredData = [];
+            }
+          }
+        } else if (storeFilter && storeFilter !== "all") {
+          // Case 3: Specific store selected => Load orders for that store only
+          filteredData = filteredData.filter(
+            (order: any) => order.storeCode === storeFilter,
+          );
+          console.log("Sales Chart - Specific store filter applied:", {
+            storeFilter,
+            beforeCount: data?.length || 0,
+            afterCount: filteredData.length,
+            sampleStoreCode: filteredData[0]?.storeCode,
+          });
+        }
+
         console.log("Sales Chart - Orders loaded with datetime:", {
           count: filteredData?.length || 0,
           totalCount: data?.length || 0,
           startDateTimeISO,
           endDateTimeISO,
           orderStatusFilter,
+          storeFilter,
+          isAdmin: storeSettings?.isAdmin,
+          afterServerFilter: true,
           sampleOrder: filteredData?.[0]
             ? {
                 id: filteredData[0].id,
                 orderNumber: filteredData[0].orderNumber,
                 orderedAt: filteredData[0].orderedAt,
                 status: filteredData[0].status,
+                storeCode: filteredData[0].storeCode,
               }
             : null,
         });
         return filteredData;
-      } catch (error) {
+      } catch (error: any) {
         console.error("Sales Chart - Error fetching orders:", error);
         return [];
       }
     },
     retry: 2,
     retryDelay: 500,
-    staleTime: 1 * 60 * 1000, // Cache for 1 minute only to ensure fresh data
+    staleTime: 0, // Disable cache to ensure fresh data on filter change
     gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
     refetchOnWindowFocus: false,
+  });
+
+  // Query store list for filter
+  const { data: storesFilterData = [] } = useQuery({
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings/list"],
+    queryFn: async () => {
+      try {
+        const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings/list");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        let data = await response.json();
+        // Filter out admin accounts (userType = 1)
+        data = data.filter((store: any) => store.typeUser !== 1);
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error("Error fetching stores:", error);
+        return [];
+      }
+    },
+    staleTime: 0,
+    gcTime: 0,
   });
 
   // Query order items for all orders
@@ -249,6 +343,17 @@ export function SalesChartReport() {
     enabled: analysisType === "product", // Only fetch when needed
   });
 
+  // Refetch orders when analysisType or storeFilter changes
+  useEffect(() => {
+    if (refetchOrders) {
+      console.log("🔄 Refetching orders due to filter change:", {
+        analysisType,
+        storeFilter,
+      });
+      refetchOrders();
+    }
+  }, [analysisType, storeFilter]);
+
   // Query tables for floor data
   const {
     data: tables,
@@ -260,7 +365,7 @@ export function SalesChartReport() {
   });
 
   // Combined loading state
-  const isLoading = ordersLoading || orderItemsLoading;
+  const isLoading = ordersLoading || orderItemsLoading || storesLoading;
 
   const { data: employees } = useQuery({
     queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/employees"],
@@ -275,30 +380,33 @@ export function SalesChartReport() {
       productSearch,
       startDate,
       endDate,
+      storeFilter, // Include store filter in query key
     ],
     queryFn: async () => {
-      const response = await fetch(
-        `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products/${selectedCategory}/${productType}/${productSearch || ""}`,
-      );
+      const storeParam =
+        storeFilter && storeFilter !== "all" ? `?storeCode=${storeFilter}` : "";
+      const response = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products${storeParam}`);
       if (!response.ok) throw new Error("Failed to fetch products");
+      return response.json();
+    },
+    staleTime: 0, // Disable cache to ensure fresh data
+    enabled: analysisType === "product", // Only fetch when needed
+  });
+
+  const { data: categories } = useQuery({
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories", storeFilter],
+    queryFn: async () => {
+      const storeParam =
+        storeFilter && storeFilter !== "all" ? `?storeCode=${storeFilter}` : "";
+      const response = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories${storeParam}`);
+      if (!response.ok) throw new Error("Failed to fetch categories");
       return response.json();
     },
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: categories } = useQuery({
-    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories"],
-    staleTime: 5 * 60 * 1000,
-  });
-
   const { data: customers } = useQuery({
-    queryKey: [
-      "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/customers",
-      customerSearch,
-      customerStatus,
-      startDate,
-      endDate,
-    ],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/customers", customerSearch, customerStatus],
     queryFn: async () => {
       const response = await fetch(
         `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/customers/${customerSearch || "all"}/${customerStatus}`,
@@ -310,81 +418,90 @@ export function SalesChartReport() {
   });
 
   // Product Analysis Data from new API
-  const { data: productAnalysisData, isLoading: productAnalysisLoading } =
-    useQuery({
-      queryKey: [
-        "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/product-analysis",
-        startDate,
-        endDate,
-        startTime,
-        endTime,
-        selectedCategory,
-        productType,
-        selectedFloor, // Include floor filter in query key
-        productSearch,
-      ],
-      queryFn: async () => {
-        try {
-          // Use YYYY-MM-DD format with time to avoid timezone conversion issues
-          const startDateTimeLocal = `${startDate} ${startTime}:00`;
-          const endDateTimeLocal = `${endDate} ${endTime}:59`;
+  const {
+    data: productAnalysisData,
+    isLoading: productAnalysisLoading,
+    error: productAnalysisError,
+  } = useQuery({
+    queryKey: [
+      "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/product-analysis",
+      startDate,
+      endDate,
+      startTime,
+      endTime,
+      selectedCategory,
+      productType,
+      selectedFloor, // Include floor filter in query key
+      productSearch,
+      storeFilter, // Include store filter in query key
+    ],
+    queryFn: async () => {
+      try {
+        // Use YYYY-MM-DD format with time to avoid timezone conversion issues
+        const startDateTimeLocal = `${startDate} ${startTime}:00`;
+        const endDateTimeLocal = `${endDate} ${endTime}:59`;
 
-          const params = new URLSearchParams({
-            categoryId: selectedCategory || "all",
-            productType: productType || "all",
-            productSearch: productSearch || "",
-          });
+        const params = new URLSearchParams({
+          categoryId: selectedCategory || "all",
+          productType: productType || "all",
+          productSearch: productSearch || "",
+        });
 
-          // Construct URL with floor filter if it's not 'all'
-          const floorFilter =
-            selectedFloor !== "all" ? `/${selectedFloor}` : "/all";
+        // Construct URL with floor filter if it's not 'all'
+        const floorFilter =
+          selectedFloor !== "all" ? `/${selectedFloor}` : "/all";
 
-          console.log("📊 Fetching product analysis data:", {
-            startDateTimeLocal,
-            endDateTimeLocal,
-            floorFilter,
-            params: params.toString(),
-          });
+        // Construct URL with store filter if it's not 'all'
+        const storeCodeFilter =
+          storeFilter !== "all" ? `/${storeFilter}` : "/all";
 
-          const response = await fetch(
-            `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/product-analysis/${encodeURIComponent(startDateTimeLocal)}/${encodeURIComponent(endDateTimeLocal)}${floorFilter}?${params}`,
-            {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-              },
+        console.log("📊 Fetching product analysis data:", {
+          startDateTimeLocal,
+          endDateTimeLocal,
+          floorFilter,
+          storeCodeFilter,
+          params: params.toString(),
+        });
+
+        const response = await fetch(
+          `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/product-analysis/${encodeURIComponent(startDateTimeLocal)}/${encodeURIComponent(endDateTimeLocal)}${floorFilter}${storeCodeFilter}?${params}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
             },
-          );
+          },
+        );
 
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error(
-              "❌ Product analysis API error:",
-              response.status,
-              errorText,
-            );
-            throw new Error(
-              `Failed to fetch product analysis: ${response.status} ${errorText}`,
-            );
-          }
-
-          const data = await response.json();
-          console.log(
-            "✅ Product analysis data received:",
-            data?.productStats?.length || 0,
-            "products",
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(
+            "❌ Product analysis API error:",
+            response.status,
+            errorText,
           );
-          return data;
-        } catch (error) {
-          console.error("❌ Product analysis query error:", error);
-          throw error;
+          // Return empty data structure instead of throwing
+          return { productStats: [], totalRevenue: 0, totalQuantity: 0 };
         }
-      },
-      enabled: analysisType === "product",
-      staleTime: 1 * 60 * 1000, // Reduced cache time for fresh data
-      retry: 2,
-      retryDelay: 1000,
-    });
+
+        const data = await response.json();
+        console.log(
+          "✅ Product analysis data received:",
+          data?.productStats?.length || 0,
+          "products",
+        );
+        return data || { productStats: [], totalRevenue: 0, totalQuantity: 0 };
+      } catch (error) {
+        console.error("❌ Product analysis query error:", error);
+        // Return empty data structure instead of throwing
+        return { productStats: [], totalRevenue: 0, totalQuantity: 0 };
+      }
+    },
+    enabled: analysisType === "product",
+    staleTime: 1 * 60 * 1000, // Reduced cache time for fresh data
+    retry: 2,
+    retryDelay: 1000,
+  });
 
   const { data: transactions } = useQuery({
     queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/transactions"],
@@ -474,6 +591,10 @@ export function SalesChartReport() {
     return Array.from({ length: 10 }, (_, i) => `Tầng ${i + 1}`);
   };
 
+  const getStoresFilter = (): any[] => {
+    return storesFilterData;
+  };
+
   // Function to get available floors, considering both fixed and dynamic data
   const getAvailableFloors = (): string[] => {
     const uniqueFloors = getUniqueFloors();
@@ -527,6 +648,7 @@ export function SalesChartReport() {
   // Get dashboard stats from orders data
   const getDashboardStats = () => {
     try {
+      // Add proper loading and error checks
       if (ordersLoading || orderItemsLoading) {
         return {
           periodRevenue: 0,
@@ -545,11 +667,10 @@ export function SalesChartReport() {
         };
       }
 
-      // Ensure we have valid arrays - add null/undefined checks
-      const validOrders = orders && Array.isArray(orders) ? orders : [];
-      const validOrderItems =
-        orderItems && Array.isArray(orderItems) ? orderItems : [];
-      const validTables = tables && Array.isArray(tables) ? tables : [];
+      // Ensure we have valid arrays - add null checks
+      let validOrders = Array.isArray(orders) ? orders : [];
+      const validOrderItems = Array.isArray(orderItems) ? orderItems : [];
+      const validTables = Array.isArray(tables) && tables ? tables : [];
 
       // Filter completed/paid orders for time analysis (exclude cancelled orders)
       const completedOrders = validOrders.filter(
@@ -573,20 +694,50 @@ export function SalesChartReport() {
           : null,
       });
 
-      // Calculate total sales revenue (sum of subtotal) - Doanh thu = Thành tiền (chưa thuế)
+      // Calculate revenue based on the correct formula
       const periodRevenue = completedOrders.reduce(
         (sum: number, order: any) => {
-          const subtotal = Number(order.subtotal || 0);
-          return sum + subtotal;
+          const orderSubtotal = Number(order.subtotal || 0); // Thành tiền từ DB
+          const orderDiscount = Number(order.discount || 0); // Giảm giá từ DB
+          const orderTax = Number(order.tax || 0); // Thuế từ DB
+          const orderPriceIncludeTax = order.priceIncludeTax === true;
+
+          // Doanh thu = priceIncludeTax ? subtotal - tax : subtotal - discount - tax
+          let doanhThu;
+          if (orderPriceIncludeTax) {
+            // When price includes tax: doanh thu = subtotal - tax
+            doanhThu = orderSubtotal - orderTax;
+          } else {
+            // When price doesn't include tax: doanh thu = subtotal - discount - tax
+            doanhThu = orderSubtotal - orderDiscount - orderTax;
+          }
+
+          // Ensure revenue is not negative
+          return sum + Math.max(0, doanhThu);
         },
         0,
       );
 
-      // Calculate subtotal revenue (sum of subtotal) - Tổng doanh thu
+      // Calculate subtotal revenue (thành tiền = số lượng × đơn giá)
       const periodSubtotalRevenue = completedOrders.reduce(
         (sum: number, order: any) => {
-          const subtotal = Number(order.subtotal || 0);
-          return sum + subtotal;
+          // Thành tiền calculation needs to consider priceIncludeTax
+          const orderSubtotal = Number(order.subtotal || 0); // Subtotal from DB
+          const orderDiscount = Number(order.discount || 0); // Discount from DB
+          const orderTax = Number(order.tax || 0); // Tax from DB
+          const orderPriceIncludeTax = order.priceIncludeTax === true;
+
+          let thanhTien;
+          if (orderPriceIncludeTax) {
+            // If price includes tax, Thành tiền = subtotal + discount + tax
+            // This is because subtotal in this case is net of tax and discount
+            thanhTien = orderSubtotal + orderDiscount + orderTax;
+          } else {
+            // If price doesn't include tax, Thành tiền = subtotal
+            thanhTien = orderSubtotal;
+          }
+
+          return sum + thanhTien;
         },
         0,
       );
@@ -807,44 +958,40 @@ export function SalesChartReport() {
 
         // Check priceIncludeTax setting from order
         const orderPriceIncludeTax = order.priceIncludeTax === true;
-        const orderSubtotal = Number(order.subtotal || 0);
-        const orderDiscount = Number(order.discount || 0);
-        const orderTax = Number(order.tax || 0);
+        const orderSubtotal = Number(order.subtotal || 0); // Thành tiền
+        const orderDiscount = Number(order.discount || 0); // Giảm giá
+        const orderTax = Number(order.tax || 0); // Thuế
         const orderTotal = Number(order.total || 0);
 
-        // Fix calculation logic based on order-specific priceIncludeTax
-        let thanhTien, doanhThu;
-
+        // Calculate revenue using the correct formula:
+        // doanh thu = priceIncludeTax == true ? subtotal - tax : subtotal - discount - tax
+        let doanhThu;
         if (orderPriceIncludeTax) {
-          // When order priceIncludeTax = true:
-          // - Thành tiền = subtotal + discount (original amount before discount)
-          // - Doanh thu = subtotal (already net of discount, includes tax)
-          thanhTien = orderSubtotal + orderDiscount + orderTax;
-          doanhThu = thanhTien - orderDiscount - orderTax;
+          // When priceIncludeTax = true: doanh thu = subtotal - tax
+          doanhThu = orderSubtotal - orderTax;
         } else {
-          // When order priceIncludeTax = false:
-          // - Thành tiền = subtotal (original amount before discount, excludes tax)
-          // - Doanh thu = subtotal - discount (net amount, excludes tax)
-          thanhTien = orderSubtotal;
-          doanhThu = Math.max(0, orderSubtotal - orderDiscount);
+          // When priceIncludeTax = false: doanh thu = subtotal - discount - tax
+          doanhThu = orderSubtotal - orderDiscount - orderTax;
         }
+
+        // Tổng tiền = doanh thu + thuế (for chart display)
+        const tongTien = doanhThu + orderTax;
 
         dailySales[dateStr].orders += 1;
         dailySales[dateStr].revenue += doanhThu; // Doanh thu
         dailySales[dateStr].customers += Number(order.customerCount || 1);
         dailySales[dateStr].discount += orderDiscount; // Giảm giá từ DB
         dailySales[dateStr].tax += orderTax; // Thuế
-        dailySales[dateStr].subtotal += thanhTien; // Thành tiền
+        dailySales[dateStr].subtotal += orderSubtotal; // Subtotal from API
 
         console.log("Processing order:", {
           id: order.id,
           date: dateStr,
-          total: orderTotal,
           subtotal: orderSubtotal,
           discount: orderDiscount,
           tax: orderTax,
           revenue: doanhThu,
-          thanhTien: thanhTien,
+          tongTien: tongTien,
           priceIncludeTax: orderPriceIncludeTax,
         });
       } catch (error) {
@@ -1060,12 +1207,16 @@ export function SalesChartReport() {
                           Array.isArray(filteredCompletedOrders)
                         ) {
                           filteredCompletedOrders.forEach((order: any) => {
-                            const paymentMethod = order.paymentMethod || "cash";
+                            const paymentMethod =
+                              order.paymentMethod || "cash";
 
                             // Try to parse as JSON for multi-payment
                             try {
                               const parsed = JSON.parse(paymentMethod);
-                              if (Array.isArray(parsed) && parsed.length > 0) {
+                              if (
+                                Array.isArray(parsed) &&
+                                parsed.length > 0
+                              ) {
                                 // Multi-payment: add all methods from JSON
                                 parsed.forEach((pm: any) => {
                                   if (pm.method) {
@@ -1120,7 +1271,7 @@ export function SalesChartReport() {
                           endIndex,
                         );
 
-                        return paginatedEntries.map(([date, data]) => {
+                        return paginatedData.map(([date, data]) => {
                           // Recalculate based on priceIncludeTax for this row
                           let rowPaymentAmount = 0; // Thành tiền
                           let rowActualRevenue = 0; // Doanh thu
@@ -1154,26 +1305,24 @@ export function SalesChartReport() {
                             const transactionDiscount = Number(
                               transaction.discount || 0,
                             );
-                            const transactionTax = Number(transaction.tax || 0);
+                            const transactionTax = Number(
+                              transaction.tax || 0,
+                            );
                             const transactionTotal = Number(
                               transaction.total || 0,
                             );
 
-                            // Fix calculation based on priceIncludeTax
-                            let thanhTien, doanhThu;
+                            // Calculate using the correct formula:
+                            // thành tiền = subtotal (số lượng × đơn giá)
+                            const thanhTien = transactionSubtotal;
 
+                            // doanh thu = priceIncludeTax == true ? subtotal - tax : subtotal - discount - tax
+                            let doanhThu;
                             if (orderPriceIncludeTax) {
-                              // When priceIncludeTax = true: thành tiền = subtotal + discount
-                              thanhTien =
-                                transactionSubtotal +
-                                transactionDiscount +
-                                transactionTax;
-                              doanhThu = transactionSubtotal - transactionTax; // Doanh thu = subtotal (already net of discount)
+                              doanhThu = transactionSubtotal - transactionTax;
                             } else {
-                              // When priceIncludeTax = false: thành tiền = subtotal
-                              thanhTien = transactionSubtotal;
                               doanhThu =
-                                transactionSubtotal - transactionDiscount; // Doanh thu = subtotal - discount
+                                transactionSubtotal - transactionDiscount - transactionTax;
                             }
 
                             rowPaymentAmount += thanhTien;
@@ -1315,11 +1464,11 @@ export function SalesChartReport() {
 
                                         let customerPayment;
                                         if (orderPriceIncludeTax) {
-                                          // When priceIncludeTax = true: customer payment = total from DB
+                                          // priceIncludeTax = true: customer payment = total from DB
                                           customerPayment =
                                             transactionTotal - transactionTax;
                                         } else {
-                                          // When priceIncludeTax = false: customer payment = revenue + tax
+                                          // priceIncludeTax = false: customer payment = revenue + tax
                                           const revenue = Math.max(
                                             0,
                                             transactionSubtotal -
@@ -1364,7 +1513,7 @@ export function SalesChartReport() {
                                                 0) + amount;
                                           });
                                         } else {
-                                          // Not a valid JSON array, treat as single payment method
+                                          // Not a valid array, treat as single payment method
                                           const transSubtotal = Number(
                                             transaction.subtotal || 0,
                                           );
@@ -1625,19 +1774,19 @@ export function SalesChartReport() {
                                             true;
 
                                           if (orderPriceIncludeTax) {
-                                            // priceIncludeTax = true: tổng tiền = total
+                                            // priceIncludeTax = true: customer payment = total from DB
                                             return formatCurrency(
                                               transactionTotal,
                                             );
                                           } else {
-                                            // priceIncludeTax = false: tổng tiền = subtotal - discount + tax
-                                            const doanhThu = Math.max(
+                                            // priceIncludeTax = false: customer payment = revenue + tax
+                                            const revenue = Math.max(
                                               0,
                                               transactionSubtotal -
                                                 transactionDiscount,
                                             );
                                             return formatCurrency(
-                                              doanhThu + transactionTax,
+                                              revenue + transactionTax,
                                             );
                                           }
                                         })()}
@@ -1805,10 +1954,53 @@ export function SalesChartReport() {
                     ) : (
                       <TableRow>
                         <TableCell
-                          colSpan={9}
-                          className="text-center text-gray-500 py-8"
+                          colSpan={(() => {
+                            // Calculate dynamic colspan based on payment methods
+                            const baseColumns =
+                              analysisType !== "employee" ? 9 : 8;
+                            const allPaymentMethods = new Set();
+                            if (
+                              filteredCompletedOrders &&
+                              Array.isArray(filteredCompletedOrders)
+                            ) {
+                              filteredCompletedOrders.forEach((order: any) => {
+                                const paymentMethod =
+                                  order.paymentMethod || "cash";
+                                try {
+                                  const parsed = JSON.parse(paymentMethod);
+                                  if (
+                                    Array.isArray(parsed) &&
+                                    parsed.length > 0
+                                  ) {
+                                    parsed.forEach((pm: any) => {
+                                      if (pm.method) {
+                                        allPaymentMethods.add(pm.method);
+                                      }
+                                    });
+                                  } else {
+                                    allPaymentMethods.add(paymentMethod);
+                                  }
+                                } catch (e) {
+                                  allPaymentMethods.add(paymentMethod);
+                                }
+                              });
+                            }
+                            return baseColumns + allPaymentMethods.size;
+                          })()}
+                          className="text-center py-12"
                         >
-                          {t("reports.noDataDescription")}
+                          <div className="flex flex-col items-center justify-center space-y-4">
+                            <div className="text-6xl">📊</div>
+                            <div className="text-lg font-medium text-gray-700">
+                              {t("reports.noDataInDateRange")}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              ({formatDate(startDate)} - {formatDate(endDate)})
+                            </div>
+                            <div className="text-sm text-gray-500 max-w-md">
+                              {t("reports.tryDifferentDateRange")}
+                            </div>
+                          </div>
                         </TableCell>
                       </TableRow>
                     )}
@@ -1961,7 +2153,9 @@ export function SalesChartReport() {
                             const transactionDiscount = Number(
                               transaction.discount || 0,
                             );
-                            const transactionTax = Number(transaction.tax || 0);
+                            const transactionTax = Number(
+                              transaction.tax || 0,
+                            );
                             const transactionTotal = Number(
                               transaction.total || 0,
                             );
@@ -2332,21 +2526,23 @@ export function SalesChartReport() {
       }
 
       // Use EXACT values from database
-      let orderSubtotal = Number(order.subtotal || 0); // Thành tiền từ DB
-      let orderDiscount = Number(order.discount || 0); // Giảm giá từ DB
-      let orderTax =
-        Number(order.tax || 0) ||
-        Number(order.total || 0) - Number(order.subtotal || 0); // Thuế từ DB hoặc tính từ total-subtotal
-      let orderTotal = Number(order.total || 0); // Tổng tiền từ DB
-      let orderRevenue = orderSubtotal - orderDiscount; // Doanh thu = thành tiền - giêm giá
+      const orderSubtotal = Number(order.subtotal || 0); // Thành tiền từ DB
+      const orderDiscount = Number(order.discount || 0); // Giảm giá từ DB
+      const orderTax = Number(order.tax || 0); // Thuế từ DB
+      const orderPriceIncludeTax = order.priceIncludeTax === true;
 
-      if (order.priceIncludeTax === true) {
-        orderSubtotal = orderSubtotal + orderDiscount + orderTax; // Thành tiền = subtotal + discount + tax
-        orderRevenue = orderSubtotal - orderDiscount - orderTax; // Doanh thu = subtotal - tax
-        orderTotal = orderRevenue + orderTax;
+      // Doanh thu calculation based on priceIncludeTax
+      let orderRevenue;
+      if (orderPriceIncludeTax) {
+        // priceIncludeTax = true: doanh thu = subtotal - tax
+        orderRevenue = orderSubtotal - orderTax;
       } else {
-        orderTotal = orderRevenue + orderTax;
+        // priceIncludeTax = false: doanh thu = subtotal - discount - tax
+        orderRevenue = orderSubtotal - orderDiscount - orderTax;
       }
+
+      // Tổng tiền = doanh thu + thuế
+      const orderTotal = orderRevenue + orderTax;
 
       const orderSummary = {
         orderDate: order.orderedAt || order.createdAt || order.created_at,
@@ -2856,8 +3052,36 @@ export function SalesChartReport() {
                                 <TableCell className="text-right text-red-600 min-w-[100px] px-2">
                                   {formatCurrency(item.discount)}
                                 </TableCell>
-                                <TableCell className="text-right text-green-600 font-medium min-w-[120px] px-2">
-                                  {formatCurrency(item.revenue)}
+                                <TableCell className="text-right text-green-600 font-medium text-sm min-w-[140px] px-2">
+                                  {(() => {
+                                    const transactionSubtotal = Number(
+                                      item.totalAmount || 0,
+                                    );
+                                    const transactionDiscount = Number(
+                                      item.discount || 0,
+                                    );
+
+                                    // Check priceIncludeTax from transaction or order
+                                    const orderPriceIncludeTax =
+                                      order.priceIncludeTax === true;
+
+                                    let doanhThu;
+                                    if (orderPriceIncludeTax) {
+                                      // priceIncludeTax = true: doanh thu = subtotal (already net of discount)
+                                      doanhThu =
+                                        transactionSubtotal -
+                                        Number(item.tax || 0);
+                                    } else {
+                                      // priceIncludeTax = false: doanh thu = subtotal - discount
+                                      doanhThu = Math.max(
+                                        0,
+                                        transactionSubtotal -
+                                          transactionDiscount,
+                                      );
+                                    }
+
+                                    return formatCurrency(doanhThu);
+                                  })()}
                                 </TableCell>
                                 <TableCell className="text-right min-w-[100px] px-2">
                                   {(() => {
@@ -2874,10 +3098,42 @@ export function SalesChartReport() {
                                   })()}
                                 </TableCell>
                                 <TableCell className="text-right min-w-[100px] px-2">
-                                  {formatCurrency(item.tax)}
+                                  {formatCurrency(item.vat)}
                                 </TableCell>
                                 <TableCell className="text-right font-bold text-blue-600 min-w-[120px] px-2">
-                                  {formatCurrency(item.totalMoney)}
+                                  {(() => {
+                                    const transactionSubtotal = Number(
+                                      item.totalAmount || 0,
+                                    );
+                                    const transactionDiscount = Number(
+                                      item.discount || 0,
+                                    );
+                                    const transactionTax = Number(
+                                      item.vat || 0,
+                                    );
+                                    const transactionTotal = Number(
+                                      item.totalMoney || 0,
+                                    );
+
+                                    // Check priceIncludeTax from transaction or order
+                                    const orderPriceIncludeTax =
+                                      order.priceIncludeTax === true;
+
+                                    if (orderPriceIncludeTax) {
+                                      // priceIncludeTax = true: tổng tiền = total
+                                      return formatCurrency(transactionTotal);
+                                    } else {
+                                      // priceIncludeTax = false: tổng tiền = subtotal - discount + tax
+                                      const doanhThu = Math.max(
+                                        0,
+                                        transactionSubtotal -
+                                          transactionDiscount,
+                                      );
+                                      return formatCurrency(
+                                        doanhThu + transactionTax,
+                                      );
+                                    }
+                                  })()}
                                 </TableCell>
                                 <TableCell className="text-center min-w-[150px] px-2 text-gray-600 text-sm">
                                   {order.notes || "-"}
@@ -3061,303 +3317,363 @@ export function SalesChartReport() {
                   </button>
                 </div>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  };
-
-  // Employee Report Component Logic - Enhanced with expandable rows and proper data handling
-  const renderEmployeeReport = () => {
-    if (ordersLoading || orderItemsLoading) {
-      return (
-        <div className="flex justify-center py-8">
-          <div className="text-gray-500">{t("reports.loading")}...</div>
-        </div>
+            )}
+          </CardContent>
+        </Card>
       );
-    }
+    };
 
-    const dashboardStats = getDashboardStats();
-    const { filteredCompletedOrders } = dashboardStats;
+    // Employee Report Component Logic - Enhanced with expandable rows and proper data handling
+    const renderEmployeeReport = () => {
+      if (ordersLoading || orderItemsLoading) {
+        return (
+          <div className="flex justify-center py-8">
+            <div className="text-gray-500">{t("reports.loading")}...</div>
+          </div>
+        );
+      }
 
-    // Employee sales data
-    const employeeSales: {
-      [employeeId: string]: {
-        employeeName: string;
-        totalRevenue: number;
-        totalOrders: number;
-        totalCustomers: number;
-        totalDiscount: number;
-        totalTax: number;
-        totalMoney: number;
-        totalSubtotal: number; // Add subtotal tracking
-        paymentMethods: { [method: string]: number };
-        orders: any[]; // Add orders array to track individual orders
-        employeeCode: string; // Add employee code
-      };
-    } = {};
+      const dashboardStats = getDashboardStats();
+      const { filteredCompletedOrders } = dashboardStats;
 
-    filteredCompletedOrders.forEach((order: any) => {
-      const employeeId = order.employeeId?.toString() || "unknown";
-      const employeeName = order.employeeName || order.cashierName || "Unknown";
-
-      if (!employeeSales[employeeId]) {
-        employeeSales[employeeId] = {
-          employeeName,
-          totalRevenue: 0,
-          totalOrders: 0,
-          totalCustomers: 0,
-          totalDiscount: 0,
-          totalTax: 0,
-          totalMoney: 0,
-          totalSubtotal: 0,
-          paymentMethods: {},
-          orders: [], // Add orders array to track individual orders
-          employeeCode: employeeId, // Add employee code
+      // Employee sales data
+      const employeeSales: {
+        [employeeId: string]: {
+          employeeName: string;
+          totalRevenue: number;
+          totalOrders: number;
+          totalCustomers: number;
+          totalDiscount: number;
+          totalTax: number;
+          totalMoney: number;
+          totalSubtotal: number; // Add subtotal tracking
+          paymentMethods: { [method: string]: number };
+          orders: any[]; // Add orders array to track individual orders
+          employeeCode: string; // Add employee code
         };
-      }
+      } = {};
 
-      const orderSubtotal = Number(order.subtotal || 0);
-      const orderDiscount = Number(order.discount || 0);
-      const orderTax = Number(order.tax || 0);
-      const orderTotal = Number(order.total || 0);
+      filteredCompletedOrders.forEach((order: any) => {
+        const employeeId = order.employeeId?.toString() || "unknown";
+        const employeeName = order.employeeName || order.cashierName || "Unknown";
 
-      // Validate numbers to prevent NaN
-      if (
-        isNaN(orderSubtotal) ||
-        isNaN(orderDiscount) ||
-        isNaN(orderTax) ||
-        isNaN(orderTotal)
-      ) {
-        console.warn("Invalid order financial data:", {
-          orderId: order.id,
-          subtotal: order.subtotal,
-          discount: order.discount,
-          tax: order.tax,
-          total: order.total,
-        });
-        return; // Skip this order if data is invalid
-      }
+        if (!employeeSales[employeeId]) {
+          employeeSales[employeeId] = {
+            employeeName,
+            totalRevenue: 0,
+            totalOrders: 0,
+            totalCustomers: 0,
+            totalDiscount: 0,
+            totalTax: 0,
+            totalMoney: 0,
+            totalSubtotal: 0,
+            paymentMethods: {},
+            orders: [], // Add orders array to track individual orders
+            employeeCode: employeeId, // Add employee code
+          };
+        }
 
-      // Calculate based on priceIncludeTax consistently
-      const orderPriceIncludeTax = order.priceIncludeTax === true;
-      let thanhTien, doanhThu, tongTien;
+        const orderSubtotal = Number(order.subtotal || 0);
+        const orderDiscount = Number(order.discount || 0);
+        const orderTax = Number(order.tax || 0);
+        const orderTotal = Number(order.total || 0);
 
-      if (orderPriceIncludeTax) {
-        // When priceIncludeTax = true:
-        // - Thành tiền = subtotal + discount (before discount deduction)
-        // - Doanh thu = subtotal (after discount, net revenue)
-        // - Tổng tiền = total from DB
-        thanhTien = orderSubtotal + orderDiscount + orderTax; // Thành tiền = subtotal + discount + tax
-        doanhThu = thanhTien - orderDiscount - orderTax; // Doanh thu = subtotal + tax
-        tongTien = orderTotal;
-      } else {
-        // When priceIncludeTax = false:
-        // - Thành tiền = subtotal (before discount)
-        // - Doanh thu = subtotal - discount (after discount)
-        // - Tổng tiền = doanh thu + tax
-        thanhTien = orderSubtotal;
-        doanhThu = Math.max(0, orderSubtotal - orderDiscount);
-        tongTien = doanhThu + orderTax;
-      }
+        // Validate numbers to prevent NaN
+        if (
+          isNaN(orderSubtotal) ||
+          isNaN(orderDiscount) ||
+          isNaN(orderTax) ||
+          isNaN(orderTotal)
+        ) {
+          console.warn("Invalid order financial data:", {
+            orderId: order.id,
+            subtotal: order.subtotal,
+            discount: order.discount,
+            tax: order.tax,
+            total: order.total,
+          });
+          return; // Skip this order if data is invalid
+        }
 
-      employeeSales[employeeId].totalSubtotal += thanhTien;
-      employeeSales[employeeId].totalRevenue += doanhThu;
-      employeeSales[employeeId].totalOrders += 1;
-      employeeSales[employeeId].totalCustomers += Number(
-        order.customerCount || 1,
+        // Calculate revenue based on the correct formula
+        const orderPriceIncludeTax = order.priceIncludeTax === true;
+        let thanhTien, doanhThu, tongTien;
+
+        if (orderPriceIncludeTax) {
+          // When priceIncludeTax = true:
+          // - Thành tiền = subtotal + discount + tax (as per original calculation context)
+          // - Doanh thu = subtotal - tax (as per formula: priceIncludeTax ? subtotal - tax)
+          // - Tổng tiền = doanh thu + tax
+          thanhTien = orderSubtotal + orderDiscount + orderTax; // This seems to be the 'thành tiền' definition
+          doanhThu = orderSubtotal - orderTax; // Corrected doanh thu
+          tongTien = doanhThu + orderTax; // Corrected tổng tiền
+        } else {
+          // When priceIncludeTax = false:
+          // - Thành tiền = subtotal
+          // - Doanh thu = subtotal - discount - tax
+          // - Tổng tiền = doanh thu + tax
+          thanhTien = orderSubtotal; // Thành tiền is just subtotal
+          doanhThu = orderSubtotal - orderDiscount - orderTax; // Corrected doanh thu
+          tongTien = doanhThu + orderTax; // Corrected tổng tiền
+        }
+
+        employeeSales[employeeId].totalSubtotal += thanhTien;
+        employeeSales[employeeId].totalRevenue += doanhThu;
+        employeeSales[employeeId].totalOrders += 1;
+        employeeSales[employeeId].totalCustomers += Number(
+          order.customerCount || 1,
+        );
+        employeeSales[employeeId].totalDiscount += orderDiscount;
+        employeeSales[employeeId].totalTax += orderTax;
+        employeeSales[employeeId].totalMoney += tongTien;
+
+        // Add order to orders array for detailed view
+        employeeSales[employeeId].orders.push(order);
+
+        // Payment methods
+        const paymentMethod = order.paymentMethod || "cash";
+        // For payment methods, we usually sum the 'totalMoney' which is 'doanh thu + tax'
+        employeeSales[employeeId].paymentMethods[paymentMethod] =
+          (employeeSales[employeeId].paymentMethods[paymentMethod] || 0) +
+          tongTien;
+      });
+
+      const data = Object.values(employeeSales).sort(
+        (a, b) => b.totalMoney - a.totalMoney, // Sort by totalMoney
       );
-      employeeSales[employeeId].totalDiscount += orderDiscount;
-      employeeSales[employeeId].totalTax += orderTax;
-      employeeSales[employeeId].totalMoney += tongTien;
 
-      // Add order to orders array for detailed view
-      employeeSales[employeeId].orders.push(order);
+      // Pagination
+      const totalPages = Math.ceil(data.length / employeePageSize);
+      const startIndex = (employeeCurrentPage - 1) * employeePageSize;
+      const endIndex = startIndex + employeePageSize;
+      const paginatedData = data.slice(startIndex, endIndex);
 
-      // Payment methods
-      const paymentMethod = order.paymentMethod || "cash";
-      employeeSales[employeeId].paymentMethods[paymentMethod] =
-        (employeeSales[employeeId].paymentMethods[paymentMethod] || 0) +
-        tongTien;
-    });
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              {t("reports.employeeSalesReport")}
+            </CardTitle>
+            <CardDescription className="flex items-center justify-between">
+              <span>
+                {t("reports.fromDate")}: {formatDate(startDate)} -{" "}
+                {t("reports.toDate")}: {formatDate(endDate)}
+              </span>
+              <Button
+                onClick={() => {
+                  const exportData = [];
 
-    const data = Object.values(employeeSales).sort(
-      (a, b) => b.totalMoney - a.totalMoney, // Sort by totalMoney
-    );
+                  // Export employee summaries with their detailed orders
+                  data.forEach((item) => {
+                    // Add employee summary row
+                    exportData.push({
+                      Loại: "Tổng nhân viên",
+                      "Mã NV": item.employeeCode,
+                      "Tên NV": item.employeeName,
+                      "Số đơn": item.totalOrders,
+                      "Thành tiền": formatCurrency(item.totalSubtotal),
+                      "Giảm giá": formatCurrency(item.totalDiscount),
+                      "Doanh thu": formatCurrency(item.totalRevenue),
+                      Thuế: formatCurrency(item.totalTax),
+                      "Tổng cộng": formatCurrency(item.totalMoney),
+                      "Phương thức thanh toán": "Tất cả",
+                    });
 
-    // Pagination
-    const totalPages = Math.ceil(data.length / employeePageSize);
-    const startIndex = (employeeCurrentPage - 1) * employeePageSize;
-    const endIndex = startIndex + employeePageSize;
-    const paginatedData = data.slice(startIndex, endIndex);
+                    // Add detailed orders for this employee
+                    item.orders.forEach((order: any) => {
+                      // Calculate order details based on priceIncludeTax for export
+                      const orderSubtotal = Number(order.subtotal || 0);
+                      const orderDiscount = Number(order.discount || 0);
+                      const orderTax = Number(order.tax || 0);
+                      const orderTotal = Number(order.total || 0);
+                      const orderPriceIncludeTax = order.priceIncludeTax === true;
 
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            {t("reports.employeeSalesReport")}
-          </CardTitle>
-          <CardDescription className="flex items-center justify-between">
-            <span>
-              {t("reports.fromDate")}: {formatDate(startDate)} -{" "}
-              {t("reports.toDate")}: {formatDate(endDate)}
-            </span>
-            <Button
-              onClick={() => {
-                const exportData = [];
+                      let orderRevenueExport, orderTotalExport;
 
-                // Export employee summaries with their detailed orders
-                data.forEach((item) => {
-                  // Add employee summary row
+                      if (orderPriceIncludeTax) {
+                        orderRevenueExport = orderSubtotal - orderTax;
+                        orderTotalExport = orderRevenueExport + orderTax;
+                      } else {
+                        orderRevenueExport = orderSubtotal - orderDiscount - orderTax;
+                        orderTotalExport = orderRevenueExport + orderTax;
+                      }
+
+                      exportData.push({
+                        Loại: "Chi tiết đơn hàng",
+                        "Mã NV": item.employeeCode,
+                        "Tên NV": item.employeeName,
+                        "Mã đơn hàng": order.orderNumber || `ORD-${order.id}`,
+                        "Ngày giờ": new Date(
+                          order.orderedAt || order.createdAt || order.created_at,
+                        ).toLocaleString("vi-VN", {
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                          hour12: false,
+                        }),
+                        "Khách hàng": order.customerName || "",
+                        "Số đơn": 1,
+                        "Doanh thu": formatCurrency(orderRevenueExport),
+                        "Giảm giá": formatCurrency(Number(order.discount || 0)),
+                        Thuế: formatCurrency(Number(order.tax || 0)),
+                        "Tổng cộng": formatCurrency(orderTotalExport),
+                        "Phương thức thanh toán": formatPaymentMethodDisplay(
+                          order.paymentMethod || "cash",
+                        ),
+                      });
+                    });
+                  });
+
+                  // Add grand total summary
                   exportData.push({
-                    Loại: "Tổng nhân viên",
-                    "Mã NV": item.employeeCode,
-                    "Tên NV": item.employeeName,
-                    "Số đơn": item.totalOrders,
-                    "Thành tiền": formatCurrency(item.totalSubtotal),
-                    "Giảm giá": formatCurrency(item.totalDiscount),
-                    "Doanh thu": formatCurrency(item.totalRevenue),
-                    Thuế: formatCurrency(item.totalTax),
-                    "Tổng cộng": formatCurrency(item.totalMoney),
+                    Loại: "TỔNG CỘNG",
+                    "Mã NV": "",
+                    "Tên NV": `${data.length} nhân viên`,
+                    "Số đơn": data.reduce(
+                      (sum, item) => sum + item.totalOrders,
+                      0,
+                    ),
+                    "Thành tiền": formatCurrency(
+                      data.reduce((sum, item) => sum + item.totalSubtotal, 0),
+                    ),
+                    "Giảm giá": formatCurrency(
+                      data.reduce((sum, item) => sum + item.totalDiscount, 0),
+                    ),
+                    "Doanh thu": formatCurrency(
+                      data.reduce((sum, item) => sum + item.totalRevenue, 0),
+                    ),
+                    Thuế: formatCurrency(
+                      data.reduce((sum, item) => sum + item.totalTax, 0),
+                    ),
+                    "Tổng cộng": formatCurrency(
+                      data.reduce((sum, item) => sum + item.totalMoney, 0),
+                    ),
                     "Phương thức thanh toán": "Tất cả",
                   });
 
-                  // Add detailed orders for this employee
-                  item.orders.forEach((order: any) => {
-                    exportData.push({
-                      Loại: "Chi tiết đơn hàng",
-                      "Mã NV": item.employeeCode,
-                      "Tên NV": item.employeeName,
-                      "Mã đơn h �ng": order.orderNumber || `ORD-${order.id}`,
-                      "Ngày giờ": new Date(
-                        order.orderedAt || order.createdAt || order.created_at,
-                      ).toLocaleString("vi-VN", {
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                        hour12: false,
-                      }),
-                      "Khách hàng": order.customerName || "",
-                      "Số đơn": 1,
-                      "Doanh thu": formatCurrency(
-                        Math.max(0, Number(order.subtotal || 0)),
-                      ),
-                      "Giảm giá": formatCurrency(Number(order.discount || 0)),
-                      Thuế: formatCurrency(Number(order.tax || 0)),
-                      "Tổng cộng": formatCurrency(Number(order.total || 0)),
-                      "Phương thức thanh toán": formatPaymentMethodDisplay(
-                        order.paymentMethod || "cash",
-                      ),
-                    });
-                  });
-                });
+                  exportToExcel(
+                    exportData,
+                    `BaoCaoNhanVien_${startDate}_to_${endDate}`,
+                  );
+                }}
+                className="inline-flex items-center gap-2 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                {t("common.exportExcel")}
+              </Button>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="w-full">
+              <div className="overflow-x-auto">
+                <Table className="w-full min-w-[1400px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead
+                        className="text-center bg-green-50 w-12 font-bold"
+                        rowSpan={2}
+                      ></TableHead>
+                      <TableHead
+                        className="text-center border-r bg-green-50 min-w-[120px] font-bold"
+                        rowSpan={2}
+                      >
+                        {t("reports.employeeId")}
+                      </TableHead>
+                      <TableHead
+                        className="text-center border-r bg-green-50 min-w-[150px] font-bold"
+                        rowSpan={2}
+                      >
+                        {t("reports.employeeName")}
+                      </TableHead>
+                      <TableHead
+                        className="text-center border-r min-w-[100px] font-bold"
+                        rowSpan={2}
+                      >
+                        {t("reports.orders")}
+                      </TableHead>
+                      <TableHead
+                        className="text-right border-r min-w-[140px] font-bold"
+                        rowSpan={2}
+                      >
+                        {t("reports.thanhTien")}
+                      </TableHead>
+                      <TableHead
+                        className="text-right border-r min-w-[120px] font-bold"
+                        rowSpan={2}
+                      >
+                        {t("reports.discount")}
+                      </TableHead>
+                      <TableHead
+                        className="text-right border-r min-w-[120px] font-bold"
+                        rowSpan={2}
+                      >
+                        {t("reports.revenue")}
+                      </TableHead>
+                      <TableHead
+                        className="text-right border-r min-w-[120px] font-bold"
+                        rowSpan={2}
+                      >
+                        {t("common.tax")}
+                      </TableHead>
+                      <TableHead
+                        className="text-right border-r min-w-[140px] font-bold"
+                        rowSpan={2}
+                      >
+                        {t("reports.totalMoney")}
+                      </TableHead>
+                      <TableHead
+                        className="text-center border-r bg-blue-50 min-w-[200px] font-bold"
+                        colSpan={(() => {
+                          // Get all unique payment methods from completed orders (including from JSON)
+                          const allPaymentMethods = new Set();
+                          if (data && Array.isArray(data)) {
+                            data.forEach((employee: any) => {
+                              if (
+                                employee.orders &&
+                                Array.isArray(employee.orders)
+                              ) {
+                                employee.orders.forEach((order: any) => {
+                                  const paymentMethodStr =
+                                    order.paymentMethod || "cash";
 
-                // Add grand total summary
-                exportData.push({
-                  Loại: "TỔNG CỘNG",
-                  "Mã NV": "",
-                  "Tên NV": `${data.length} nhân viên`,
-                  "Số đơn": data.reduce(
-                    (sum, item) => sum + item.totalOrders,
-                    0,
-                  ),
-                  "Thành tiền": formatCurrency(
-                    data.reduce((sum, item) => sum + item.totalSubtotal, 0),
-                  ),
-                  "Giảm giá": formatCurrency(
-                    data.reduce((sum, item) => sum + item.totalDiscount, 0),
-                  ),
-                  "Doanh thu": formatCurrency(
-                    data.reduce((sum, item) => sum + item.totalRevenue, 0),
-                  ),
-                  Thuế: formatCurrency(
-                    data.reduce((sum, item) => sum + item.totalTax, 0),
-                  ),
-                  "Tổng cộng": formatCurrency(
-                    data.reduce((sum, item) => sum + item.totalMoney, 0),
-                  ),
-                  "Phương thức thanh toán": "Tất cả",
-                });
-
-                exportToExcel(
-                  exportData,
-                  `BaoCaoNhanVien_${startDate}_to_${endDate}`,
-                );
-              }}
-              className="inline-flex items-center gap-2 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              {t("common.exportExcel")}
-            </Button>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="w-full">
-            <div className="overflow-x-auto">
-              <Table className="w-full min-w-[1400px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead
-                      className="text-center bg-green-50 w-12 font-bold"
-                      rowSpan={2}
-                    ></TableHead>
-                    <TableHead
-                      className="text-center border-r bg-green-50 min-w-[120px] font-bold"
-                      rowSpan={2}
-                    >
-                      {t("reports.employeeId")}
-                    </TableHead>
-                    <TableHead
-                      className="text-center border-r bg-green-50 min-w-[150px] font-bold"
-                      rowSpan={2}
-                    >
-                      {t("reports.employeeName")}
-                    </TableHead>
-                    <TableHead
-                      className="text-center border-r min-w-[100px] font-bold"
-                      rowSpan={2}
-                    >
-                      {t("reports.orders")}
-                    </TableHead>
-                    <TableHead
-                      className="text-right border-r min-w-[140px] font-bold"
-                      rowSpan={2}
-                    >
-                      {t("reports.thanhTien")}
-                    </TableHead>
-                    <TableHead
-                      className="text-right border-r min-w-[120px] font-bold"
-                      rowSpan={2}
-                    >
-                      {t("reports.discount")}
-                    </TableHead>
-                    <TableHead
-                      className="text-right border-r min-w-[120px] font-bold"
-                      rowSpan={2}
-                    >
-                      {t("reports.revenue")}
-                    </TableHead>
-                    <TableHead
-                      className="text-right border-r min-w-[120px] font-bold"
-                      rowSpan={2}
-                    >
-                      {t("common.tax")}
-                    </TableHead>
-                    <TableHead
-                      className="text-right border-r min-w-[140px] font-bold"
-                      rowSpan={2}
-                    >
-                      {t("reports.totalMoney")}
-                    </TableHead>
-                    <TableHead
-                      className="text-center border-r bg-blue-50 min-w-[200px] font-bold"
-                      colSpan={(() => {
-                        // Get all unique payment methods from completed orders (including from JSON)
+                                  // Try to parse as JSON for multi-payment
+                                  try {
+                                    const parsed = JSON.parse(paymentMethodStr);
+                                    if (
+                                      Array.isArray(parsed) &&
+                                      parsed.length > 0
+                                    ) {
+                                      // Multi-payment: add all methods from JSON
+                                      parsed.forEach((pm: any) => {
+                                        if (pm.method) {
+                                          allPaymentMethods.add(pm.method);
+                                        }
+                                      });
+                                    } else {
+                                      // Single payment method
+                                      allPaymentMethods.add(paymentMethodStr);
+                                    }
+                                  } catch (e) {
+                                    // Not JSON, treat as single payment method
+                                    allPaymentMethods.add(paymentMethodStr);
+                                  }
+                                });
+                              }
+                            });
+                          }
+                          return allPaymentMethods.size;
+                        })()}
+                      >
+                        {t("reports.totalCustomerPayment")}
+                      </TableHead>
+                    </TableRow>
+                    <TableRow>
+                      {(() => {
+                        // Get all unique payment methods from employee orders (including from JSON)
                         const allPaymentMethods = new Set();
                         if (data && Array.isArray(data)) {
                           data.forEach((employee: any) => {
@@ -3394,33 +3710,595 @@ export function SalesChartReport() {
                             }
                           });
                         }
-                        return allPaymentMethods.size;
+
+                        const paymentMethodsArray =
+                          Array.from(allPaymentMethods).sort();
+
+                        return (
+                          <>
+                            {paymentMethodsArray.map(
+                              (method: any, index: number) => (
+                                <TableHead
+                                  key={`payment-header-${index}-${method}`}
+                                  className="text-center border-r bg-blue-50 min-w-[130px] font-bold"
+                                >
+                                  {getPaymentMethodLabel(method)}
+                                </TableHead>
+                              ),
+                            )}
+                          </>
+                        );
                       })()}
-                    >
-                      {t("reports.totalCustomerPayment")}
-                    </TableHead>
-                  </TableRow>
-                  <TableRow>
-                    {(() => {
-                      // Get all unique payment methods from employee orders (including from JSON)
-                      const allPaymentMethods = new Set();
-                      if (data && Array.isArray(data)) {
-                        data.forEach((employee: any) => {
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedData.length > 0 ? (
+                      paginatedData.map((item, index) => {
+                        const isExpanded =
+                          expandedRows[item.employeeCode] || false;
+
+                        return (
+                          <>
+                            <TableRow
+                              key={`${item.employeeCode}-${index}`}
+                              className="hover:bg-gray-50"
+                            >
+                              <TableCell className="text-center border-r w-12">
+                                <button
+                                  onClick={() =>
+                                    setExpandedRows((prev) => ({
+                                      ...prev,
+                                      [item.employeeCode]:
+                                        !prev[item.employeeCode],
+                                    }))
+                                  }
+                                  className="w-8 h-8 flex items-center justify-center hover:bg-gray-200 rounded text-sm"
+                                >
+                                  {isExpanded ? "−" : "+"}
+                                </button>
+                              </TableCell>
+                              <TableCell className="text-center border-r bg-green-50 font-medium min-w-[120px] px-4">
+                                {item.employeeCode}
+                              </TableCell>
+                              <TableCell className="text-center border-r bg-green-50 font-medium min-w-[150px] px-4">
+                                {item.employeeName}
+                              </TableCell>
+                              <TableCell className="text-center border-r min-w-[100px] px-4">
+                                {item.totalOrders.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right border-r min-w-[140px] px-4">
+                                {formatCurrency(item.totalSubtotal)}
+                              </TableCell>
+                              <TableCell className="text-right border-r text-red-600 min-w-[120px] px-4">
+                                {formatCurrency(item.totalDiscount)}
+                              </TableCell>
+                              <TableCell className="text-right border-r min-w-[120px] px-4">
+                                {formatCurrency(item.totalRevenue)}
+                              </TableCell>
+                              <TableCell className="text-right border-r min-w-[120px] px-4">
+                                {formatCurrency(item.totalTax)}
+                              </TableCell>
+                              <TableCell className="text-right border-r text-blue-600 font-bold min-w-[140px] px-4">
+                                {formatCurrency(item.totalMoney)}
+                              </TableCell>
+                              {(() => {
+                                // Get all unique payment methods from all employee data (including from JSON)
+                                const allPaymentMethods = new Set();
+                                if (data && Array.isArray(data)) {
+                                  data.forEach((employee: any) => {
+                                    if (
+                                      employee.orders &&
+                                      Array.isArray(employee.orders)
+                                    ) {
+                                      employee.orders.forEach((order: any) => {
+                                        const paymentMethodStr =
+                                          order.paymentMethod || "cash";
+
+                                        // Try to parse as JSON for multi-payment
+                                        try {
+                                          const parsed =
+                                            JSON.parse(paymentMethodStr);
+                                          if (
+                                            Array.isArray(parsed) &&
+                                            parsed.length > 0
+                                          ) {
+                                            // Multi-payment: add all methods from JSON
+                                            parsed.forEach((pm: any) => {
+                                              if (pm.method) {
+                                                allPaymentMethods.add(pm.method);
+                                              }
+                                            });
+                                          } else {
+                                            // Single payment method
+                                            allPaymentMethods.add(
+                                              paymentMethodStr,
+                                            );
+                                          }
+                                        } catch (e) {
+                                          // Not JSON, treat as single payment method
+                                          allPaymentMethods.add(paymentMethodStr);
+                                        }
+                                      });
+                                    }
+                                  });
+                                }
+
+                                const paymentMethodsArray =
+                                  Array.from(allPaymentMethods).sort();
+
+                                return (
+                                  <>
+                                    {paymentMethodsArray.map((method: any) => {
+                                      // Calculate customer payment for this payment method
+                                      let customerPaymentForMethod = 0;
+                                      if (
+                                        item.orders &&
+                                        Array.isArray(item.orders)
+                                      ) {
+                                        item.orders.forEach((order: any) => {
+                                          const paymentMethodStr =
+                                            order.paymentMethod || "cash";
+                                          const orderSubtotal = Number(
+                                            order.subtotal || 0,
+                                          );
+                                          const orderDiscount = Number(
+                                            order.discount || 0,
+                                          );
+                                          const orderTax = Number(order.tax || 0);
+                                          const orderTotal = Number(
+                                            order.total || 0,
+                                          );
+
+                                          const customerPayment =
+                                            order.priceIncludeTax === true
+                                              ? orderTotal
+                                              : orderSubtotal -
+                                                orderDiscount +
+                                                orderTax;
+
+                                          // Try to parse as JSON for multi-payment
+                                          try {
+                                            const parsed =
+                                              JSON.parse(paymentMethodStr);
+                                            if (
+                                              Array.isArray(parsed) &&
+                                              parsed.length > 0
+                                            ) {
+                                              // Multi-payment: find amount for this method from JSON
+                                              const paymentItem = parsed.find(
+                                                (pm: any) =>
+                                                  pm.method === method,
+                                              );
+                                              if (paymentItem) {
+                                                customerPaymentForMethod +=
+                                                  Number(
+                                                    paymentItem.amount || 0,
+                                                  );
+                                              }
+                                            } else {
+                                              // Not a valid array, treat as single payment
+                                              if (
+                                                paymentMethodStr === method
+                                              ) {
+                                                customerPaymentForMethod +=
+                                                  customerPayment;
+                                              }
+                                            }
+                                          } catch (e) {
+                                            // Not JSON, single payment method
+                                            if (
+                                              paymentMethodStr === method
+                                            ) {
+                                              customerPaymentForMethod +=
+                                                customerPayment;
+                                            }
+                                          }
+                                        });
+                                      }
+
+                                      return (
+                                        <TableCell
+                                          key={method}
+                                          className="text-right border-r font-medium min-w-[130px] px-4"
+                                        >
+                                          {customerPaymentForMethod > 0
+                                            ? formatCurrency(
+                                                customerPaymentForMethod,
+                                              )
+                                            : "-"}
+                                        </TableCell>
+                                      );
+                                    })}
+                                  </>
+                                );
+                              })()}
+                            </TableRow>
+
+                            {/* Expanded Order Details */}
+                            {isExpanded &&
+                              item.orders.length > 0 &&
+                              item.orders.map(
+                                (order: any, orderIndex: number) => (
+                                  <TableRow
+                                    key={`${item.employeeCode}-order-${
+                                      order.id || orderIndex
+                                    }`}
+                                    className="bg-blue-50/50 border-l-4 border-l-blue-400"
+                                  >
+                                    <TableCell className="text-center border-r bg-blue-50 w-12">
+                                      <div className="w-8 h-6 flex items-center justify-center text-blue-600 text-xs">
+                                        └
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-center border-r text-blue-600 text-sm min-w-[120px] px-4">
+                                      <button
+                                        onClick={() => {
+                                          const orderNumber =
+                                            order.orderNumber ||
+                                            `ORD-${order.id}`;
+                                          window.location.href = `/sales-orders?order=${orderNumber}`;
+                                        }}
+                                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer bg-transparent border-none p-0"
+                                        title="Click to view order details"
+                                      >
+                                        {order.orderNumber || `ORD-${order.id}`}
+                                      </button>
+                                    </TableCell>
+                                    <TableCell className="text-center border-r text-sm min-w-[150px] px-4">
+                                      <div>
+                                        {new Date(
+                                          order.orderedAt ||
+                                            order.createdAt ||
+                                            order.created_at,
+                                        ).toLocaleDateString("vi-VN")}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(
+                                          order.orderedAt ||
+                                            order.createdAt ||
+                                            order.created_at,
+                                        ).toLocaleTimeString("vi-VN", {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                          hour12: false,
+                                        })}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-center border-r text-sm min-w-[100px] px-4">
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        {order.customerName}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right text-green-600 font-medium text-sm min-w-[140px] px-4">
+                                      {(() => {
+                                        const subtotal =
+                                          Number(order.subtotal) || 0;
+                                        const discount =
+                                          Number(order.discount) || 0;
+                                        const tax = Number(order.tax) || 0;
+                                        if (order.priceIncludeTax === true) {
+                                          return formatCurrency(
+                                            subtotal + discount + tax,
+                                          );
+                                        } else {
+                                          return formatCurrency(subtotal);
+                                        }
+                                      })()}
+                                    </TableCell>
+                                    <TableCell className="text-right text-orange-600 text-sm min-w-[120px] px-4">
+                                      {formatCurrency(
+                                        Number(order.discount || 0),
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-right border-r text-sm min-w-[120px] px-4">
+                                      {(() => {
+                                        const subtotal =
+                                          Number(order.subtotal) || 0;
+                                        const discount =
+                                          Number(order.discount) || 0;
+                                        const tax = Number(order.tax) || 0;
+                                        if (order.priceIncludeTax === false) {
+                                          return formatCurrency(subtotal - tax);
+                                        } else {
+                                          return formatCurrency(subtotal);
+                                        }
+                                      })()}
+                                    </TableCell>
+                                    <TableCell className="text-right border-r text-sm min-w-[120px] px-4">
+                                      {formatCurrency(Number(order.tax || 0))}
+                                    </TableCell>
+                                    <TableCell className="text-right border-r font-bold text-blue-600 text-sm min-w-[140px] px-4">
+                                      {(() => {
+                                        const subtotal =
+                                          Number(order.subtotal) || 0;
+                                        const discount =
+                                          Number(order.discount) || 0;
+                                        const tax = Number(order.tax) || 0;
+                                        const total = Number(order.total) || 0;
+                                        if (order.priceIncludeTax === false) {
+                                          return formatCurrency(
+                                            subtotal - discount + tax,
+                                          );
+                                        } else {
+                                          return formatCurrency(total);
+                                        }
+                                      })()}
+                                    </TableCell>
+                                    {(() => {
+                                      // Get all unique payment methods from all employee data (including from JSON)
+                                      const allPaymentMethods = new Set();
+                                      if (data && Array.isArray(data)) {
+                                        data.forEach((employee: any) => {
+                                          if (
+                                            employee.orders &&
+                                            Array.isArray(employee.orders)
+                                          ) {
+                                            employee.orders.forEach(
+                                              (order: any) => {
+                                                const paymentMethodStr =
+                                                  order.paymentMethod || "cash";
+
+                                                // Try to parse as JSON for multi-payment
+                                                try {
+                                                  const parsed =
+                                                    JSON.parse(paymentMethodStr);
+                                                  if (
+                                                    Array.isArray(parsed) &&
+                                                    parsed.length > 0
+                                                  ) {
+                                                    // Multi-payment: add all methods from JSON
+                                                    parsed.forEach((pm: any) => {
+                                                      if (pm.method) {
+                                                        allPaymentMethods.add(
+                                                          pm.method,
+                                                        );
+                                                      }
+                                                    });
+                                                  } else {
+                                                    // Single payment method
+                                                    allPaymentMethods.add(
+                                                      paymentMethodStr,
+                                                    );
+                                                  }
+                                                } catch (e) {
+                                                  // Not JSON, treat as single payment method
+                                                  allPaymentMethods.add(
+                                                    paymentMethodStr,
+                                                  );
+                                                }
+                                              },
+                                            );
+                                          }
+                                        });
+                                      }
+
+                                      const paymentMethodsArray =
+                                        Array.from(allPaymentMethods).sort();
+
+                                      return (
+                                        <>
+                                          {paymentMethodsArray.map(
+                                            (method: any) => {
+                                              const orderPaymentMethodStr =
+                                                order.paymentMethod || "cash";
+                                              let orderPaymentForMethod = 0;
+
+                                              const orderSubtotal = Number(
+                                                order.subtotal || 0,
+                                              );
+                                              const orderDiscount = Number(
+                                                order.discount || 0,
+                                              );
+                                              const orderTax = Number(
+                                                order.tax || 0,
+                                              );
+                                              const orderTotal = Number(
+                                                order.total || 0,
+                                              );
+
+                                              const customerPayment =
+                                                order.priceIncludeTax === true
+                                                  ? orderTotal
+                                                  : orderSubtotal -
+                                                    orderDiscount +
+                                                    orderTax;
+
+                                              // Try to parse as JSON for multi-payment
+                                              try {
+                                                const parsed = JSON.parse(
+                                                  orderPaymentMethodStr,
+                                                );
+                                                if (
+                                                  Array.isArray(parsed) &&
+                                                  parsed.length > 0
+                                                ) {
+                                                  // Multi-payment: find amount for this method from JSON
+                                                  const paymentItem = parsed.find(
+                                                    (pm: any) =>
+                                                      pm.method === method,
+                                                  );
+                                                  if (paymentItem) {
+                                                    orderPaymentForMethod =
+                                                      Number(
+                                                        paymentItem.amount || 0,
+                                                      );
+                                                  }
+                                                } else {
+                                                  // Not a valid array, treat as single payment
+                                                  if (
+                                                    orderPaymentMethodStr ===
+                                                    method
+                                                  ) {
+                                                    orderPaymentForMethod =
+                                                      customerPayment;
+                                                  }
+                                                }
+                                              } catch (e) {
+                                                // Not JSON, single payment method
+                                                if (
+                                                  orderPaymentMethodStr ===
+                                                  method
+                                                ) {
+                                                  orderPaymentForMethod =
+                                                    customerPayment;
+                                                }
+                                              }
+
+                                              return (
+                                                <TableCell
+                                                  key={method}
+                                                  className="text-right border-r text-sm min-w-[130px] px-4"
+                                                >
+                                                  {orderPaymentForMethod > 0
+                                                    ? formatCurrency(
+                                                        orderPaymentForMethod,
+                                                      )
+                                                    : "-"}
+                                                </TableCell>
+                                              );
+                                            },
+                                          )}
+                                        </>
+                                      );
+                                    })()}
+                                  </TableRow>
+                                ),
+                              )}
+                          </>
+                        );
+                      })
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={8}
+                          className="text-center text-gray-500 py-8"
+                        >
+                          {t("reports.noDataDescription")}
+                        </TableCell>
+                      </TableRow>
+                    )}
+
+                    {/* Summary Row */}
+                    {data.length > 0 && (
+                      <TableRow className="bg-gray-100 font-bold border-t-2">
+                        <TableCell className="text-center border-r w-12"></TableCell>
+                        <TableCell className="text-center border-r bg-green-100 min-w-[120px] px-4">
+                          {t("common.total")}
+                        </TableCell>
+                        <TableCell className="text-center border-r bg-green-100 min-w-[150px] px-4">
+                          {data.length} nhân viên
+                        </TableCell>
+                        <TableCell className="text-center border-r min-w-[100px] px-4">
+                          {data
+                            .reduce((sum, item) => sum + item.totalOrders, 0)
+                            .toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right border-r min-w-[140px] px-4">
+                          {formatCurrency(
+                            data.reduce(
+                              (sum, item) => sum + item.totalSubtotal,
+                              0,
+                            ),
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right border-r text-red-600 min-w-[120px] px-4">
+                          {formatCurrency(
+                            data.reduce(
+                              (sum, item) => sum + item.totalDiscount,
+                              0,
+                            ),
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right border-r min-w-[120px] px-4">
+                          {formatCurrency(
+                            data.reduce(
+                              (sum, item) => sum + item.totalRevenue,
+                              0,
+                            ),
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right border-r min-w-[120px] px-4">
+                          {formatCurrency(
+                            data.reduce((sum, item) => sum + item.totalTax, 0),
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right border-r text-blue-600 font-bold min-w-[140px] px-4">
+                          {formatCurrency(
+                            data.reduce((sum, item) => sum + item.totalMoney, 0),
+                          )}
+                        </TableCell>
+                        {(() => {
+                          // Calculate total payment methods across all dates with proper multi-payment handling
+                          const totalPaymentMethods: {
+                            [method: string]: number;
+                          } = {};
+
+                          filteredCompletedOrders.forEach((transaction: any) => {
+                            const paymentMethodStr =
+                              transaction.paymentMethod || "cash";
+
+                            const transactionSubtotal = Number(
+                              transaction.subtotal || 0,
+                            );
+                            const transactionDiscount = Number(
+                              transaction.discount || 0,
+                            );
+                            const transactionTax = Number(
+                              transaction.tax || 0,
+                            );
+                            const transactionTotal = Number(
+                              transaction.total || 0,
+                            );
+
+                            const customerPayment =
+                              transaction.priceIncludeTax === true
+                                ? transactionTotal
+                                : transactionSubtotal -
+                                  transactionDiscount +
+                                  transactionTax;
+
+                            // Try to parse as JSON for multi-payment
+                            try {
+                              const parsed = JSON.parse(paymentMethodStr);
+                              if (Array.isArray(parsed) && parsed.length > 0) {
+                                // Multi-payment: use amounts directly from JSON
+                                parsed.forEach((pm: any) => {
+                                  const method = pm.method || "cash";
+                                  const amount = Number(pm.amount || 0);
+                                  totalPaymentMethods[method] =
+                                    (totalPaymentMethods[method] || 0) + amount;
+                                });
+                              } else {
+                                // Not a valid JSON array, treat as single payment
+                                totalPaymentMethods[paymentMethodStr] =
+                                  (totalPaymentMethods[paymentMethodStr] || 0) +
+                                  customerPayment;
+                              }
+                            } catch (e) {
+                              // Not JSON, single payment method
+                              totalPaymentMethods[paymentMethodStr] =
+                                (totalPaymentMethods[paymentMethodStr] || 0) +
+                                customerPayment;
+                            }
+                          });
+
+                          // Get all unique payment methods from all completed orders (including from JSON)
+                          const allPaymentMethods = new Set();
                           if (
-                            employee.orders &&
-                            Array.isArray(employee.orders)
+                            filteredCompletedOrders &&
+                            Array.isArray(filteredCompletedOrders)
                           ) {
-                            employee.orders.forEach((order: any) => {
+                            filteredCompletedOrders.forEach((order: any) => {
                               const paymentMethodStr =
                                 order.paymentMethod || "cash";
 
                               // Try to parse as JSON for multi-payment
                               try {
                                 const parsed = JSON.parse(paymentMethodStr);
-                                if (
-                                  Array.isArray(parsed) &&
-                                  parsed.length > 0
-                                ) {
+                                if (Array.isArray(parsed) && parsed.length > 0) {
                                   // Multi-payment: add all methods from JSON
                                   parsed.forEach((pm: any) => {
                                     if (pm.method) {
@@ -3437,2191 +4315,1614 @@ export function SalesChartReport() {
                               }
                             });
                           }
-                        });
-                      }
 
-                      const paymentMethodsArray =
-                        Array.from(allPaymentMethods).sort();
+                          const paymentMethodsArray =
+                            Array.from(allPaymentMethods).sort();
 
-                      return (
-                        <>
-                          {paymentMethodsArray.map(
-                            (method: any, index: number) => (
-                              <TableHead
-                                key={`payment-header-${index}-${method}`}
-                                className="text-center border-r bg-blue-50 min-w-[130px] font-bold"
-                              >
-                                {getPaymentMethodLabel(method)}
-                              </TableHead>
-                            ),
-                          )}
-                        </>
-                      );
-                    })()}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedData.length > 0 ? (
-                    paginatedData.map((item, index) => {
-                      const isExpanded =
-                        expandedRows[item.employeeCode] || false;
-
-                      return (
-                        <>
-                          <TableRow
-                            key={`${item.employeeCode}-${index}`}
-                            className="hover:bg-gray-50"
-                          >
-                            <TableCell className="text-center border-r w-12">
-                              <button
-                                onClick={() =>
-                                  setExpandedRows((prev) => ({
-                                    ...prev,
-                                    [item.employeeCode]:
-                                      !prev[item.employeeCode],
-                                  }))
-                                }
-                                className="w-8 h-8 flex items-center justify-center hover:bg-gray-200 rounded text-sm"
-                              >
-                                {isExpanded ? "−" : "+"}
-                              </button>
-                            </TableCell>
-                            <TableCell className="text-center border-r bg-green-50 font-medium min-w-[120px] px-4">
-                              {item.employeeCode}
-                            </TableCell>
-                            <TableCell className="text-center border-r bg-green-50 font-medium min-w-[150px] px-4">
-                              {item.employeeName}
-                            </TableCell>
-                            <TableCell className="text-center border-r min-w-[100px] px-4">
-                              {item.totalOrders.toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-right border-r min-w-[140px] px-4">
-                              {formatCurrency(item.totalSubtotal)}
-                            </TableCell>
-                            <TableCell className="text-right border-r text-red-600 min-w-[120px] px-4">
-                              {formatCurrency(item.totalDiscount)}
-                            </TableCell>
-                            <TableCell className="text-right border-r min-w-[120px] px-4">
-                              {formatCurrency(item.totalRevenue)}
-                            </TableCell>
-                            <TableCell className="text-right border-r min-w-[120px] px-4">
-                              {formatCurrency(item.totalTax)}
-                            </TableCell>
-                            <TableCell className="text-right border-r text-blue-600 font-bold min-w-[140px] px-4">
-                              {formatCurrency(item.totalMoney)}
-                            </TableCell>
-                            {(() => {
-                              // Get all unique payment methods from all employee data (including from JSON)
-                              const allPaymentMethods = new Set();
-                              if (data && Array.isArray(data)) {
-                                data.forEach((employee: any) => {
-                                  if (
-                                    employee.orders &&
-                                    Array.isArray(employee.orders)
-                                  ) {
-                                    employee.orders.forEach((order: any) => {
-                                      const paymentMethodStr =
-                                        order.paymentMethod || "cash";
-
-                                      // Try to parse as JSON for multi-payment
-                                      try {
-                                        const parsed =
-                                          JSON.parse(paymentMethodStr);
-                                        if (
-                                          Array.isArray(parsed) &&
-                                          parsed.length > 0
-                                        ) {
-                                          // Multi-payment: add all methods from JSON
-                                          parsed.forEach((pm: any) => {
-                                            if (pm.method) {
-                                              allPaymentMethods.add(pm.method);
-                                            }
-                                          });
-                                        } else {
-                                          // Single payment method
-                                          allPaymentMethods.add(
-                                            paymentMethodStr,
-                                          );
-                                        }
-                                      } catch (e) {
-                                        // Not JSON, treat as single payment method
-                                        allPaymentMethods.add(paymentMethodStr);
-                                      }
-                                    });
-                                  }
-                                });
-                              }
-
-                              const paymentMethodsArray =
-                                Array.from(allPaymentMethods).sort();
-
-                              return (
-                                <>
-                                  {paymentMethodsArray.map((method: any) => {
-                                    // Calculate customer payment for this payment method
-                                    let customerPaymentForMethod = 0;
-                                    if (
-                                      item.orders &&
-                                      Array.isArray(item.orders)
-                                    ) {
-                                      item.orders.forEach((order: any) => {
-                                        const paymentMethodStr =
-                                          order.paymentMethod || "cash";
-                                        const orderSubtotal = Number(
-                                          order.subtotal || 0,
-                                        );
-                                        const orderDiscount = Number(
-                                          order.discount || 0,
-                                        );
-                                        const orderTax = Number(order.tax || 0);
-                                        const orderTotal = Number(
-                                          order.total || 0,
-                                        );
-
-                                        const customerPayment =
-                                          order.priceIncludeTax === true
-                                            ? orderTotal
-                                            : orderSubtotal -
-                                              orderDiscount +
-                                              orderTax;
-
-                                        // Try to parse as JSON for multi-payment
-                                        try {
-                                          const parsed =
-                                            JSON.parse(paymentMethodStr);
-                                          if (
-                                            Array.isArray(parsed) &&
-                                            parsed.length > 0
-                                          ) {
-                                            // Multi-payment: find amount for this method from JSON
-                                            const paymentItem = parsed.find(
-                                              (pm: any) => pm.method === method,
-                                            );
-                                            if (paymentItem) {
-                                              customerPaymentForMethod +=
-                                                Number(paymentItem.amount || 0);
-                                            }
-                                          } else {
-                                            // Not a valid array, treat as single payment
-                                            if (paymentMethodStr === method) {
-                                              customerPaymentForMethod +=
-                                                customerPayment;
-                                            }
-                                          }
-                                        } catch (e) {
-                                          // Not JSON, single payment method
-                                          if (paymentMethodStr === method) {
-                                            customerPaymentForMethod +=
-                                              customerPayment;
-                                          }
-                                        }
-                                      });
-                                    }
-
-                                    return (
-                                      <TableCell
-                                        key={method}
-                                        className="text-right border-r font-medium min-w-[130px] px-4"
-                                      >
-                                        {customerPaymentForMethod > 0
-                                          ? formatCurrency(
-                                              customerPaymentForMethod,
-                                            )
-                                          : "-"}
-                                      </TableCell>
-                                    );
-                                  })}
-                                </>
-                              );
-                            })()}
-                          </TableRow>
-
-                          {/* Expanded Order Details */}
-                          {isExpanded &&
-                            item.orders.length > 0 &&
-                            item.orders.map(
-                              (order: any, orderIndex: number) => (
-                                <TableRow
-                                  key={`${item.employeeCode}-order-${
-                                    order.id || orderIndex
-                                  }`}
-                                  className="bg-blue-50/50 border-l-4 border-l-blue-400"
-                                >
-                                  <TableCell className="text-center border-r bg-blue-50 w-12">
-                                    <div className="w-8 h-6 flex items-center justify-center text-blue-600 text-xs">
-                                      └
-                                    </div>
+                          return (
+                            <>
+                              {paymentMethodsArray.map((method: any) => {
+                                const total = totalPaymentMethods[method] || 0;
+                                return (
+                                  <TableCell
+                                    key={method}
+                                    className="text-right border-r font-bold text-green-600 min-w-[130px] px-4"
+                                  >
+                                    {total > 0 ? formatCurrency(total) : "-"}
                                   </TableCell>
-                                  <TableCell className="text-center border-r text-blue-600 text-sm min-w-[120px] px-4">
-                                    <button
-                                      onClick={() => {
-                                        const orderNumber =
-                                          order.orderNumber ||
-                                          `ORD-${order.id}`;
-                                        window.location.href = `/sales-orders?order=${orderNumber}`;
-                                      }}
-                                      className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer bg-transparent border-none p-0"
-                                      title="Click to view order details"
-                                    >
-                                      {order.orderNumber || `ORD-${order.id}`}
-                                    </button>
-                                  </TableCell>
-                                  <TableCell className="text-center border-r text-sm min-w-[150px] px-4">
-                                    <div>
-                                      {new Date(
-                                        order.orderedAt ||
-                                          order.createdAt ||
-                                          order.created_at,
-                                      ).toLocaleDateString("vi-VN")}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      {new Date(
-                                        order.orderedAt ||
-                                          order.createdAt ||
-                                          order.created_at,
-                                      ).toLocaleTimeString("vi-VN", {
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                        hour12: false,
-                                      })}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-center border-r text-sm min-w-[100px] px-4">
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs"
-                                    >
-                                      {order.customerName}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-right text-green-600 font-medium text-sm min-w-[140px] px-4">
-                                    {(() => {
-                                      const subtotal =
-                                        Number(order.subtotal) || 0;
-                                      const discount =
-                                        Number(order.discount) || 0;
-                                      const tax = Number(order.tax) || 0;
-                                      if (order.priceIncludeTax === true) {
-                                        return formatCurrency(
-                                          subtotal + discount + tax,
-                                        );
-                                      } else {
-                                        return formatCurrency(subtotal);
-                                      }
-                                    })()}
-                                  </TableCell>
-                                  <TableCell className="text-right text-orange-600 text-sm min-w-[120px] px-4">
-                                    {formatCurrency(
-                                      Number(order.discount || 0),
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="text-right border-r text-sm min-w-[120px] px-4">
-                                    {(() => {
-                                      const subtotal =
-                                        Number(order.subtotal) || 0;
-                                      const discount =
-                                        Number(order.discount) || 0;
-                                      const tax = Number(order.tax) || 0;
-                                      if (order.priceIncludeTax === false) {
-                                        return formatCurrency(subtotal - tax);
-                                      } else {
-                                        return formatCurrency(subtotal);
-                                      }
-                                    })()}
-                                  </TableCell>
-                                  <TableCell className="text-right border-r text-sm min-w-[120px] px-4">
-                                    {formatCurrency(Number(order.tax || 0))}
-                                  </TableCell>
-                                  <TableCell className="text-right border-r font-bold text-blue-600 text-sm min-w-[140px] px-4">
-                                    {(() => {
-                                      const subtotal =
-                                        Number(order.subtotal) || 0;
-                                      const discount =
-                                        Number(order.discount) || 0;
-                                      const tax = Number(order.tax) || 0;
-                                      const total = Number(order.total) || 0;
-                                      if (order.priceIncludeTax === false) {
-                                        return formatCurrency(
-                                          subtotal - discount + tax,
-                                        );
-                                      } else {
-                                        return formatCurrency(total);
-                                      }
-                                    })()}
-                                  </TableCell>
-                                  {(() => {
-                                    // Get all unique payment methods from all employee data (including from JSON)
-                                    const allPaymentMethods = new Set();
-                                    if (data && Array.isArray(data)) {
-                                      data.forEach((employee: any) => {
-                                        if (
-                                          employee.orders &&
-                                          Array.isArray(employee.orders)
-                                        ) {
-                                          employee.orders.forEach(
-                                            (order: any) => {
-                                              const paymentMethodStr =
-                                                order.paymentMethod || "cash";
-
-                                              // Try to parse as JSON for multi-payment
-                                              try {
-                                                const parsed =
-                                                  JSON.parse(paymentMethodStr);
-                                                if (
-                                                  Array.isArray(parsed) &&
-                                                  parsed.length > 0
-                                                ) {
-                                                  // Multi-payment: add all methods from JSON
-                                                  parsed.forEach((pm: any) => {
-                                                    if (pm.method) {
-                                                      allPaymentMethods.add(
-                                                        pm.method,
-                                                      );
-                                                    }
-                                                  });
-                                                } else {
-                                                  // Single payment method
-                                                  allPaymentMethods.add(
-                                                    paymentMethodStr,
-                                                  );
-                                                }
-                                              } catch (e) {
-                                                // Not JSON, treat as single payment method
-                                                allPaymentMethods.add(
-                                                  paymentMethodStr,
-                                                );
-                                              }
-                                            },
-                                          );
-                                        }
-                                      });
-                                    }
-
-                                    const paymentMethodsArray =
-                                      Array.from(allPaymentMethods).sort();
-
-                                    return (
-                                      <>
-                                        {paymentMethodsArray.map(
-                                          (method: any) => {
-                                            const orderPaymentMethodStr =
-                                              order.paymentMethod || "cash";
-                                            let orderPaymentForMethod = 0;
-
-                                            const orderSubtotal = Number(
-                                              order.subtotal || 0,
-                                            );
-                                            const orderDiscount = Number(
-                                              order.discount || 0,
-                                            );
-                                            const orderTax = Number(
-                                              order.tax || 0,
-                                            );
-                                            const orderTotal = Number(
-                                              order.total || 0,
-                                            );
-
-                                            const customerPayment =
-                                              order.priceIncludeTax === true
-                                                ? orderTotal
-                                                : orderSubtotal -
-                                                  orderDiscount +
-                                                  orderTax;
-
-                                            // Try to parse as JSON for multi-payment
-                                            try {
-                                              const parsed = JSON.parse(
-                                                orderPaymentMethodStr,
-                                              );
-                                              if (
-                                                Array.isArray(parsed) &&
-                                                parsed.length > 0
-                                              ) {
-                                                // Multi-payment: find amount for this method from JSON
-                                                const paymentItem = parsed.find(
-                                                  (pm: any) =>
-                                                    pm.method === method,
-                                                );
-                                                if (paymentItem) {
-                                                  orderPaymentForMethod =
-                                                    Number(
-                                                      paymentItem.amount || 0,
-                                                    );
-                                                }
-                                              } else {
-                                                // Not a valid array, treat as single payment
-                                                if (
-                                                  orderPaymentMethodStr ===
-                                                  method
-                                                ) {
-                                                  orderPaymentForMethod =
-                                                    customerPayment;
-                                                }
-                                              }
-                                            } catch (e) {
-                                              // Not JSON, single payment method
-                                              if (
-                                                orderPaymentMethodStr === method
-                                              ) {
-                                                orderPaymentForMethod =
-                                                  customerPayment;
-                                              }
-                                            }
-
-                                            return (
-                                              <TableCell
-                                                key={method}
-                                                className="text-right border-r text-sm min-w-[130px] px-4"
-                                              >
-                                                {orderPaymentForMethod > 0
-                                                  ? formatCurrency(
-                                                      orderPaymentForMethod,
-                                                    )
-                                                  : "-"}
-                                              </TableCell>
-                                            );
-                                          },
-                                        )}
-                                      </>
-                                    );
-                                  })()}
-                                </TableRow>
-                              ),
-                            )}
-                        </>
-                      );
-                    })
-                  ) : (
-                    <TableRow>
-                      <TableCell
-                        colSpan={8}
-                        className="text-center text-gray-500 py-8"
-                      >
-                        {t("reports.noDataDescription")}
-                      </TableCell>
-                    </TableRow>
-                  )}
-
-                  {/* Summary Row */}
-                  {data.length > 0 && (
-                    <TableRow className="bg-gray-100 font-bold border-t-2">
-                      <TableCell className="text-center border-r w-12"></TableCell>
-                      <TableCell className="text-center border-r bg-green-100 min-w-[120px] px-4">
-                        {t("common.total")}
-                      </TableCell>
-                      <TableCell className="text-center border-r bg-green-100 min-w-[150px] px-4">
-                        {data.length} nhân viên
-                      </TableCell>
-                      <TableCell className="text-center border-r min-w-[100px] px-4">
-                        {data
-                          .reduce((sum, item) => sum + item.totalOrders, 0)
-                          .toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right border-r min-w-[140px] px-4">
-                        {formatCurrency(
-                          data.reduce(
-                            (sum, item) => sum + item.totalSubtotal,
-                            0,
-                          ),
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right border-r text-red-600 min-w-[120px] px-4">
-                        {formatCurrency(
-                          data.reduce(
-                            (sum, item) => sum + item.totalDiscount,
-                            0,
-                          ),
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right border-r text-green-600 min-w-[120px] px-4">
-                        {formatCurrency(
-                          data.reduce(
-                            (sum, item) => sum + item.totalRevenue,
-                            0,
-                          ),
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right border-r min-w-[120px] px-4">
-                        {formatCurrency(
-                          data.reduce((sum, item) => sum + item.totalTax, 0),
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right border-r text-blue-600 font-bold min-w-[140px] px-4">
-                        {formatCurrency(
-                          data.reduce((sum, item) => sum + item.totalMoney, 0),
-                        )}
-                      </TableCell>
-                      {(() => {
-                        // Calculate total payment methods across all dates with proper multi-payment handling
-                        const totalPaymentMethods: {
-                          [method: string]: number;
-                        } = {};
-
-                        filteredCompletedOrders.forEach((transaction: any) => {
-                          const paymentMethodStr =
-                            transaction.paymentMethod || "cash";
-
-                          const transactionSubtotal = Number(
-                            transaction.subtotal || 0,
+                                );
+                              })}
+                            </>
                           );
-                          const transactionDiscount = Number(
-                            transaction.discount || 0,
-                          );
-                          const transactionTax = Number(transaction.tax || 0);
-                          const transactionTotal = Number(
-                            transaction.total || 0,
-                          );
-
-                          const customerPayment =
-                            transaction.priceIncludeTax === true
-                              ? transactionTotal
-                              : transactionSubtotal -
-                                transactionDiscount +
-                                transactionTax;
-
-                          // Try to parse as JSON for multi-payment
-                          try {
-                            const parsed = JSON.parse(paymentMethodStr);
-                            if (Array.isArray(parsed) && parsed.length > 0) {
-                              // Multi-payment: use amounts directly from JSON
-                              parsed.forEach((pm: any) => {
-                                const method = pm.method || "cash";
-                                const amount = Number(pm.amount || 0);
-                                totalPaymentMethods[method] =
-                                  (totalPaymentMethods[method] || 0) + amount;
-                              });
-                            } else {
-                              // Not a valid JSON array, treat as single payment
-                              totalPaymentMethods[paymentMethodStr] =
-                                (totalPaymentMethods[paymentMethodStr] || 0) +
-                                customerPayment;
-                            }
-                          } catch (e) {
-                            // Not JSON, single payment method
-                            totalPaymentMethods[paymentMethodStr] =
-                              (totalPaymentMethods[paymentMethodStr] || 0) +
-                              customerPayment;
-                          }
-                        });
-
-                        // Get all unique payment methods from all completed orders (including from JSON)
-                        const allPaymentMethods = new Set();
-                        if (
-                          filteredCompletedOrders &&
-                          Array.isArray(filteredCompletedOrders)
-                        ) {
-                          filteredCompletedOrders.forEach((order: any) => {
-                            const paymentMethodStr =
-                              order.paymentMethod || "cash";
-
-                            // Try to parse as JSON for multi-payment
-                            try {
-                              const parsed = JSON.parse(paymentMethodStr);
-                              if (Array.isArray(parsed) && parsed.length > 0) {
-                                // Multi-payment: add all methods from JSON
-                                parsed.forEach((pm: any) => {
-                                  if (pm.method) {
-                                    allPaymentMethods.add(pm.method);
-                                  }
-                                });
-                              } else {
-                                // Single payment method
-                                allPaymentMethods.add(paymentMethodStr);
-                              }
-                            } catch (e) {
-                              // Not JSON, treat as single payment method
-                              allPaymentMethods.add(paymentMethodStr);
-                            }
-                          });
-                        }
-
-                        const paymentMethodsArray =
-                          Array.from(allPaymentMethods).sort();
-
-                        return (
-                          <>
-                            {paymentMethodsArray.map((method: any) => {
-                              const total = totalPaymentMethods[method] || 0;
-                              return (
-                                <TableCell
-                                  key={method}
-                                  className="text-right border-r font-bold text-green-600 min-w-[130px] px-4"
-                                >
-                                  {total > 0 ? formatCurrency(total) : "-"}
-                                </TableCell>
-                              );
-                            })}
-                          </>
-                        );
-                      })()}
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-
-          {/* Pagination Controls for Customer Report */}
-          {data.length > 0 && (
-            <div className="flex items-center justify-between space-x-6 py-4">
-              <div className="flex items-center space-x-2">
-                <p className="text-sm font-medium">{t("common.show")} </p>
-                <Select
-                  value={employeePageSize.toString()}
-                  onValueChange={(value) => {
-                    setEmployeePageSize(Number(value));
-                    setEmployeeCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-[70px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent side="top">
-                    <SelectItem value="15">15</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="30">30</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm font-medium"> {t("common.rows")}</p>
+                        })()}
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </div>
+            </div>
 
-              <div className="flex items-center space-x-2">
-                <p className="text-sm font-medium">
-                  {t("common.page")} {employeeCurrentPage} / {totalPages}
-                </p>
-                <div className="flex items-center space-x-1">
-                  <button
-                    onClick={() => setEmployeeCurrentPage(1)}
-                    disabled={employeeCurrentPage === 1}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+            {/* Pagination Controls for Customer Report */}
+            {data.length > 0 && (
+              <div className="flex items-center justify-between space-x-6 py-4">
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm font-medium">{t("common.show")} </p>
+                  <Select
+                    value={employeePageSize.toString()}
+                    onValueChange={(value) => {
+                      setEmployeePageSize(Number(value));
+                      setEmployeeCurrentPage(1);
+                    }}
                   >
-                    «
-                  </button>
-                  <button
-                    onClick={() =>
-                      setEmployeeCurrentPage((prev) => Math.max(prev - 1, 1))
-                    }
-                    disabled={employeeCurrentPage === 1}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
-                  >
-                    ‹
-                  </button>
-                  <button
-                    onClick={() =>
-                      setEmployeeCurrentPage((prev) =>
-                        Math.min(prev + 1, totalPages),
-                      )
-                    }
-                    disabled={employeeCurrentPage === totalPages}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
-                  >
-                    ›
-                  </button>
-                  <button
-                    onClick={() => setEmployeeCurrentPage(totalPages)}
-                    disabled={employeeCurrentPage === totalPages}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
-                  >
-                    »
-                  </button>
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="top">
+                      <SelectItem value="15">15</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="30">30</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm font-medium"> {t("common.rows")}</p>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm font-medium">
+                    {t("common.page")} {employeeCurrentPage} / {totalPages}
+                  </p>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => setEmployeeCurrentPage(1)}
+                      disabled={employeeCurrentPage === 1}
+                      className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                    >
+                      «
+                    </button>
+                    <button
+                      onClick={() =>
+                        setEmployeeCurrentPage((prev) => Math.max(prev - 1, 1))
+                      }
+                      disabled={employeeCurrentPage === 1}
+                      className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      onClick={() =>
+                        setEmployeeCurrentPage((prev) =>
+                          Math.min(prev + 1, totalPages),
+                        )
+                      }
+                      disabled={employeeCurrentPage === totalPages}
+                      className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                    >
+                      ›
+                    </button>
+                    <button
+                      onClick={() => setEmployeeCurrentPage(totalPages)}
+                      disabled={employeeCurrentPage === totalPages}
+                      className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                    >
+                      »
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  };
-
-  // Customer Report with Pagination State
-  // const [customerCurrentPage, setCustomerCurrentPage] = useState(1); // Moved up
-  // const [customerPageSize, setCustomerPageSize] = useState(15); // Moved up
-
-  // Legacy Customer Report Component Logic
-  const renderCustomerReport = () => {
-    if (ordersLoading) {
-      return (
-        <div className="flex justify-center py-8">
-          <div className="text-gray-500">{t("reports.loading")}...</div>
-        </div>
+            )}
+          </CardContent>
+        </Card>
       );
-    }
+    };
 
-    if (!orders || !Array.isArray(orders)) {
-      return (
-        <div className="flex justify-center py-8">
-          <div className="text-gray-500">Không có dữ liệu đơn hàng</div>
-        </div>
-      );
-    }
+    // Customer Report with Pagination State
+    // const [customerCurrentPage, setCustomerCurrentPage] = useState(1); // Moved up
+    // const [customerPageSize, setCustomerPageSize] = useState(15); // Moved up
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
-
-    const filteredOrders = orders.filter((order: any) => {
-      const orderDate = new Date(
-        order.orderedAt || order.created_at || order.createdAt,
-      );
-
-      if (isNaN(orderDate.getTime())) {
-        return false;
+    // Legacy Customer Report Component Logic
+    const renderCustomerReport = () => {
+      if (ordersLoading) {
+        return (
+          <div className="flex justify-center py-8">
+            <div className="text-gray-500">{t("reports.loading")}...</div>
+          </div>
+        );
       }
 
-      // Apply floor filter
-      const floorMatch =
-        selectedFloor === "all" ||
-        !order.tableId ||
-        !tables ||
-        !Array.isArray(tables) ||
-        tables.find((table: any) => table.id === order.tableId)?.floor ===
-          selectedFloor;
+      if (!orders || !Array.isArray(orders)) {
+        return (
+          <div className="flex justify-center py-8">
+            <div className="text-gray-500">Không có dữ liệu đơn hàng</div>
+          </div>
+        );
+      }
 
-      const dateMatch = orderDate >= start && orderDate <= end;
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
 
-      const customerMatch =
-        !customerSearch ||
-        (order.customerName &&
-          order.customerName
-            .toLowerCase()
-            .includes(customerSearch.toLowerCase())) ||
-        (order.customerId &&
-          order.customerId
-            .toString()
-            .toLowerCase()
-            .includes(customerSearch.toLowerCase()));
+      const filteredOrders = orders.filter((order: any) => {
+        const orderDate = new Date(
+          order.orderedAt || order.created_at || order.createdAt,
+        );
 
-      // Status filter logic
-      let statusMatch = true;
-      if (customerStatus !== "all") {
-        const orderTotal = Number(order.total || 0);
-        const customerId = order.customerId;
-
-        switch (customerStatus) {
-          case "active":
-            // Customer has recent orders (within last 30 days)
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            statusMatch = orderDate >= thirtyDaysAgo;
-            break;
-          case "inactive":
-            // Customer hasn't ordered in last 30 days
-            const thirtyDaysAgoInactive = new Date();
-            thirtyDaysAgoInactive.setDate(thirtyDaysAgoInactive.getDate() - 30);
-            statusMatch = orderDate < thirtyDaysAgoInactive;
-            break;
-          case "vip":
-            // VIP customers with orders > 500,000 VND
-            statusMatch = orderTotal >= 500000;
-            break;
-          case "new":
-            // New customers (first order within date range)
-            statusMatch = customerId && customerId !== "guest";
-            break;
-          default:
-            statusMatch = true;
+        if (isNaN(orderDate.getTime())) {
+          return false;
         }
-      }
 
-      // Include paid, completed, and cancelled orders
-      const validOrderStatus =
-        order.status === "paid" ||
-        order.status === "completed" ||
-        order.status === "cancelled";
+        // Apply floor filter
+        const floorMatch =
+          selectedFloor === "all" ||
+          !order.tableId ||
+          !tables ||
+          !Array.isArray(tables) ||
+          tables.find((table: any) => table.id === order.tableId)?.floor ===
+            selectedFloor;
+
+        const dateMatch = orderDate >= start && orderDate <= end;
+
+        const customerMatch =
+          !customerSearch ||
+          (order.customerName &&
+            order.customerName
+              .toLowerCase()
+              .includes(customerSearch.toLowerCase())) ||
+          (order.customerId &&
+            order.customerId
+              .toString()
+              .toLowerCase()
+              .includes(customerSearch.toLowerCase()));
+
+        // Status filter logic
+        let statusMatch = true;
+        if (customerStatus !== "all") {
+          const orderTotal = Number(order.total || 0);
+          const customerId = order.customerId;
+
+          switch (customerStatus) {
+            case "active":
+              // Customer has recent orders (within last 30 days)
+              const thirtyDaysAgo = new Date();
+              thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+              statusMatch = orderDate >= thirtyDaysAgo;
+              break;
+            case "inactive":
+              // Customer hasn't ordered in last 30 days
+              const thirtyDaysAgoInactive = new Date();
+              thirtyDaysAgoInactive.setDate(thirtyDaysAgoInactive.getDate() - 30);
+              statusMatch = orderDate < thirtyDaysAgoInactive;
+              break;
+            case "vip":
+              // VIP customers with orders > 500,000 VND
+              statusMatch = orderTotal >= 500000;
+              break;
+            case "new":
+              // New customers (first order within date range)
+              statusMatch = customerId && customerId !== "guest";
+              break;
+            default:
+              statusMatch = true;
+          }
+        }
+
+        // Include paid, completed, and cancelled orders
+        const validOrderStatus =
+          order.status === "paid" ||
+          order.status === "completed" ||
+          order.status === "cancelled";
+
+        return (
+          dateMatch &&
+          customerMatch &&
+          statusMatch &&
+          validOrderStatus &&
+          floorMatch
+        ); // Add floor match
+      });
+
+      // Calculate customer sales
+      const customerSales: {
+        [customerId: string]: {
+          customerId: string;
+          customerName: string;
+          customerGroup: string;
+          orders: number;
+          totalAmount: number;
+          discount: number; // Default discount to 0
+          revenue: number;
+          status: string;
+          customerGroup: string;
+          orderDetails: any[]; // Added orderDetails
+        };
+      } = {};
+
+      filteredOrders.forEach((order: any) => {
+        const customerId = order.customerId || "";
+        const customerName = order.customerName || "";
+
+        if (!customerSales[customerId]) {
+          customerSales[customerId] = {
+            customerId: customerId === "guest" ? "KL-001" : customerId,
+            customerName: customerName,
+            customerGroup: t("common.regularCustomer"), // Default group
+            orders: 0,
+            totalAmount: 0,
+            discount: 0, // Default discount to 0
+            revenue: 0,
+            status: t("reports.active"), // Default status
+            customerGroup: t("common.regularCustomer"), // Default group
+            orderDetails: [], // Initialize orderDetails array
+          };
+        }
+
+        const orderSubtotal = Number(order.subtotal || 0); // Use subtotal from DB
+        const orderDiscount = Number(order.discount || 0); // Default discount to 0
+        const orderTax = Number(order.tax || 0); // Default discount to 0
+
+        // Count all orders and add to orderDetails
+        customerSales[customerId].orders += 1;
+        customerSales[customerId].orderDetails.push(order);
+
+        // Always add to totals (including cancelled orders for total amount calculation)
+        customerSales[customerId].discount += orderDiscount;
+
+        // Calculate revenue correctly based on priceIncludeTax setting (only for non-cancelled orders)
+        const orderPriceIncludeTax = order.priceIncludeTax ?? false;
+        let orderRevenue;
+        if (orderPriceIncludeTax) {
+          // When priceIncludeTax = true: doanh thu = subtotal (already net of discount)
+          orderRevenue = orderSubtotal - orderTax;
+          customerSales[customerId].totalAmount +=
+            orderRevenue - orderDiscount - orderTax;
+        } else {
+          // When priceIncludeTax = false: doanh thu = subtotal - discount
+          orderRevenue = Math.max(0, orderSubtotal - orderDiscount);
+          customerSales[customerId].totalAmount += orderSubtotal - orderDiscount;
+        }
+        customerSales[customerId].revenue += orderRevenue;
+
+        // Determine customer group based on total spending
+        if (customerSales[customerId].revenue >= 1000000) {
+          customerSales[customerId].customerGroup = t("reports.vip");
+        } else if (customerSales[customerId].revenue >= 500000) {
+          customerSales[customerId].customerGroup = t("common.goldCustomer");
+        }
+      });
+
+      const data = Object.values(customerSales).sort(
+        (a, b) => b.revenue - a.revenue,
+      );
+
+      // Pagination logic
+      const totalPages = Math.ceil(data.length / customerPageSize);
+      const startIndex = (customerCurrentPage - 1) * customerPageSize;
+      const endIndex = startIndex + customerPageSize;
+      const paginatedData = data.slice(startIndex, endIndex);
 
       return (
-        dateMatch &&
-        customerMatch &&
-        statusMatch &&
-        validOrderStatus &&
-        floorMatch
-      ); // Add floor match
-    });
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              {t("reports.customerSalesReport")}
+            </CardTitle>
+            <CardDescription className="flex items-center justify-between">
+              <span>
+                {t("reports.fromDate")}: {formatDate(startDate)} -{" "}
+                {t("reports.toDate")}: {formatDate(endDate)}
+              </span>
+              <Button
+                onClick={() => {
+                  let exportData = [];
 
-    // Calculate customer sales
-    const customerSales: {
-      [customerId: string]: {
-        customerId: string;
-        customerName: string;
-        customerGroup: string;
-        orders: number;
-        totalAmount: number;
-        discount: number; // Default discount to 0
-        revenue: number;
-        status: string;
-        customerGroup: string;
-        orderDetails: any[]; // Added orderDetails
-      };
-    } = {};
+                  // Export customer summaries with their detailed orders
+                  data.forEach((customer) => {
+                    // Add customer summary row
+                    exportData.push({
+                      Loại: "Tổng khách hàng",
+                      "Mã KH": customer.customerId,
+                      "Tên KH": customer.customerName,
+                      "Nhóm KH": customer.customerGroup,
+                      "Mã đơn hàng": "",
+                      "Ngày giờ": "",
+                      "Số đơn": customer.orders,
+                      "Tổng tiền": formatCurrency(customer.totalAmount),
+                      "Giảm giá": formatCurrency(customer.discount),
+                      "Doanh thu": formatCurrency(customer.revenue),
+                      "Trạng thái": customer.status,
+                      "Phương thức thanh toán": "Tất cả",
+                    });
 
-    filteredOrders.forEach((order: any) => {
-      const customerId = order.customerId || "";
-      const customerName = order.customerName || "";
+                    // Add detailed orders for this customer
+                    if (
+                      customer.orderDetails &&
+                      customer.orderDetails.length > 0
+                    ) {
+                      customer.orderDetails.forEach((order: any) => {
+                        exportData.push({
+                          Loại: "Chi tiết đơn hàng",
+                          "Mã KH": customer.customerId,
+                          "Tên KH": customer.customerName,
+                          "Nhóm KH": customer.customerGroup,
+                          "Mã đơn hàng": order.orderNumber || `ORD-${order.id}`,
+                          "Ngày giờ": new Date(
+                            order.orderedAt || order.created_at,
+                          ).toLocaleString("vi-VN", {
+                            year: "numeric",
+                            month: "2-digit",
+                            day: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                            hour12: false,
+                          }),
+                          "Số đ n": 1,
+                          "Tổng tiền": formatCurrency(
+                            Number(order.subtotal || 0),
+                          ),
+                          "Giảm giá": formatCurrency(Number(order.discount || 0)),
+                          "Doanh thu": formatCurrency(
+                            Math.max(
+                              0,
+                              Number(order.subtotal || 0) -
+                                Number(order.discount || 0),
+                            ),
+                          ),
+                          "Trạng thái":
+                            order.status === "paid"
+                              ? "Đã thanh toán"
+                              : order.status === "cancelled"
+                                ? "Đã hủy"
+                                : order.status,
+                          "Phương thức thanh toán": formatPaymentMethodDisplay(
+                            order.paymentMethod || "cash",
+                          ),
+                        });
+                      });
+                    }
+                  });
 
-      if (!customerSales[customerId]) {
-        customerSales[customerId] = {
-          customerId: customerId === "guest" ? "KL-001" : customerId,
-          customerName: customerName,
-          customerGroup: t("common.regularCustomer"), // Default group
-          orders: 0,
-          totalAmount: 0,
-          discount: 0, // Default discount to 0
-          revenue: 0,
-          status: t("reports.active"), // Default status
-          customerGroup: t("common.regularCustomer"), // Default group
-          orderDetails: [], // Initialize orderDetails array
-        };
-      }
-
-      const orderSubtotal = Number(order.subtotal || 0); // Use subtotal from DB
-      const orderDiscount = Number(order.discount || 0); // Default discount to 0
-      const orderTax = Number(order.tax || 0); // Default discount to 0
-
-      // Count all orders and add to orderDetails
-      customerSales[customerId].orders += 1;
-      customerSales[customerId].orderDetails.push(order);
-
-      // Always add to totals (including cancelled orders for total amount calculation)
-      customerSales[customerId].discount += orderDiscount;
-
-      // Calculate revenue correctly based on priceIncludeTax setting (only for non-cancelled orders)
-      const orderPriceIncludeTax = order.priceIncludeTax ?? false;
-      let orderRevenue;
-      if (orderPriceIncludeTax) {
-        // When priceIncludeTax = true: doanh thu = subtotal (already includes discount effect)
-        orderRevenue = orderSubtotal + orderDiscount + orderTax;
-        customerSales[customerId].totalAmount +=
-          orderRevenue - orderDiscount - orderTax;
-      } else {
-        // When priceIncludeTax = false: doanh thu = subtotal - discount
-        orderRevenue = Math.max(0, orderSubtotal - orderDiscount);
-        customerSales[customerId].totalAmount += orderSubtotal - orderDiscount;
-      }
-      customerSales[customerId].revenue += orderRevenue;
-
-      // Determine customer group based on total spending
-      if (customerSales[customerId].revenue >= 1000000) {
-        customerSales[customerId].customerGroup = t("reports.vip");
-      } else if (customerSales[customerId].revenue >= 500000) {
-        customerSales[customerId].customerGroup = t("common.goldCustomer");
-      }
-    });
-
-    const data = Object.values(customerSales).sort(
-      (a, b) => b.revenue - a.revenue,
-    );
-
-    // Pagination logic
-    const totalPages = Math.ceil(data.length / customerPageSize);
-    const startIndex = (customerCurrentPage - 1) * customerPageSize;
-    const endIndex = startIndex + customerPageSize;
-    const paginatedData = data.slice(startIndex, endIndex);
-
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            {t("reports.customerSalesReport")}
-          </CardTitle>
-          <CardDescription className="flex items-center justify-between">
-            <span>
-              {t("reports.fromDate")}: {formatDate(startDate)} -{" "}
-              {t("reports.toDate")}: {formatDate(endDate)}
-            </span>
-            <Button
-              onClick={() => {
-                let exportData = [];
-
-                // Export customer summaries with their detailed orders
-                data.forEach((customer) => {
-                  // Add customer summary row
+                  // Add grand total summary
                   exportData.push({
-                    Loại: "Tổng khách hàng",
-                    "Mã KH": customer.customerId,
-                    "Tên KH": customer.customerName,
-                    "Nhóm KH": customer.customerGroup,
+                    Loại: "TỔNG CỘNG",
+                    "Mã KH": "",
+                    "Tên KH": `${data.length} khách hàng`,
+                    "Nhóm KH": "",
                     "Mã đơn hàng": "",
                     "Ngày giờ": "",
-                    "Số đơn": customer.orders,
-                    "Tổng tiền": formatCurrency(customer.totalAmount),
-                    "Giảm giá": formatCurrency(customer.discount),
-                    "Doanh thu": formatCurrency(customer.revenue),
-                    "Trạng thái": customer.status,
+                    "Số đơn": data.reduce(
+                      (sum, customer) => sum + customer.orders,
+                      0,
+                    ),
+                    "Tổng tiền": formatCurrency(
+                      data.reduce(
+                        (sum, customer) => sum + customer.totalAmount,
+                        0,
+                      ),
+                    ),
+                    "Giảm giá": formatCurrency(
+                      data.reduce((sum, customer) => sum + customer.discount, 0),
+                    ),
+                    "Doanh thu": formatCurrency(
+                      data.reduce((sum, customer) => sum + customer.revenue, 0),
+                    ),
+                    "Trạng thái": "",
                     "Phương thức thanh toán": "Tất cả",
                   });
 
-                  // Add detailed orders for this customer
-                  if (
-                    customer.orderDetails &&
-                    customer.orderDetails.length > 0
-                  ) {
-                    customer.orderDetails.forEach((order: any) => {
-                      exportData.push({
-                        Loại: "Chi tiết đơn hàng",
-                        "Mã KH": customer.customerId,
-                        "Tên KH": customer.customerName,
-                        "Nhóm KH": customer.customerGroup,
-                        "Mã đơn hàng": order.orderNumber || `ORD-${order.id}`,
-                        "Ngày giờ": new Date(
-                          order.orderedAt || order.created_at,
-                        ).toLocaleString("vi-VN", {
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          second: "2-digit",
-                          hour12: false,
-                        }),
-                        "Số đ �n": 1,
-                        "Tổng tiền": formatCurrency(
-                          Number(order.subtotal || 0),
-                        ),
-                        "Giảm giá": formatCurrency(Number(order.discount || 0)),
-                        "Doanh thu": formatCurrency(
-                          Math.max(
-                            0,
-                            Number(order.subtotal || 0) -
-                              Number(order.discount || 0),
-                          ),
-                        ),
-                        "Trạng thái":
-                          order.status === "paid"
-                            ? "Đã thanh toán"
-                            : order.status === "cancelled"
-                              ? "Đã hủy"
-                              : order.status,
-                        "Phương thức thanh toán": formatPaymentMethodDisplay(
-                          order.paymentMethod || "cash",
-                        ),
-                      });
-                    });
-                  }
-                });
-
-                // Add grand total summary
-                exportData.push({
-                  Loại: "TỔNG CỘNG",
-                  "Mã KH": "",
-                  "Tên KH": `${data.length} khách hàng`,
-                  "Nhóm KH": "",
-                  "Mã đơn hàng": "",
-                  "Ngày giờ": "",
-                  "Số đơn": data.reduce(
-                    (sum, customer) => sum + customer.orders,
-                    0,
-                  ),
-                  "Tổng tiền": formatCurrency(
-                    data.reduce(
-                      (sum, customer) => sum + customer.totalAmount,
-                      0,
-                    ),
-                  ),
-                  "Giảm giá": formatCurrency(
-                    data.reduce((sum, customer) => sum + customer.discount, 0),
-                  ),
-                  "Doanh thu": formatCurrency(
-                    data.reduce((sum, customer) => sum + customer.revenue, 0),
-                  ),
-                  "Trạng thái": "",
-                  "Phương thức thanh toán": "Tất cả",
-                });
-
-                exportToExcel(
-                  exportData,
-                  `BaoCaoKhachHang_${startDate}_to_${endDate}`,
-                );
-              }}
-              className="inline-flex items-center gap-2 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              {t("common.exportExcel")}
-            </Button>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="w-full">
-            <div className="overflow-x-auto xl:overflow-x-visible">
-              <Table className="w-full min-w-[1000px] xl:min-w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead
-                      className="text-center bg-green-50 w-12 font-bold"
-                      rowSpan={1}
-                    ></TableHead>
-                    <TableHead className="text-center border-r bg-green-50 min-w-[120px] font-bold">
-                      {t("reports.customerId")}
-                    </TableHead>
-                    <TableHead className="text-center border-r bg-green-50 min-w-[150px] font-bold">
-                      {t("reports.customerName")}
-                    </TableHead>
-                    <TableHead className="text-center border-r min-w-[100px] font-bold">
-                      {t("reports.orders")}
-                    </TableHead>
-                    <TableHead className="text-center border-r min-w-[100px] font-bold">
-                      {t("common.customerGroup")}
-                    </TableHead>
-                    <TableHead className="text-right border-r min-w-[140px] font-bold">
-                      {t("reports.thanhTien")}
-                    </TableHead>
-                    {analysisType !== "employee" && (
-                      <TableHead className="text-right border-r min-w-[120px] font-bold">
-                        {t("reports.discount")}
-                      </TableHead>
-                    )}
-                    <TableHead className="text-right border-r min-w-[140px] font-bold">
-                      {t("reports.revenue")}
-                    </TableHead>
-                    <TableHead className="text-center min-w-[100px] font-bold">
-                      {t("reports.status")}
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedData.length > 0 ? (
-                    paginatedData.map((item, index) => {
-                      const isExpanded = expandedRows[item.customerId] || false;
-
-                      return (
-                        <>
-                          <TableRow
-                            key={`${item.customerId}-${index}`}
-                            className="hover:bg-gray-50"
-                          >
-                            <TableCell className="text-center border-r w-12">
-                              <button
-                                onClick={() =>
-                                  setExpandedRows((prev) => ({
-                                    ...prev,
-                                    [item.customerId]: !prev[item.customerId],
-                                  }))
-                                }
-                                className="w-8 h-8 flex items-center justify-center hover:bg-gray-200 rounded text-sm"
-                              >
-                                {isExpanded ? "−" : "+"}
-                              </button>
-                            </TableCell>
-                            <TableCell className="text-center border-r bg-green-50 min-w-[120px] px-4">
-                              {item.customerId}
-                            </TableCell>
-                            <TableCell className="text-center border-r bg-green-50 min-w-[150px] px-4">
-                              {item.customerName}
-                            </TableCell>
-                            <TableCell className="text-center border-r min-w-[100px] px-4">
-                              {item.orders}
-                            </TableCell>
-                            <TableCell className="text-center border-r min-w-[130px] px-4">
-                              <Badge
-                                variant={
-                                  item.customerGroup === t("reports.vip")
-                                    ? "default"
-                                    : "secondary"
-                                }
-                              >
-                                {item.customerGroup}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right border-r min-w-[140px] px-4">
-                              {formatCurrency(item.totalAmount)}
-                            </TableCell>
-                            {analysisType !== "employee" && (
-                              <TableCell className="text-right border-r text-red-600 min-w-[120px] px-4">
-                                {formatCurrency(item.discount)}
-                              </TableCell>
-                            )}
-                            <TableCell className="text-right border-r text-green-600 font-medium min-w-[120px] px-4">
-                              {(() => {
-                                // Calculate revenue properly for each customer
-                                if (
-                                  item.orderDetails &&
-                                  Array.isArray(item.orderDetails) &&
-                                  item.orderDetails.length > 0
-                                ) {
-                                  let totalRevenue = 0;
-                                  item.orderDetails.forEach((order: any) => {
-                                    const orderSubtotal = Number(
-                                      order.subtotal || 0,
-                                    );
-                                    const orderDiscount = Number(
-                                      order.discount || 0,
-                                    );
-                                    const orderTax = Number(order.tax || 0);
-                                    const orderPriceIncludeTax =
-                                      order.priceIncludeTax === true;
-
-                                    let orderRevenue;
-                                    if (orderPriceIncludeTax) {
-                                      // When priceIncludeTax = true: doanh thu = subtotal (already net of discount)
-                                      orderRevenue = orderSubtotal - orderTax;
-                                    } else {
-                                      // When priceIncludeTax = false: doanh thu = subtotal - discount
-                                      orderRevenue = Math.max(
-                                        0,
-                                        orderSubtotal - orderDiscount,
-                                      );
-                                    }
-                                    totalRevenue += orderRevenue;
-                                  });
-                                  return formatCurrency(totalRevenue);
-                                }
-                                // Fallback to item.revenue if no order details
-                                return formatCurrency(item.revenue || 0);
-                              })()}
-                            </TableCell>
-                            <TableCell className="text-center min-w-[100px] px-4">
-                              <Badge
-                                variant={
-                                  item.status === t("reports.active")
-                                    ? "default"
-                                    : "secondary"
-                                }
-                                className="text-xs"
-                              >
-                                {item.status}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-
-                          {/* Expanded order details */}
-                          {isExpanded &&
-                            item.orderDetails.length > 0 &&
-                            item.orderDetails.map(
-                              (order: any, orderIndex: number) => (
-                                <TableRow
-                                  key={`${item.customerId}-order-${
-                                    order.id || orderIndex
-                                  }`}
-                                  className="bg-blue-50/50 border-l-4 border-l-blue-400"
-                                >
-                                  <TableCell className="text-center border-r bg-blue-50 w-12">
-                                    <div className="w-8 h-6 flex items-center justify-center text-blue-600 text-xs">
-                                      └
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-center border-r text-blue-600 text-sm min-w-[120px] px-4">
-                                    <button
-                                      onClick={() => {
-                                        // Navigate to sales orders with order filter
-                                        const orderNumber =
-                                          order.orderNumber ||
-                                          `ORD-${order.id}`;
-                                        window.location.href = `/sales-orders?order=${orderNumber}`;
-                                      }}
-                                      className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer bg-transparent border-none p-0"
-                                      title="Click to view order details"
-                                    >
-                                      {order.orderNumber ||
-                                        order.transactionId ||
-                                        `ORD-${order.id}`}
-                                    </button>
-                                  </TableCell>
-                                  <TableCell className="text-center border-r text-sm min-w-[150px] px-4">
-                                    {new Date(
-                                      order.orderedAt || order.created_at,
-                                    ).toLocaleString("vi-VN", {
-                                      year: "numeric",
-                                      month: "2-digit",
-                                      day: "2-digit",
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                      second: "2-digit",
-                                      hour12: false,
-                                    })}
-                                  </TableCell>
-                                  <TableCell className="text-center border-r text-sm min-w-[100px] px-4">
-                                    1
-                                  </TableCell>
-                                  <TableCell className="text-center border-r text-sm min-w-[130px] px-4">
-                                    <div className="text-xs whitespace-pre-wrap break-words">
-                                      {formatPaymentMethodDisplay(
-                                        order.paymentMethod,
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-right border-r text-sm min-w-[140px] px-4">
-                                    {(() => {
-                                      const subtotal = Number(order.subtotal);
-                                      const discount = Number(order.discount);
-                                      if (order.priceIncludeTax === true) {
-                                        return formatCurrency(
-                                          subtotal + discount,
-                                        );
-                                      } else {
-                                        return formatCurrency(subtotal);
-                                      }
-                                    })()}
-                                  </TableCell>
-                                  {analysisType !== "employee" && (
-                                    <TableCell className="text-right border-r text-red-600 text-sm min-w-[120px] px-4">
-                                      {formatCurrency(
-                                        Number(order.discount || 0),
-                                      )}
-                                    </TableCell>
-                                  )}
-                                  <TableCell className="text-right border-r text-sm min-w-[140px] px-4">
-                                    {(() => {
-                                      const subtotal = Number(order.subtotal);
-                                      const discount = Number(order.discount);
-                                      const tax = Number(order.tax);
-                                      if (order.priceIncludeTax === false) {
-                                        return formatCurrency(
-                                          subtotal - discount,
-                                        );
-                                      } else {
-                                        return formatCurrency(subtotal - tax);
-                                      }
-                                    })()}
-                                  </TableCell>
-                                  <TableCell className="text-center text-center text-sm min-w-[100px] px-4">
-                                    <Badge
-                                      variant={
-                                        order.status === "paid"
-                                          ? "default"
-                                          : order.status === "cancelled"
-                                            ? "destructive"
-                                            : "secondary"
-                                      }
-                                      className="text-xs"
-                                    >
-                                      {order.status === "paid"
-                                        ? t("common.paid")
-                                        : order.status === "cancelled"
-                                          ? "Đã hủy"
-                                          : order.status}
-                                    </Badge>
-                                  </TableCell>
-                                </TableRow>
-                              ),
-                            )}
-                        </>
-                      );
-                    })
-                  ) : (
+                  exportToExcel(
+                    exportData,
+                    `BaoCaoKhachHang_${startDate}_to_${endDate}`,
+                  );
+                }}
+                className="inline-flex items-center gap-2 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                {t("common.exportExcel")}
+              </Button>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="w-full">
+              <div className="overflow-x-auto xl:overflow-x-visible">
+                <Table className="w-full min-w-[1000px] xl:min-w-full">
+                  <TableHeader>
                     <TableRow>
-                      <TableCell
-                        colSpan={9}
-                        className="text-center text-gray-500"
-                      >
-                        {t("reports.noDataDescription")}
-                      </TableCell>
-                    </TableRow>
-                  )}
-
-                  {/* Summary Row */}
-                  {data.length > 0 && (
-                    <TableRow className="bg-gray-100 font-bold border-t-2">
-                      <TableCell className="text-center border-r w-12"></TableCell>
-                      <TableCell className="text-center border-r bg-green-50 min-w-[120px] px-4">
-                        {t("common.total")}
-                      </TableCell>
-                      <TableCell className="text-center border-r bg-green-50 min-w-[150px] px-4">
-                        {data.length} khách hàng
-                      </TableCell>
-                      <TableCell className="text-center border-r min-w-[100px] px-4">
-                        {(() => {
-                          // Calculate total number of orders from all order details
-                          let totalOrdersCount = 0;
-                          data.forEach((customer) => {
-                            if (
-                              customer.orderDetails &&
-                              Array.isArray(customer.orderDetails)
-                            ) {
-                              totalOrdersCount += customer.orderDetails.length;
-                            }
-                          });
-                          return totalOrdersCount.toLocaleString();
-                        })()}
-                      </TableCell>
-                      <TableCell className="text-center border-r min-w-[130px]"></TableCell>
-                      <TableCell className="text-right border-r min-w-[140px] px-4">
-                        {formatCurrency(
-                          data.reduce(
-                            (sum, customer) => sum + customer.totalAmount,
-                            0,
-                          ),
-                        )}
-                      </TableCell>
+                      <TableHead
+                        className="text-center bg-green-50 w-12 font-bold"
+                        rowSpan={1}
+                      ></TableHead>
+                      <TableHead className="text-center border-r bg-green-50 min-w-[120px] font-bold">
+                        {t("reports.customerId")}
+                      </TableHead>
+                      <TableHead className="text-center border-r bg-green-50 min-w-[150px] font-bold">
+                        {t("reports.customerName")}
+                      </TableHead>
+                      <TableHead className="text-center border-r min-w-[100px] font-bold">
+                        {t("reports.orders")}
+                      </TableHead>
+                      <TableHead className="text-center border-r min-w-[100px] font-bold">
+                        {t("common.customerGroup")}
+                      </TableHead>
+                      <TableHead className="text-right border-r min-w-[140px] font-bold">
+                        {t("reports.thanhTien")}
+                      </TableHead>
                       {analysisType !== "employee" && (
-                        <TableCell className="text-right border-r text-red-600 min-w-[120px] px-4">
+                        <TableHead className="text-right border-r min-w-[120px] font-bold">
+                          {t("reports.discount")}
+                        </TableHead>
+                      )}
+                      <TableHead className="text-right border-r min-w-[140px] font-bold">
+                        {t("reports.revenue")}
+                      </TableHead>
+                      <TableHead className="text-center min-w-[100px] font-bold">
+                        {t("reports.status")}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedData.length > 0 ? (
+                      paginatedData.map((item, index) => {
+                        const isExpanded = expandedRows[item.customerId] || false;
+
+                        return (
+                          <>
+                            <TableRow
+                              key={`${item.customerId}-${index}`}
+                              className="hover:bg-gray-50"
+                            >
+                              <TableCell className="text-center border-r w-12">
+                                <button
+                                  onClick={() =>
+                                    setExpandedRows((prev) => ({
+                                      ...prev,
+                                      [item.customerId]: !prev[item.customerId],
+                                    }))
+                                  }
+                                  className="w-8 h-8 flex items-center justify-center hover:bg-gray-200 rounded text-sm"
+                                >
+                                  {isExpanded ? "−" : "+"}
+                                </button>
+                              </TableCell>
+                              <TableCell className="text-center border-r bg-green-50 min-w-[120px] px-4">
+                                {item.customerId}
+                              </TableCell>
+                              <TableCell className="text-center border-r bg-green-50 min-w-[150px] px-4">
+                                {item.customerName}
+                              </TableCell>
+                              <TableCell className="text-center border-r min-w-[100px] px-4">
+                                {item.orders}
+                              </TableCell>
+                              <TableCell className="text-center border-r min-w-[130px] px-4">
+                                <Badge
+                                  variant={
+                                    item.customerGroup === t("reports.vip")
+                                      ? "default"
+                                      : "secondary"
+                                  }
+                                >
+                                  {item.customerGroup}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right border-r min-w-[140px] px-4">
+                                {formatCurrency(item.totalAmount)}
+                              </TableCell>
+                              {analysisType !== "employee" && (
+                                <TableCell className="text-right border-r text-red-600 min-w-[120px] px-4">
+                                  {formatCurrency(item.discount)}
+                                </TableCell>
+                              )}
+                              <TableCell className="text-right border-r text-green-600 font-medium min-w-[120px] px-4">
+                                {(() => {
+                                  // Calculate revenue properly for each customer
+                                  if (
+                                    item.orderDetails &&
+                                    Array.isArray(item.orderDetails) &&
+                                    item.orderDetails.length > 0
+                                  ) {
+                                    let totalRevenue = 0;
+                                    item.orderDetails.forEach((order: any) => {
+                                      const orderSubtotal = Number(
+                                        order.subtotal || 0,
+                                      );
+                                      const orderDiscount = Number(
+                                        order.discount || 0,
+                                      );
+                                      const orderTax = Number(order.tax || 0);
+                                      const orderPriceIncludeTax =
+                                        order.priceIncludeTax === true;
+
+                                      let orderRevenue;
+                                      if (orderPriceIncludeTax) {
+                                        // When priceIncludeTax = true: doanh thu = subtotal (already net of discount)
+                                        orderRevenue = orderSubtotal - orderTax;
+                                      } else {
+                                        // When priceIncludeTax = false: doanh thu = subtotal - discount
+                                        orderRevenue = Math.max(
+                                          0,
+                                          orderSubtotal - orderDiscount,
+                                        );
+                                      }
+                                      totalRevenue += orderRevenue;
+                                    });
+                                    return formatCurrency(totalRevenue);
+                                  }
+                                  // Fallback to item.revenue if no order details
+                                  return formatCurrency(item.revenue || 0);
+                                })()}
+                              </TableCell>
+                              <TableCell className="text-center min-w-[100px] px-4">
+                                <Badge
+                                  variant={
+                                    item.status === t("reports.active")
+                                      ? "default"
+                                      : "secondary"
+                                  }
+                                  className="text-xs"
+                                >
+                                  {item.status}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+
+                            {/* Expanded order details */}
+                            {isExpanded &&
+                              item.orderDetails.length > 0 &&
+                              item.orderDetails.map(
+                                (order: any, orderIndex: number) => (
+                                  <TableRow
+                                    key={`${item.customerId}-order-${
+                                      order.id || orderIndex
+                                    }`}
+                                    className="bg-blue-50/50 border-l-4 border-l-blue-400"
+                                  >
+                                    <TableCell className="text-center border-r bg-blue-50 w-12">
+                                      <div className="w-8 h-6 flex items-center justify-center text-blue-600 text-xs">
+                                        └
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-center border-r text-blue-600 text-sm min-w-[120px] px-4">
+                                      <button
+                                        onClick={() => {
+                                          // Navigate to sales orders with order filter
+                                          const orderNumber =
+                                            order.orderNumber ||
+                                            `ORD-${order.id}`;
+                                          window.location.href = `/sales-orders?order=${orderNumber}`;
+                                        }}
+                                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer bg-transparent border-none p-0"
+                                        title="Click to view order details"
+                                      >
+                                        {order.orderNumber ||
+                                          order.transactionId ||
+                                          `ORD-${order.id}`}
+                                      </button>
+                                    </TableCell>
+                                    <TableCell className="text-center border-r text-sm min-w-[150px] px-4">
+                                      {new Date(
+                                        order.orderedAt || order.created_at,
+                                      ).toLocaleString("vi-VN", {
+                                        year: "numeric",
+                                        month: "2-digit",
+                                        day: "2-digit",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                        second: "2-digit",
+                                        hour12: false,
+                                      })}
+                                    </TableCell>
+                                    <TableCell className="text-center border-r text-sm min-w-[100px] px-4">
+                                      1
+                                    </TableCell>
+                                    <TableCell className="text-center border-r text-sm min-w-[130px] px-4">
+                                      <div className="text-xs whitespace-pre-wrap break-words">
+                                        {formatPaymentMethodDisplay(
+                                          order.paymentMethod,
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-right border-r text-sm min-w-[140px] px-4">
+                                      {(() => {
+                                        const subtotal = Number(order.subtotal);
+                                        const discount = Number(order.discount);
+                                        if (order.priceIncludeTax === true) {
+                                          return formatCurrency(
+                                            subtotal + discount,
+                                          );
+                                        } else {
+                                          return formatCurrency(subtotal);
+                                        }
+                                      })()}
+                                    </TableCell>
+                                    {analysisType !== "employee" && (
+                                      <TableCell className="text-right border-r text-red-600 text-sm min-w-[120px] px-4">
+                                        {formatCurrency(
+                                          Number(order.discount || 0),
+                                        )}
+                                      </TableCell>
+                                    )}
+                                    <TableCell className="text-right border-r text-sm min-w-[140px] px-4">
+                                      {(() => {
+                                        const subtotal = Number(order.subtotal);
+                                        const discount = Number(order.discount);
+                                        const tax = Number(order.tax);
+                                        if (order.priceIncludeTax === false) {
+                                          return formatCurrency(subtotal - tax);
+                                        } else {
+                                          return formatCurrency(subtotal);
+                                        }
+                                      })()}
+                                    </TableCell>
+                                    <TableCell className="text-center text-center text-sm min-w-[100px] px-4">
+                                      <Badge
+                                        variant={
+                                          order.status === "paid"
+                                            ? "default"
+                                            : order.status === "cancelled"
+                                              ? "destructive"
+                                              : "secondary"
+                                        }
+                                        className="text-xs"
+                                      >
+                                        {order.status === "paid"
+                                          ? t("common.paid")
+                                          : order.status === "cancelled"
+                                            ? "Đã hủy"
+                                            : order.status}
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                ),
+                              )}
+                          </>
+                        );
+                      })
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={9}
+                          className="text-center text-gray-500"
+                        >
+                          {t("reports.noDataDescription")}
+                        </TableCell>
+                      </TableRow>
+                    )}
+
+                    {/* Summary Row */}
+                    {data.length > 0 && (
+                      <TableRow className="bg-gray-100 font-bold border-t-2">
+                        <TableCell className="text-center border-r w-12"></TableCell>
+                        <TableCell className="text-center border-r bg-green-50 min-w-[120px] px-4">
+                          {t("common.total")}
+                        </TableCell>
+                        <TableCell className="text-center border-r bg-green-50 min-w-[150px] px-4">
+                          {data.length} kh ch hàng
+                        </TableCell>
+                        <TableCell className="text-center border-r min-w-[100px] px-4">
+                          {(() => {
+                            // Calculate total number of orders from all order details
+                            let totalOrdersCount = 0;
+                            data.forEach((customer) => {
+                              if (
+                                customer.orderDetails &&
+                                Array.isArray(customer.orderDetails)
+                              ) {
+                                totalOrdersCount += customer.orderDetails.length;
+                              }
+                            });
+                            return totalOrdersCount.toLocaleString();
+                          })()}
+                        </TableCell>
+                        <TableCell className="text-center border-r min-w-[130px]"></TableCell>
+                        <TableCell className="text-right border-r min-w-[140px] px-4">
                           {formatCurrency(
                             data.reduce(
-                              (sum, customer) => sum + customer.discount,
+                              (sum, customer) => sum + customer.totalAmount,
                               0,
                             ),
                           )}
                         </TableCell>
-                      )}
-                      <TableCell className="text-right border-r text-green-600 font-medium min-w-[120px] px-4">
-                        {formatCurrency(
-                          data.reduce((sum, customer) => {
-                            // Calculate revenue from order details for each customer with proper priceIncludeTax logic
-                            if (
-                              customer.orderDetails &&
-                              Array.isArray(customer.orderDetails) &&
-                              customer.orderDetails.length > 0
-                            ) {
-                              let customerRevenue = 0;
-                              customer.orderDetails.forEach((order: any) => {
-                                const orderSubtotal = Number(
-                                  order.subtotal || 0,
-                                );
-                                const orderDiscount = Number(
-                                  order.discount || 0,
-                                );
-                                const orderTax = Number(order.tax || 0);
-                                const orderPriceIncludeTax =
-                                  order.priceIncludeTax === true;
-
-                                let orderRevenue;
-                                if (orderPriceIncludeTax) {
-                                  // When priceIncludeTax = true: doanh thu = subtotal (already net of discount)
-                                  orderRevenue = orderSubtotal;
-                                } else {
-                                  // When priceIncludeTax = false: doanh thu = subtotal - discount
-                                  orderRevenue = Math.max(
-                                    0,
-                                    orderSubtotal - orderDiscount,
-                                  );
-                                }
-                                customerRevenue += orderRevenue;
-                              });
-                              return sum + customerRevenue;
-                            }
-                            // Fallback to customer.revenue if no order details
-                            return sum + (customer.revenue || 0);
-                          }, 0),
+                        {analysisType !== "employee" && (
+                          <TableCell className="text-right border-r text-red-600 min-w-[120px] px-4">
+                            {formatCurrency(
+                              data.reduce(
+                                (sum, customer) => sum + customer.discount,
+                                0,
+                              ),
+                            )}
+                          </TableCell>
                         )}
-                      </TableCell>
-                      <TableCell className="text-center min-w-[100px] px-4"></TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
+                        <TableCell className="text-right border-r text-green-600 font-medium min-w-[120px] px-4">
+                          {formatCurrency(
+                            data.reduce((sum, customer) => {
+                              // Calculate revenue from order details for each customer with proper priceIncludeTax logic
+                              if (
+                                customer.orderDetails &&
+                                Array.isArray(customer.orderDetails) &&
+                                customer.orderDetails.length > 0
+                              ) {
+                                let customerRevenue = 0;
+                                customer.orderDetails.forEach((order: any) => {
+                                  const orderSubtotal = Number(
+                                    order.subtotal || 0,
+                                  );
+                                  const orderDiscount = Number(
+                                    order.discount || 0,
+                                  );
+                                  const orderTax = Number(order.tax || 0);
+                                  const orderPriceIncludeTax =
+                                    order.priceIncludeTax === true;
 
-          {/* Pagination Controls for Customer Report */}
-          {data.length > 0 && (
-            <div className="flex items-center justify-between space-x-6 py-4">
-              <div className="flex items-center space-x-2">
-                <p className="text-sm font-medium">{t("common.show")} </p>
-                <Select
-                  value={customerPageSize.toString()}
-                  onValueChange={(value) => {
-                    setCustomerPageSize(Number(value));
-                    setCustomerCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-[70px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent side="top">
-                    <SelectItem value="15">15</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="30">30</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm font-medium"> {t("common.rows")}</p>
+                                  let orderRevenue;
+                                  if (orderPriceIncludeTax) {
+                                    // When priceIncludeTax = true: doanh thu = subtotal (already net of discount)
+                                    orderRevenue = orderSubtotal - orderTax;
+                                  } else {
+                                    // When priceIncludeTax = false: doanh thu = subtotal - discount
+                                    orderRevenue = Math.max(
+                                      0,
+                                      orderSubtotal - orderDiscount,
+                                    );
+                                  }
+                                  customerRevenue += orderRevenue;
+                                });
+                                return sum + customerRevenue;
+                              }
+                              // Fallback to customer.revenue if no order details
+                              return sum + (customer.revenue || 0);
+                            }, 0),
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center min-w-[100px] px-4"></TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </div>
+            </div>
 
-              <div className="flex items-center space-x-2">
-                <p className="text-sm font-medium">
-                  {t("common.page")} {customerCurrentPage} / {totalPages}
-                </p>
-                <div className="flex items-center space-x-1">
-                  <button
-                    onClick={() => setCustomerCurrentPage(1)}
-                    disabled={customerCurrentPage === 1}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+            {/* Pagination Controls for Customer Report */}
+            {data.length > 0 && (
+              <div className="flex items-center justify-between space-x-6 py-4">
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm font-medium">{t("common.show")} </p>
+                  <Select
+                    value={customerPageSize.toString()}
+                    onValueChange={(value) => {
+                      setCustomerPageSize(Number(value));
+                      setCustomerCurrentPage(1);
+                    }}
                   >
-                    «
-                  </button>
-                  <button
-                    onClick={() =>
-                      setCustomerCurrentPage((prev) => Math.max(prev - 1, 1))
-                    }
-                    disabled={customerCurrentPage === 1}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
-                  >
-                    ‹
-                  </button>
-                  <button
-                    onClick={() =>
-                      setCustomerCurrentPage((prev) =>
-                        Math.min(prev + 1, totalPages),
-                      )
-                    }
-                    disabled={customerCurrentPage === totalPages}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
-                  >
-                    ›
-                  </button>
-                  <button
-                    onClick={() => setCustomerCurrentPage(totalPages)}
-                    disabled={customerCurrentPage === totalPages}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
-                  >
-                    »
-                  </button>
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="top">
+                      <SelectItem value="15">15</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="30">30</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm font-medium"> {t("common.rows")}</p>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm font-medium">
+                    {t("common.page")} {customerCurrentPage} / {totalPages}
+                  </p>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => setCustomerCurrentPage(1)}
+                      disabled={customerCurrentPage === 1}
+                      className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                    >
+                      «
+                    </button>
+                    <button
+                      onClick={() =>
+                        setCustomerCurrentPage((prev) => Math.max(prev - 1, 1))
+                      }
+                      disabled={customerCurrentPage === 1}
+                      className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      onClick={() =>
+                        setCustomerCurrentPage((prev) =>
+                          Math.min(prev + 1, totalPages),
+                        )
+                      }
+                      disabled={customerCurrentPage === totalPages}
+                      className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                    >
+                      ›
+                    </button>
+                    <button
+                      onClick={() => setCustomerCurrentPage(totalPages)}
+                      disabled={customerCurrentPage === totalPages}
+                      className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                    >
+                      »
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  };
-
-  // Sales Channel Report Component Logic
-  const renderSalesChannelReport = () => {
-    if (ordersLoading) {
-      return (
-        <div className="flex justify-center py-8">
-          <div className="text-gray-500">{t("reports.loading")}...</div>
-        </div>
+            )}
+          </CardContent>
+        </Card>
       );
-    }
-
-    if (!orders || !Array.isArray(orders)) {
-      return (
-        <div className="flex justify-center py-8">
-          <div className="text-gray-500">Không có dữ liệu đơn hàng</div>
-        </div>
-      );
-    }
-
-    const validOrders = Array.isArray(orders) ? orders : [];
-
-    // Filter orders that are completed, paid, or cancelled
-    const relevantOrders = validOrders.filter((order: any) => {
-      // Apply floor filter
-      const floorMatch =
-        selectedFloor === "all" ||
-        !order.tableId ||
-        !tables ||
-        !Array.isArray(tables) ||
-        tables.find((table: any) => table.id === order.tableId)?.floor ===
-          selectedFloor;
-
-      return (
-        (order.status === "paid" ||
-          order.status === "completed" ||
-          order.status === "cancelled") &&
-        floorMatch
-      );
-    });
-
-    console.log("Sales Channel Report Debug:", {
-      totalOrders: validOrders.length,
-      relevantOrders: relevantOrders.length,
-      completedOrders: relevantOrders.filter(
-        (o) => o.status === "paid" || o.status === "completed",
-      ).length,
-      cancelledOrders: relevantOrders.filter((o) => o.status === "cancelled")
-        .length,
-      dateRange: `${startDate} to ${endDate}`,
-      sampleOrder: relevantOrders[0]
-        ? {
-            id: relevantOrders[0].id,
-            tableId: relevantOrders[0].tableId,
-            total: relevantOrders[0].total,
-            status: relevantOrders[0].status,
-            salesChannel: relevantOrders[0].salesChannel,
-          }
-        : null,
-    });
-
-    // Group data by sales method (Dine In vs Takeaway)
-    const salesMethodData: {
-      [method: string]: {
-        completedOrders: number;
-        cancelledOrders: number;
-        totalOrders: number;
-        completedRevenue: number;
-        cancelledRevenue: number;
-        totalRevenue: number;
-      };
-    } = {
-      [t("reports.dineIn")]: {
-        completedOrders: 0,
-        cancelledOrders: 0,
-        totalOrders: 0,
-        completedRevenue: 0,
-        cancelledRevenue: 0,
-        totalRevenue: 0,
-      },
-      [t("reports.takeaway")]: {
-        completedOrders: 0,
-        cancelledOrders: 0,
-        totalOrders: 0,
-        completedRevenue: 0,
-        cancelledRevenue: 0,
-        totalRevenue: 0,
-      },
     };
 
-    // Process all relevant orders (completed, paid, and cancelled)
-    relevantOrders.forEach((order: any) => {
-      // Check tableId or salesChannel to determine method
-      const isDineIn = order.tableId && order.tableId !== null;
-      const method = isDineIn ? t("reports.dineIn") : t("reports.takeaway");
+    // Sales Channel Report Component Logic
+    const renderSalesChannelReport = () => {
+      if (ordersLoading) {
+        return (
+          <div className="flex justify-center py-8">
+            <div className="text-gray-500">{t("reports.loading")}...</div>
+          </div>
+        );
+      }
 
-      if (salesMethodData[method]) {
-        const orderRevenue = Number(order.subtotal || 0); // Doanh thu = subtotal (chưa thuế)
+      if (!orders || !Array.isArray(orders)) {
+        return (
+          <div className="flex justify-center py-8">
+            <div className="text-gray-500">Không có dữ liệu đơn hàng</div>
+          </div>
+        );
+      }
+
+      const validOrders = Array.isArray(orders) ? orders : [];
+
+      // Filter orders that are completed, paid, or cancelled
+      const relevantOrders = validOrders.filter((order: any) => {
+        // Apply floor filter
+        const floorMatch =
+          selectedFloor === "all" ||
+          !order.tableId ||
+          !tables ||
+          !Array.isArray(tables) ||
+          tables.find((table: any) => table.id === order.tableId)?.floor ===
+            selectedFloor;
+
+        return (
+          (order.status === "paid" ||
+            order.status === "completed" ||
+            order.status === "cancelled") &&
+          floorMatch
+        );
+      });
+
+      console.log("Sales Channel Report Debug:", {
+        totalOrders: validOrders.length,
+        relevantOrders: relevantOrders.length,
+        completedOrders: relevantOrders.filter(
+          (o) => o.status === "paid" || o.status === "completed",
+        ).length,
+        cancelledOrders: relevantOrders.filter((o) => o.status === "cancelled")
+          .length,
+        dateRange: `${startDate} to ${endDate}`,
+        sampleOrder: relevantOrders[0]
+          ? {
+              id: relevantOrders[0].id,
+              tableId: relevantOrders[0].tableId,
+              total: relevantOrders[0].total,
+              status: relevantOrders[0].status,
+              salesChannel: relevantOrders[0].salesChannel,
+            }
+          : null,
+      });
+
+      // Group data by sales method (Dine In vs Takeaway)
+      const salesMethodData: {
+        [method: string]: {
+          completedOrders: number;
+          cancelledOrders: number;
+          totalOrders: number;
+          completedRevenue: number;
+          cancelledRevenue: number;
+          totalRevenue: number;
+        };
+      } = {
+        [t("reports.dineIn")]: {
+          completedOrders: 0,
+          cancelledOrders: 0,
+          totalOrders: 0,
+          completedRevenue: 0,
+          cancelledRevenue: 0,
+          totalRevenue: 0,
+        },
+        [t("reports.takeaway")]: {
+          completedOrders: 0,
+          cancelledOrders: 0,
+          totalOrders: 0,
+          completedRevenue: 0,
+          cancelledRevenue: 0,
+          totalRevenue: 0,
+        },
+      };
+
+      // Process all relevant orders (completed, paid, and cancelled)
+      relevantOrders.forEach((order: any) => {
+        // Check tableId or salesChannel to determine method
+        const isDineIn = order.tableId && order.tableId !== null;
+        const method = isDineIn ? t("reports.dineIn") : t("reports.takeaway");
+
+        const orderSubtotal = Number(order.subtotal || 0);
+        const orderDiscount = Number(order.discount || 0);
+        const orderTax = Number(order.tax || 0);
+        const orderPriceIncludeTax = order.priceIncludeTax === true;
+
+        // Calculate revenue based on correct formula for export and display
+        let orderRevenueExport;
+        if (orderPriceIncludeTax) {
+          orderRevenueExport = orderSubtotal - orderTax;
+        } else {
+          orderRevenueExport = orderSubtotal - orderDiscount - orderTax;
+        }
 
         if (order.status === "cancelled") {
           salesMethodData[method].cancelledOrders += 1;
-          salesMethodData[method].cancelledRevenue += orderRevenue;
+          salesMethodData[method].cancelledRevenue += orderRevenueExport;
         } else {
           // completed or paid orders
           salesMethodData[method].completedOrders += 1;
-          salesMethodData[method].completedRevenue += orderRevenue;
+          salesMethodData[method].completedRevenue += orderRevenueExport;
         }
 
         salesMethodData[method].totalOrders += 1;
-        salesMethodData[method].totalRevenue += orderRevenue;
-      }
-    });
+        salesMethodData[method].totalRevenue += orderRevenueExport;
+      });
 
-    console.log("Sales Method Data:", salesMethodData);
+      console.log("Sales Method Data:", salesMethodData);
 
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="w-5 h-5" />
-            {t("reports.channelSalesReport")}
-          </CardTitle>
-          <CardDescription className="flex items-center justify-between">
-            <span>
-              {t("reports.fromDate")}: {formatDate(startDate)} -{" "}
-              {t("reports.toDate")}: {formatDate(endDate)}
-            </span>
-            <Button
-              onClick={() => {
-                // Prepare data with summary row
-                const dataWithSummary = [
-                  ...Object.entries(salesMethodData).map(([method, data]) => ({
-                    "Phương thức bán hàng": method,
-                    "Đơn đã hoàn thành": data.completedOrders,
-                    "Doanh thu đã hoàn thành": formatCurrency(
-                      data.completedRevenue,
-                    ),
-                    "Tổng đơn": data.totalOrders,
-                    "Tổng doanh thu": formatCurrency(data.totalRevenue),
-                  })),
-                  // Add summary row
-                  {
-                    "Phương thức bán hàng": "TỔNG CỘNG",
-                    "Đơn đã hoàn thành": Object.values(salesMethodData).reduce(
-                      (sum, data) => sum + data.completedOrders,
-                      0,
-                    ),
-                    "Doanh thu đã hoàn thành": formatCurrency(
-                      Object.values(salesMethodData).reduce(
-                        (sum, data) => sum + data.completedRevenue,
-                        0,
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5" />
+              {t("reports.channelSalesReport")}
+            </CardTitle>
+            <CardDescription className="flex items-center justify-between">
+              <span>
+                {t("reports.fromDate")}: {formatDate(startDate)} -{" "}
+                {t("reports.toDate")}: {formatDate(endDate)}
+              </span>
+              <Button
+                onClick={() => {
+                  // Prepare data with summary row
+                  const dataWithSummary = [
+                    ...Object.entries(salesMethodData).map(([method, data]) => ({
+                      "Phương thức bán hàng": method,
+                      "Đơn đã hoàn thành": data.completedOrders,
+                      "Doanh thu đã hoàn thành": formatCurrency(
+                        data.completedRevenue,
                       ),
-                    ),
-                    "Tổng đơn": Object.values(salesMethodData).reduce(
-                      (sum, data) => sum + data.totalOrders,
-                      0,
-                    ),
-                    "Tổng doanh thu": formatCurrency(
-                      Object.values(salesMethodData).reduce(
-                        (sum, data) => sum + data.totalRevenue,
-                        0,
-                      ),
-                    ),
-                  },
-                ];
-                exportToExcel(
-                  dataWithSummary,
-                  `SalesChannel_${startDate}_to_${endDate}`,
-                );
-              }}
-              className="inline-flex items-center gap-2 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              {t("common.exportExcel")}
-            </Button>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="w-full">
-            <div className="overflow-x-visible">
-              <Table className="w-full min-w-[800px] xl:min-w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead
-                      className="text-center font-bold bg-green-100 border"
-                      rowSpan={2}
-                    >
-                      {t("reports.salesMethod")}
-                    </TableHead>
-                    <TableHead
-                      className="text-center font-bold bg-green-100 border"
-                      colSpan={3}
-                    >
-                      {t("reports.totalOrders")}
-                    </TableHead>
-                    <TableHead
-                      className="text-center font-bold bg-green-100 border"
-                      colSpan={3}
-                    >
-                      {t("reports.totalSalesRevenue")}
-                    </TableHead>
-                  </TableRow>
-                  <TableRow>
-                    <TableHead className="text-center bg-green-50 border">
-                      {t("reports.completed")}
-                    </TableHead>
-                    <TableHead className="text-center bg-green-50 border">
-                      {t("reports.cancelled")}
-                    </TableHead>
-                    <TableHead className="text-center bg-green-50 border">
-                      {t("common.total")}
-                    </TableHead>
-                    <TableHead className="text-center bg-green-50 border">
-                      {t("reports.completed")}
-                    </TableHead>
-                    <TableHead className="text-center bg-green-50 border">
-                      {t("reports.cancelled")}
-                    </TableHead>
-                    <TableHead className="text-center bg-green-50 border">
-                      {t("common.total")}
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {Object.entries(salesMethodData).map(([method, data]) => (
-                    <TableRow key={method} className="hover:bg-gray-50">
-                      <TableCell className="font-medium text-center border bg-blue-50">
-                        {method}
-                      </TableCell>
-                      <TableCell className="text-center border">
-                        {data.completedOrders}
-                      </TableCell>
-                      <TableCell className="text-center border">
-                        {data.cancelledOrders}
-                      </TableCell>
-                      <TableCell className="text-center border font-medium">
-                        {data.totalOrders}
-                      </TableCell>
-                      <TableCell className="text-right border">
-                        {formatCurrency(data.completedRevenue)}
-                      </TableCell>
-                      <TableCell className="text-right border">
-                        {formatCurrency(data.cancelledRevenue)}
-                      </TableCell>
-                      <TableCell className="text-right border font-medium">
-                        {formatCurrency(data.totalRevenue)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-
-                  {/* Summary Row */}
-                  <TableRow className="bg-green-100 font-bold border-t-2">
-                    <TableCell className="text-center border font-bold">
-                      {t("common.total")}
-                    </TableCell>
-                    <TableCell className="text-center border">
-                      {Object.values(salesMethodData).reduce(
+                      "Tổng đơn": data.totalOrders,
+                      "Tổng doanh thu": formatCurrency(data.totalRevenue),
+                    })),
+                    // Add summary row
+                    {
+                      "Phương thức bán hàng": "TỔNG CỘNG",
+                      "Đơn đã hoàn thành": Object.values(salesMethodData).reduce(
                         (sum, data) => sum + data.completedOrders,
                         0,
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center border">
-                      {Object.values(salesMethodData).reduce(
-                        (sum, data) => sum + data.cancelledOrders,
-                        0,
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center border font-medium">
-                      {Object.values(salesMethodData).reduce(
-                        (sum, data) => sum + data.totalOrders,
-                        0,
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right border">
-                      {formatCurrency(
+                      ),
+                      "Doanh thu đã hoàn thành": formatCurrency(
                         Object.values(salesMethodData).reduce(
                           (sum, data) => sum + data.completedRevenue,
                           0,
                         ),
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right border">
-                      {formatCurrency(
-                        Object.values(salesMethodData).reduce(
-                          (sum, data) => sum + data.cancelledRevenue,
-                          0,
-                        ),
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right border font-medium">
-                      {formatCurrency(
+                      ),
+                      "Tổng đơn": Object.values(salesMethodData).reduce(
+                        (sum, data) => sum + data.totalOrders,
+                        0,
+                      ),
+                      "Tổng doanh thu": formatCurrency(
                         Object.values(salesMethodData).reduce(
                           (sum, data) => sum + data.totalRevenue,
                           0,
                         ),
-                      )}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+                      ),
+                    },
+                  ];
+                  exportToExcel(
+                    dataWithSummary,
+                    `SalesChannel_${startDate}_to_${endDate}`,
+                  );
+                }}
+                className="inline-flex items-center gap-2 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                {t("common.exportExcel")}
+              </Button>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="w-full">
+              <div className="overflow-x-visible">
+                <Table className="w-full min-w-[800px] xl:min-w-full">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead
+                        className="text-center font-bold bg-green-100 border"
+                        rowSpan={2}
+                      >
+                        {t("reports.salesMethod")}
+                      </TableHead>
+                      <TableHead
+                        className="text-center font-bold bg-green-100 border"
+                        colSpan={3}
+                      >
+                        {t("reports.totalOrders")}
+                      </TableHead>
+                      <TableHead
+                        className="text-center font-bold bg-green-100 border"
+                        colSpan={3}
+                      >
+                        {t("reports.totalSalesRevenue")}
+                      </TableHead>
+                    </TableRow>
+                    <TableRow>
+                      <TableHead className="text-center bg-green-50 border">
+                        {t("reports.completed")}
+                      </TableHead>
+                      <TableHead className="text-center bg-green-50 border">
+                        {t("reports.cancelled")}
+                      </TableHead>
+                      <TableHead className="text-center bg-green-50 border">
+                        {t("common.total")}
+                      </TableHead>
+                      <TableHead className="text-center bg-green-50 border">
+                        {t("reports.completed")}
+                      </TableHead>
+                      <TableHead className="text-center bg-green-50 border">
+                        {t("reports.cancelled")}
+                      </TableHead>
+                      <TableHead className="text-center bg-green-50 border">
+                        {t("common.total")}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Object.entries(salesMethodData).map(([method, data]) => (
+                      <TableRow key={method} className="hover:bg-gray-50">
+                        <TableCell className="font-medium text-center border bg-blue-50">
+                          {method}
+                        </TableCell>
+                        <TableCell className="text-center border">
+                          {data.completedOrders}
+                        </TableCell>
+                        <TableCell className="text-center border">
+                          {data.cancelledOrders}
+                        </TableCell>
+                        <TableCell className="text-center border font-medium">
+                          {data.totalOrders}
+                        </TableCell>
+                        <TableCell className="text-right border">
+                          {formatCurrency(data.completedRevenue)}
+                        </TableCell>
+                        <TableCell className="text-right border">
+                          {formatCurrency(data.cancelledRevenue)}
+                        </TableCell>
+                        <TableCell className="text-right border font-medium">
+                          {formatCurrency(data.totalRevenue)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+
+                    {/* Summary Row */}
+                    <TableRow className="bg-green-100 font-bold border-t-2">
+                      <TableCell className="text-center border font-bold">
+                        {t("common.total")}
+                      </TableCell>
+                      <TableCell className="text-center border">
+                        {Object.values(salesMethodData).reduce(
+                          (sum, data) => sum + data.completedOrders,
+                          0,
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center border">
+                        {Object.values(salesMethodData).reduce(
+                          (sum, data) => sum + data.cancelledOrders,
+                          0,
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center border font-medium">
+                        {Object.values(salesMethodData).reduce(
+                          (sum, data) => sum + data.totalOrders,
+                          0,
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right border">
+                        {formatCurrency(
+                          Object.values(salesMethodData).reduce(
+                            (sum, data) => sum + data.completedRevenue,
+                            0,
+                          ),
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right border">
+                        {formatCurrency(
+                          Object.values(salesMethodData).reduce(
+                            (sum, data) => sum + data.cancelledRevenue,
+                            0,
+                          ),
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right border font-medium">
+                        {formatCurrency(
+                          Object.values(salesMethodData).reduce(
+                            (sum, data) => sum + data.totalRevenue,
+                            0,
+                          ),
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
+          </CardContent>
+        </Card>
+      );
+    };
 
-  // Chart configurations for each analysis type
-  const chartConfig = {
-    revenue: {
-      label: t("reports.revenue"),
-      color: "#10b981",
-    },
-    netRevenue: {
-      label: t("reports.netRevenue"),
-      color: "#3b82f6",
-    },
-    returnValue: {
-      label: t("reports.returnValue"),
-      color: "#ef4444",
-    },
-    quantity: {
-      label: t("reports.quantity"),
-      color: "#f59e0b",
-    },
-    profit: {
-      label: t("reports.profit"),
-      color: "#8b5cf6",
-    },
-  };
+    // Chart configurations for each analysis type
+    const chartConfig = {
+      revenue: {
+        label: t("reports.revenue"),
+        color: "#10b981",
+      },
+      netRevenue: {
+        label: t("reports.netRevenue"),
+        color: "#3b82f6",
+      },
+      returnValue: {
+        label: t("reports.returnValue"),
+        color: "#ef4444",
+      },
+      quantity: {
+        label: t("reports.quantity"),
+        color: "#f59e0b",
+      },
+      profit: {
+        label: t("reports.profit"),
+        color: "#8b5cf6",
+      },
+    };
 
-  // Colors for pie chart
-  const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
+    // Colors for pie chart
+    const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
 
-  // Get chart data based on analysis type
-  const getChartData = () => {
-    try {
-      switch (analysisType) {
-        case "time":
-          const timeStart = new Date(startDate);
-          const timeEnd = new Date(endDate);
-          timeEnd.setHours(23, 59, 59, 999);
+    // Get chart data based on analysis type
+    const getChartData = () => {
+      try {
+        switch (analysisType) {
+          case "time":
+            const timeStart = new Date(startDate);
+            const timeEnd = new Date(endDate);
+            timeEnd.setHours(23, 59, 59, 999);
 
-          // Group orders by date using EXACT same logic as dashboard
-          const dailyData: {
-            [date: string]: { revenue: number; orders: number };
-          } = {};
+            // Group orders by date using EXACT same logic as dashboard
+            const dailyData: {
+              [date: string]: { revenue: number; orders: number };
+            } = {};
 
-          console.log("Time Analysis Debug:", {
-            startDate,
-            endDate,
-            timeStart: timeStart.toISOString(),
-            timeEnd: timeEnd.toISOString(),
-            ordersLength: orders?.length || 0,
-          });
-
-          if (orders && Array.isArray(orders) && orders.length > 0) {
-            // Use EXACT same filtering logic as dashboard
-            const filteredOrders = orders.filter((order: any) => {
-              try {
-                // EXACT same status check as dashboard - exclude cancelled orders
-                if (order.status !== "paid" && order.status !== "completed") {
-                  return false;
-                }
-
-                // Apply floor filter
-                const floorMatch =
-                  selectedFloor === "all" ||
-                  !order.tableId ||
-                  !tables ||
-                  !Array.isArray(tables) ||
-                  tables.find((table: any) => table.id === order.tableId)
-                    ?.floor === selectedFloor;
-
-                // EXACT same date parsing as dashboard
-                const orderDate = new Date(
-                  order.orderedAt ||
-                    order.paidAt ||
-                    order.createdAt ||
-                    order.created_at,
-                );
-
-                if (isNaN(orderDate.getTime())) {
-                  console.warn("Invalid date for order:", order.id);
-                  return false;
-                }
-
-                const dateMatch =
-                  orderDate >= timeStart && orderDate <= timeEnd;
-                return dateMatch && floorMatch;
-              } catch (error) {
-                console.warn("Error filtering order:", order.id, error);
-                return false;
-              }
+            console.log("Time Analysis Debug:", {
+              startDate,
+              endDate,
+              timeStart: timeStart.toISOString(),
+              timeEnd: timeEnd.toISOString(),
+              ordersLength: orders?.length || 0,
             });
 
-            console.log(
-              `Time analysis: ${filteredOrders.length} orders after filtering`,
-            );
+            if (orders && Array.isArray(orders) && orders.length > 0) {
+              // Use EXACT same filtering logic as dashboard
+              const filteredOrders = orders.filter((order: any) => {
+                try {
+                  // EXACT same status check as dashboard - exclude cancelled orders
+                  if (order.status !== "paid" && order.status !== "completed") {
+                    return false;
+                  }
 
-            filteredOrders.forEach((order: any) => {
-              try {
-                const orderDate = new Date(
-                  order.orderedAt ||
-                    order.paidAt ||
-                    order.createdAt ||
-                    order.created_at,
-                );
-                const dateKey = orderDate.toISOString().split("T")[0];
+                  // Apply floor filter
+                  const floorMatch =
+                    selectedFloor === "all" ||
+                    !order.tableId ||
+                    !tables ||
+                    !Array.isArray(tables) ||
+                    tables.find((table: any) => table.id === order.tableId)
+                      ?.floor === selectedFloor;
 
-                if (!dailyData[dateKey]) {
-                  dailyData[dateKey] = { revenue: 0, orders: 0 };
+                  // Apply store filter
+                  const storeMatch =
+                    storeFilter === "all" || order.storeCode === storeFilter;
+
+                  // EXACT same date parsing as dashboard
+                  const orderDate = new Date(
+                    order.orderedAt ||
+                      order.paidAt ||
+                      order.createdAt ||
+                      order.created_at,
+                  );
+
+                  if (isNaN(orderDate.getTime())) {
+                    console.warn("Invalid date for order:", order.id);
+                    return false;
+                  }
+
+                  const dateMatch =
+                    orderDate >= timeStart && orderDate <= timeEnd;
+                  return dateMatch && floorMatch && storeMatch;
+                } catch (error) {
+                  console.warn("Error filtering order:", order.id, error);
+                  return false;
                 }
+              });
 
-                const orderSubtotal = Number(order.subtotal || 0);
-                const discount = Number(order.discount || 0);
-                const revenue = Math.max(0, orderSubtotal - discount); // Ensure non-negative
+              console.log(
+                `Time analysis: ${filteredOrders.length} orders after filtering`,
+              );
 
-                dailyData[dateKey].revenue += revenue;
-                dailyData[dateKey].orders += 1;
-              } catch (error) {
-                console.warn(
-                  "Error processing order for chart:",
-                  order.id,
-                  error,
-                );
-              }
-            });
-          }
+              filteredOrders.forEach((order: any) => {
+                try {
+                  const orderDate = new Date(
+                    order.orderedAt ||
+                      order.paidAt ||
+                      order.createdAt ||
+                      order.created_at,
+                  );
+                  const dateKey = orderDate.toISOString().split("T")[0];
 
-          const chartData = Object.keys(dailyData)
-            .map((date) => ({
-              name: formatDate(date),
-              revenue: Math.round(dailyData[date].revenue), // Round to avoid floating point issues
-              orders: dailyData[date].orders,
-            }))
-            .sort(
-              (a, b) =>
-                new Date(a.name.split("/").reverse().join("-")).getTime() -
-                new Date(b.name.split("/").reverse().join("-")).getTime(),
-            )
-            .slice(0, 10);
+                  if (!dailyData[dateKey]) {
+                    dailyData[dateKey] = { revenue: 0, orders: 0 };
+                  }
 
-          console.log("Generated chart data:", chartData);
-          return chartData;
+                  // Calculate revenue: subtotal - discount
+                  const orderSubtotal = Number(order.subtotal || 0);
+                  const orderDiscount = Number(order.discount || 0);
+                  const revenue = Math.max(0, orderSubtotal - orderDiscount); // Ensure non-negative
 
-        case "product":
-          // Use the new productAnalysisData
-          if (productAnalysisLoading) {
-            console.log("Product analysis still loading...");
-            return [];
-          }
+                  dailyData[dateKey].revenue += revenue;
+                  dailyData[dateKey].orders += 1;
+                } catch (error) {
+                  console.warn(
+                    "Error processing order for chart:",
+                    order.id,
+                    error,
+                  );
+                }
+              });
+            }
 
-          if (!productAnalysisData || !productAnalysisData.productStats) {
-            console.log("No product analysis data available");
-            return [];
-          }
+            const chartData = Object.keys(dailyData)
+              .map((date) => ({
+                name: formatDate(date),
+                revenue: Math.round(dailyData[date].revenue), // Round to avoid floating point issues
+                orders: dailyData[date].orders,
+              }))
+              .sort(
+                (a, b) =>
+                  new Date(a.name.split("/").reverse().join("-")).getTime() -
+                  new Date(b.name.split("/").reverse().join("-")).getTime(),
+              )
+              .slice(0, 10);
 
-          const productStats = productAnalysisData.productStats || [];
-          console.log("Product stats received:", productStats.length, "items");
+            return chartData;
 
-          const productChartData = productStats
-            .filter((product: any) => {
-              const isValid =
-                product &&
-                product.productName &&
-                typeof product.totalRevenue === "number" &&
-                typeof product.totalQuantity === "number" &&
-                product.totalQuantity > 0;
-              if (!isValid) {
-                console.warn("Invalid product data:", product);
-              }
-              return isValid;
-            })
-            .map((product: any) => ({
-              name:
-                product.productName.length > 15
-                  ? product.productName.substring(0, 15) + "..."
-                  : product.productName,
-              revenue: Math.round(Number(product.totalRevenue) || 0),
-              quantity: Number(product.totalQuantity) || 0,
-            }))
-            .sort((a, b) => b.revenue - a.revenue)
-            .slice(0, 10);
-
-          console.log("Generated product chart data:", productChartData);
-          return productChartData;
-
-        case "employee":
-          try {
-            if (!orders || !Array.isArray(orders) || orders.length === 0) {
-              console.warn("Employee chart: No orders data available");
+          case "product":
+            // Use the new productAnalysisData
+            if (productAnalysisLoading) {
+              console.log("Product analysis still loading...");
               return [];
             }
 
-            const empStart = new Date(startDate);
-            const empEnd = new Date(endDate);
-            empEnd.setHours(23, 59, 59, 999);
+            if (!productAnalysisData || !productAnalysisData.productStats) {
+              console.log("No product analysis data available");
+              return [];
+            }
 
-            // Use EXACT same filtering logic as dashboard
-            const empFilteredOrders = orders.filter((order: any) => {
-              try {
-                // Check if order is completed/paid (EXACT same as dashboard)
-                if (order.status !== "completed" && order.status !== "paid")
-                  return false;
+            const productStats = productAnalysisData.productStats || [];
+            console.log("Product stats received:", productStats.length, "items");
 
-                // Apply floor filter
-                const floorMatch =
-                  selectedFloor === "all" ||
-                  !order.tableId ||
-                  !tables ||
-                  !Array.isArray(tables) ||
-                  tables.find((table: any) => table.id === order.tableId)
-                    ?.floor === selectedFloor;
-
-                // Try multiple possible date fields (EXACT same as dashboard)
-                const orderDate = new Date(
-                  order.orderedAt ||
-                    order.createdAt ||
-                    order.created_at ||
-                    order.paidAt,
-                );
-
-                // Skip if date is invalid
-                if (isNaN(orderDate.getTime())) {
-                  console.warn("Invalid date for employee order:", order.id);
-                  return false;
+            const productChartData = productStats
+              .filter((product: any) => {
+                const isValid =
+                  product &&
+                  product.productName &&
+                  typeof product.totalRevenue === "number" &&
+                  typeof product.totalQuantity === "number" &&
+                  product.totalQuantity > 0;
+                if (!isValid) {
+                  console.warn("Invalid product data:", product);
                 }
-
-                // Fix date comparison - ensure we're comparing dates correctly
-                const startOfDay = new Date(empStart);
-                startOfDay.setHours(0, 0, 0, 0);
-                const endOfDay = new Date(empEnd);
-                endOfDay.setHours(23, 59, 59, 999);
-
-                const dateMatch =
-                  orderDate >= startOfDay && orderDate <= endOfDay;
-
-                // Safe employee matching with proper null/undefined checks
-                const employeeMatch =
-                  !selectedEmployee ||
-                  selectedEmployee === "all" ||
-                  selectedEmployee === "" ||
-                  (order.employeeName &&
-                    order.employeeName === selectedEmployee) ||
-                  (order.cashierName &&
-                    order.cashierName === selectedEmployee) ||
-                  (order.employeeId &&
-                    order.employeeId.toString() === selectedEmployee) ||
-                  (order.employeeName &&
-                    typeof order.employeeName === "string" &&
-                    selectedEmployee &&
-                    typeof selectedEmployee === "string" &&
-                    selectedEmployee !== "all" &&
-                    selectedEmployee.trim() !== "" &&
-                    order.employeeName
-                      .toLowerCase()
-                      .includes(selectedEmployee.toLowerCase())) ||
-                  (order.cashierName &&
-                    typeof order.cashierName === "string" &&
-                    selectedEmployee &&
-                    typeof selectedEmployee === "string" &&
-                    selectedEmployee !== "all" &&
-                    selectedEmployee.trim() !== "" &&
-                    order.cashierName
-                      .toLowerCase()
-                      .includes(selectedEmployee.toLowerCase()));
-
-                return dateMatch && employeeMatch && floorMatch;
-              } catch (error) {
-                console.warn(
-                  "Error filtering employee order:",
-                  order.id,
-                  error,
-                );
-                return false;
-              }
-            });
-
-            const employeeData: {
-              [cashier: string]: { revenue: number; orders: number };
-            } = {};
-
-            empFilteredOrders.forEach((order: any) => {
-              try {
-                const cashier =
-                  order.cashierName || order.employeeName || "Unknown";
-                if (!employeeData[cashier]) {
-                  employeeData[cashier] = { revenue: 0, orders: 0 };
-                }
-
-                // Use subtotal as revenue (excludes tax): subtotal - discount
-                const orderSubtotal = Number(order.subtotal || 0);
-                const orderDiscount = Number(order.discount || 0);
-                const revenue = Math.max(0, orderSubtotal - orderDiscount); // Ensure non-negative
-
-                employeeData[cashier].revenue += revenue;
-                employeeData[cashier].orders += 1;
-              } catch (error) {
-                console.warn(
-                  "Error processing employee order:",
-                  order.id,
-                  error,
-                );
-              }
-            });
-
-            const result = Object.entries(employeeData)
-              .filter(([name, data]) => data.revenue > 0 || data.orders > 0) // Filter before mapping
-              .map(([name, data]) => ({
+                return isValid;
+              })
+              .map((product: any) => ({
                 name:
-                  name && name.length > 10
-                    ? name.substring(0, 10) + "..."
-                    : name || "Unknown",
-                revenue: Math.round(data.revenue || 0),
-                orders: data.orders || 0,
+                  product.productName.length > 15
+                    ? product.productName.substring(0, 15) + "..."
+                    : product.productName,
+                revenue: Math.round(Number(product.totalRevenue) || 0),
+                quantity: Number(product.totalQuantity) || 0,
               }))
               .sort((a, b) => b.revenue - a.revenue)
               .slice(0, 10);
 
-            console.log("Employee chart data generated:", {
-              filteredOrdersCount: empFilteredOrders.length,
-              employeeDataKeys: Object.keys(employeeData),
-              result,
-            });
+            console.log("Generated product chart data:", productChartData);
+            return productChartData;
 
-            return result;
-          } catch (error) {
-            console.error("Error in employee chart data generation:", error);
-            return [];
-          }
+          case "employee":
+            try {
+              if (!orders || !Array.isArray(orders) || orders.length === 0) {
+                console.warn("Employee chart: No orders data available");
+                return [];
+              }
 
-        case "customer":
-          try {
-            if (!orders || !Array.isArray(orders) || orders.length === 0) {
-              console.warn("Customer chart: No orders data available");
-              return [];
-            }
+              const empStart = new Date(startDate);
+              const empEnd = new Date(endDate);
+              empEnd.setHours(23, 59, 59, 999);
 
-            const custStart = new Date(startDate);
-            const custEnd = new Date(endDate);
-            custEnd.setHours(23, 59, 59, 999);
+              // Use EXACT same filtering logic as dashboard
+              const empFilteredOrders = orders.filter((order: any) => {
+                try {
+                  // Check if order is completed/paid (EXACT same as dashboard)
+                  if (order.status !== "completed" && order.status !== "paid")
+                    return false;
 
-            const custFilteredOrders = orders.filter((order: any) => {
-              try {
-                const orderDate = new Date(
-                  order.orderedAt || order.created_at || order.createdAt,
-                );
+                  // Apply floor filter
+                  const floorMatch =
+                    selectedFloor === "all" ||
+                    !order.tableId ||
+                    !tables ||
+                    !Array.isArray(tables) ||
+                    tables.find((table: any) => table.id === order.tableId)
+                      ?.floor === selectedFloor;
 
-                if (isNaN(orderDate.getTime())) {
-                  console.warn("Invalid date for customer order:", order.id);
+                  // Apply store filter
+                  const storeMatch =
+                    storeFilter === "all" || order.storeCode === storeFilter;
+
+                  // Try multiple possible date fields (EXACT same as dashboard)
+                  const orderDate = new Date(
+                    order.orderedAt ||
+                      order.createdAt ||
+                      order.created_at ||
+                      order.paidAt,
+                  );
+
+                  // Skip if date is invalid
+                  if (isNaN(orderDate.getTime())) {
+                    console.warn("Invalid date for employee order:", order.id);
+                    return false;
+                  }
+
+                  // Fix date comparison - ensure we're comparing dates correctly
+                  const startOfDay = new Date(empStart);
+                  startOfDay.setHours(0, 0, 0, 0);
+                  const endOfDay = new Date(empEnd);
+                  endOfDay.setHours(23, 59, 59, 999);
+
+                  const dateMatch =
+                    orderDate >= startOfDay && orderDate <= endOfDay;
+
+                  // Safe employee matching with proper null/undefined checks
+                  const employeeMatch =
+                    !selectedEmployee ||
+                    selectedEmployee === "all" ||
+                    selectedEmployee === "" ||
+                    (order.employeeName &&
+                      order.employeeName === selectedEmployee) ||
+                    (order.cashierName &&
+                      order.cashierName === selectedEmployee) ||
+                    (order.employeeId &&
+                      order.employeeId.toString() === selectedEmployee) ||
+                    (order.employeeName &&
+                      typeof order.employeeName === "string" &&
+                      selectedEmployee &&
+                      typeof selectedEmployee === "string" &&
+                      selectedEmployee !== "all" &&
+                      selectedEmployee.trim() !== "" &&
+                      order.employeeName
+                        .toLowerCase()
+                        .includes(selectedEmployee.toLowerCase())) ||
+                    (order.cashierName &&
+                      typeof order.cashierName === "string" &&
+                      selectedEmployee &&
+                      typeof selectedEmployee === "string" &&
+                      selectedEmployee !== "all" &&
+                      selectedEmployee.trim() !== "" &&
+                      order.cashierName
+                        .toLowerCase()
+                        .includes(selectedEmployee.toLowerCase()));
+
+                  return dateMatch && employeeMatch && floorMatch && storeMatch;
+                } catch (error) {
+                  console.warn(
+                    "Error filtering employee order:",
+                    order.id,
+                    error,
+                  );
                   return false;
                 }
+              });
 
-                // Apply floor filter
-                const floorMatch =
-                  selectedFloor === "all" ||
-                  !order.tableId ||
-                  !tables ||
-                  !Array.isArray(tables) ||
-                  tables.find((table: any) => table.id === order.tableId)
-                    ?.floor === selectedFloor;
+              const employeeData: {
+                [cashier: string]: { revenue: number; orders: number };
+              } = {};
 
-                return (
-                  orderDate >= custStart &&
-                  orderDate <= custEnd &&
-                  order.status === "paid" &&
-                  floorMatch
-                );
-              } catch (error) {
-                console.warn(
-                  "Error filtering customer order:",
-                  order.id,
-                  error,
-                );
-                return false;
-              }
-            });
+              empFilteredOrders.forEach((order: any) => {
+                try {
+                  const cashier =
+                    order.cashierName || order.employeeName || "Unknown";
+                  if (!employeeData[cashier]) {
+                    employeeData[cashier] = { revenue: 0, orders: 0 };
+                  }
 
-            const customerData: {
-              [customerId: string]: {
-                customerName: string;
-                orders: number;
-                revenue: number;
-              };
-            } = {};
+                  // Use subtotal as revenue (excludes tax): subtotal - discount
+                  const orderSubtotal = Number(order.subtotal || 0);
+                  const orderDiscount = Number(order.discount || 0);
+                  const revenue = Math.max(0, orderSubtotal - orderDiscount); // Ensure non-negative
 
-            custFilteredOrders.forEach((order: any) => {
-              try {
-                const customerId = order.customerId || "";
-                const customerName = order.customerName || "";
-
-                if (!customerData[customerId]) {
-                  customerData[customerId] = {
-                    customerName: customerName,
-                    orders: 0,
-                    revenue: 0,
-                  };
+                  employeeData[cashier].revenue += revenue;
+                  employeeData[cashier].orders += 1;
+                } catch (error) {
+                  console.warn(
+                    "Error processing employee order:",
+                    order.id,
+                    error,
+                  );
                 }
+              });
 
-                const orderSubtotal = Number(order.subtotal || 0);
-                const orderDiscount = Number(order.discount || 0);
-                const revenue = Math.max(0, orderSubtotal - orderDiscount);
+              const result = Object.entries(employeeData)
+                .filter(([name, data]) => data.revenue > 0 || data.orders > 0) // Filter before mapping
+                .map(([name, data]) => ({
+                  name:
+                    name && name.length > 10
+                      ? name.substring(0, 10) + "..."
+                      : name || "Unknown",
+                  revenue: Math.round(data.revenue || 0),
+                  orders: data.orders || 0,
+                }))
+                .sort((a, b) => b.revenue - a.revenue)
+                .slice(0, 10);
 
-                customerData[customerId].orders += 1;
-                customerData[customerId].revenue += revenue;
-              } catch (error) {
-                console.warn(
-                  "Error processing customer order:",
-                  order.id,
-                  error,
-                );
-              }
-            });
+              console.log("Employee chart data generated:", {
+                filteredOrdersCount: empFilteredOrders.length,
+                employeeDataKeys: Object.keys(employeeData),
+                result,
+              });
 
-            return Object.entries(customerData)
-              .filter(([_, data]) => data.revenue > 0 || data.orders > 0)
-              .map(([customerId, data]) => ({
-                name:
-                  data.customerName.length > 10
-                    ? data.customerName.substring(0, 10) + "..."
-                    : data.customerName,
-                revenue: Math.round(data.revenue),
-                orders: data.orders,
-              }))
-              .sort((a, b) => b.revenue - a.revenue)
-              .slice(0, 10);
-          } catch (error) {
-            console.error("Error in customer chart data generation:", error);
-            return [];
-          }
-
-        case "salesMethod":
-          try {
-            if (!orders || !Array.isArray(orders) || orders.length === 0) {
-              console.warn("Sales method chart: No orders data available");
+              return result;
+            } catch (error) {
+              console.error("Error in employee chart data generation:", error);
               return [];
             }
 
-            const salesMethodStart = new Date(startDate);
-            const salesMethodEnd = new Date(endDate);
-            salesMethodEnd.setHours(23, 59, 59, 999);
+          case "customer":
+            try {
+              if (!orders || !Array.isArray(orders) || orders.length === 0) {
+                console.warn("Customer chart: No orders data available");
+                return [];
+              }
 
-            // Filter orders that are completed, paid, or cancelled
-            const salesMethodFilteredOrders = orders.filter((order: any) => {
-              try {
-                if (
+              const custStart = new Date(startDate);
+              const custEnd = new Date(endDate);
+              custEnd.setHours(23, 59, 59, 999);
+
+              const custFilteredOrders = orders.filter((order: any) => {
+                try {
+                  const orderDate = new Date(
+                    order.orderedAt || order.created_at || order.createdAt,
+                  );
+
+                  if (isNaN(orderDate.getTime())) {
+                    console.warn("Invalid date for customer order:", order.id);
+                    return false;
+                  }
+
+                  // Apply floor filter
+                  const floorMatch =
+                    selectedFloor === "all" ||
+                    !order.tableId ||
+                    !tables ||
+                    !Array.isArray(tables) ||
+                    tables.find((table: any) => table.id === order.tableId)
+                      ?.floor === selectedFloor;
+
+                  // Apply store filter
+                  const storeMatch =
+                    storeFilter === "all" || order.storeCode === storeFilter;
+
+                  return (
+                    orderDate >= custStart &&
+                    orderDate <= custEnd &&
+                    order.status === "paid" &&
+                    floorMatch &&
+                    storeMatch
+                  );
+                } catch (error) {
+                  console.warn(
+                    "Error filtering customer order:",
+                    order.id,
+                    error,
+                  );
+                  return false;
+                }
+              });
+
+              const customerData: {
+                [customerId: string]: {
+                  customerName: string;
+                  orders: number;
+                  revenue: number;
+                };
+              } = {};
+
+              custFilteredOrders.forEach((order: any) => {
+                try {
+                  const customerId = order.customerId || "";
+                  const customerName = order.customerName || "";
+
+                  if (!customerData[customerId]) {
+                    customerData[customerId] = {
+                      customerName: customerName,
+                      orders: 0,
+                      revenue: 0,
+                    };
+                  }
+
+                  const orderSubtotal = Number(order.subtotal || 0);
+                  const orderDiscount = Number(order.discount || 0);
+                  const revenue = Math.max(0, orderSubtotal - orderDiscount);
+
+                  customerData[customerId].orders += 1;
+                  customerData[customerId].revenue += revenue;
+                } catch (error) {
+                  console.warn(
+                    "Error processing customer order:",
+                    order.id,
+                    error,
+                  );
+                }
+              });
+
+              return Object.entries(customerData)
+                .filter(([_, data]) => data.revenue > 0 || data.orders > 0)
+                .map(([customerId, data]) => ({
+                  name:
+                    data.customerName.length > 10
+                      ? data.customerName.substring(0, 10) + "..."
+                      : data.customerName,
+                  revenue: Math.round(data.revenue),
+                  orders: data.orders,
+                }))
+                .sort((a, b) => b.revenue - a.revenue)
+                .slice(0, 10);
+            } catch (error) {
+              console.error("Error in customer chart data generation:", error);
+              return [];
+            }
+
+          case "salesMethod":
+            try {
+              if (!orders || !Array.isArray(orders) || orders.length === 0) {
+                console.warn("Sales method chart: No orders data available");
+                return [];
+              }
+
+              const salesMethodStart = new Date(startDate);
+              const salesMethodEnd = new Date(endDate);
+              salesMethodEnd.setHours(23, 59, 59, 999);
+
+              // Filter orders that are completed, paid, or cancelled
+              const salesMethodFilteredOrders = orders.filter((order: any) => {
+                try {
+                  if (
                   order.status !== "completed" &&
                   order.status !== "paid" &&
                   order.status !== "cancelled"
@@ -5636,6 +5937,10 @@ export function SalesChartReport() {
                   !Array.isArray(tables) ||
                   tables.find((table: any) => table.id === order.tableId)
                     ?.floor === selectedFloor;
+
+                // Apply store filter
+                const storeMatch =
+                  storeFilter === "all" || order.storeCode === storeFilter;
 
                 const orderDate = new Date(
                   order.orderedAt ||
@@ -5655,7 +5960,8 @@ export function SalesChartReport() {
                 return (
                   orderDate >= salesMethodStart &&
                   orderDate <= salesMethodEnd &&
-                  floorMatch
+                  floorMatch &&
+                  storeMatch
                 );
               } catch (error) {
                 console.warn(
@@ -5693,19 +5999,28 @@ export function SalesChartReport() {
             salesMethodFilteredOrders.forEach((order: any) => {
               try {
                 // Check if order has tableId to determine if it's dine-in or takeaway
-                const isDineIn = order.salesChannel === "table" ? true : false;
+                const isDineIn = order.tableId && order.tableId !== null;
                 const method = isDineIn ? "Ăn tại chỗ" : "Mang về";
 
-                const orderRevenue = Number(order.subtotal || 0);
+                const orderSubtotal = Number(order.subtotal || 0);
                 const orderDiscount = Number(order.discount || 0);
-                const revenue = Math.max(0, orderRevenue - orderDiscount);
+                const orderTax = Number(order.tax || 0);
+                const orderPriceIncludeTax = order.priceIncludeTax === true;
+
+                // Calculate revenue based on correct formula for export and display
+                let orderRevenueExport;
+                if (orderPriceIncludeTax) {
+                  orderRevenueExport = orderSubtotal - orderTax;
+                } else {
+                  orderRevenueExport = orderSubtotal - orderDiscount - orderTax;
+                }
 
                 if (order.status === "cancelled") {
                   salesMethodData[method].cancelledCount += 1;
-                  salesMethodData[method].cancelledRevenue += revenue;
+                  salesMethodData[method].cancelledRevenue += orderRevenueExport;
                 } else {
                   salesMethodData[method].count += 1;
-                  salesMethodData[method].revenue += revenue;
+                  salesMethodData[method].revenue += orderRevenueExport;
                 }
               } catch (error) {
                 console.warn(
@@ -5715,6 +6030,8 @@ export function SalesChartReport() {
                 );
               }
             });
+
+            console.log("Sales Method Data:", salesMethodData);
 
             // Convert to chart data format - show total revenue (including cancelled)
             const salesMethodChartData = Object.entries(salesMethodData)
@@ -5729,1017 +6046,995 @@ export function SalesChartReport() {
 
             console.log("Sales method chart data:", salesMethodChartData);
             return salesMethodChartData;
-          } catch (error) {
-            console.error(
-              "Error in sales method chart data generation:",
-              error,
-            );
+          default:
+            console.warn("Unknown analysis type:", analysisType);
             return [];
-          }
-        default:
-          console.warn("Unknown analysis type:", analysisType);
-          return [];
+        }
+      } catch (error) {
+        console.error("Error in getChartData:", error);
+        return [];
       }
-    } catch (error) {
-      console.error("Error in getChartData:", error);
-      return [];
-    }
-  };
-
-  // Product Report Logic (Moved up to be before renderChart)
-  const renderProductReport = () => {
-    if (productAnalysisLoading) {
-      return (
-        <div className="flex justify-center py-8">
-          <div className="text-gray-500">{t("reports.loading")}...</div>
-        </div>
-      );
-    }
-
-    if (
-      !productAnalysisData?.productStats ||
-      productAnalysisData.productStats.length === 0
-    ) {
-      return (
-        <div className="text-center py-8">
-          <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {t("reports.noDataTitle")}
-          </h3>
-          <p className="text-gray-500 max-w-sm mx-auto">
-            📊 {t("reports.noDataDescription")}
-            <br />({formatDate(startDate)} - {formatDate(endDate)})
-            <br />
-            Thử chọn khoảng thời gian khác hoặc kiểm tra dữ liệu đơn hàng và hóa
-            đơn
-          </p>
-          <div className="mt-4 text-sm text-gray-400">
-            Không có dữ liệu sản phẩm
-          </div>
-        </div>
-      );
-    }
-
-    const {
-      productStats,
-      totalRevenue,
-      totalQuantity,
-      totalDiscount,
-      totalProducts,
-    } = productAnalysisData;
-
-    const getSalesData = () => {
-      return productStats || [];
     };
-    console.log("Product Analysis Data:", productAnalysisData);
 
-    const data = getSalesData();
-    const totalPages = Math.ceil(data.length / productPageSize);
-    const startIndex = (productCurrentPage - 1) * productPageSize;
-    const endIndex = startIndex + productPageSize;
-    const paginatedData = data.slice(startIndex, endIndex);
+    // Product Report Logic (Moved up to be before renderChart)
+    const renderProductReport = () => {
+      if (productAnalysisLoading) {
+        return (
+          <div className="flex justify-center py-8">
+            <div className="text-gray-500">{t("reports.loading")}...</div>
+          </div>
+        );
+      }
 
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="w-5 h-5" />
-            {t("reports.salesReportByProduct")}
-          </CardTitle>
-          <CardDescription className="flex items-center justify-between">
-            <span>
-              {t("reports.fromDate")}: {formatDate(startDate)} -{" "}
-              {t("reports.toDate")}: {formatDate(endDate)}
-            </span>
-            <Button
-              onClick={() => {
-                const dataWithSummary = [
-                  ...data.map((product: any) => ({
-                    "Mã hàng": product.productSku,
-                    "Tên hàng": product.productName,
-                    "Đơn vị tính": t("common.perUnit"),
-                    "Sn lượng bán": product.quantity,
-                    "Thành tiền": formatCurrency(
-                      (product.unitPrice || 0) * (product.quantity || 1),
-                    ),
-                    "Giảm giá": formatCurrency(product.discount),
-                    "Doanh thu": formatCurrency(
-                      (product.unitPrice || 0) * (product.quantity || 1) -
-                        (product.discount || 0),
-                    ),
-                    "Nhóm hàng": product.categoryName,
-                  })),
-                  // Add summary row
-                  {
-                    "Mã hàng": "TỔNG CỘNG",
-                    "Tên hàng": `${totalProducts} sản phẩm`,
-                    "Đơn vị tính": "-",
-                    "Số l>ợng bán": totalQuantity,
-                    "Thành tiền": formatCurrency(totalRevenue),
-                    "Giảm giá": formatCurrency(totalDiscount),
-                    "Doanh thu": formatCurrency(
-                      (totalRevenue || 0) - (totalDiscount || 0),
-                    ),
-                    "Nhóm hàng": "-",
-                  },
-                ];
-                exportToExcel(
-                  dataWithSummary,
-                  `ProductAnalysis_${startDate}_to_${endDate}`,
-                );
-              }}
-              className="inline-flex items-center gap-2 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              {t("common.exportExcel")}
-            </Button>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="w-full">
-            <div className="overflow-x-auto xl:overflow-x-visible">
-              <Table className="w-full min-w-[1000px] xl:min-w-full">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead> {t("reports.productCode")} </TableHead>
-                    <TableHead> {t("reports.productName")} </TableHead>
-                    <TableHead className="text-center">
-                      {t("common.unit")}
-                    </TableHead>
-                    <TableHead className="text-center">
-                      {t("reports.quantitySold")}
-                    </TableHead>
-                    <TableHead className="text-right">
-                      {t("reports.thanhTien")}
-                    </TableHead>
-                    {analysisType !== "employee" && (
-                      <TableHead className="text-right">
-                        {t("reports.discount")}
-                      </TableHead>
-                    )}
-                    <TableHead className="text-right">
-                      {t("reports.revenue")}
-                    </TableHead>
-                    <TableHead className="text-center">
-                      {t("reports.productGroup")}
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedData.length > 0 ? (
-                    paginatedData.map((product: any, index: number) => (
-                      <TableRow key={product.productId || index}>
-                        <TableCell className="font-medium">
-                          <button
-                            onClick={() => {
-                              // Map product analysis data to modal format
-                              const productForModal = {
-                                id: product.productId,
-                                name: product.productName,
-                                sku: product.productSku,
-                                price: product.unitPrice || 0,
-                                stock: 0, // Not available in analysis data
-                                categoryId: 0, // Not available in analysis data
-                                categoryName: product.categoryName,
-                                imageUrl: null,
-                                isActive: true,
-                                productType: 1,
-                                trackInventory: false,
-                                taxRate: product,
-                                priceIncludesTax: false,
-                                afterTaxPrice: product.unitPrice || 0,
-                                createdAt: null,
-                                updatedAt: null,
-                              };
-                              // setSelectedProduct(productForModal);
-                              // setShowProductDetail(true);
-                              setSearchSKU(product.productSku);
-                              setShowProductManager(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                          >
-                            {product.productSku}
-                          </button>
-                        </TableCell>
-                        <TableCell> {product.productName} </TableCell>
-                        <TableCell className="text-center">
-                          {t("common.perUnit")}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="outline"> {product.quantity} </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">
-                          {formatCurrency(
-                            (product.unitPrice || 0) * (product.quantity || 1),
-                          )}
-                        </TableCell>
-                        {analysisType !== "employee" && (
-                          <TableCell className="text-right text-red-600">
-                            {formatCurrency(product.discount)}
-                          </TableCell>
-                        )}
-                        <TableCell className="text-right font-semibold text-green-600">
-                          {formatCurrency(
-                            (product.unitPrice || 0) * (product.quantity || 1) -
-                              (product.discount || 0),
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          {product.categoryName}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell
-                        colSpan={8}
-                        className="text-center text-gray-500 italic"
-                      >
-                        {t("reports.noDataDescription")}
-                      </TableCell>
-                    </TableRow>
-                  )}
-
-                  {/* Summary Row */}
-                  {data.length > 0 && (
-                    <TableRow className="bg-gray-100 font-bold border-t-2">
-                      <TableCell className="text-center font-bold">
-                        TỔNG CỘNG
-                      </TableCell>
-                      <TableCell className="text-center font-bold">
-                        {totalProducts} sản phẩm
-                      </TableCell>
-                      <TableCell className="text-center font-bold">
-                        Món
-                      </TableCell>
-                      <TableCell className="text-center font-bold">
-                        <Badge variant="outline" className="font-bold">
-                          {totalQuantity}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-bold text-blue-600">
-                        {formatCurrency(totalRevenue)}
-                      </TableCell>
-                      {analysisType !== "employee" && (
-                        <TableCell className="text-right font-bold text-red-600">
-                          {formatCurrency(totalDiscount)}
-                        </TableCell>
-                      )}
-                      <TableCell className="text-right font-bold text-green-600">
-                        {formatCurrency(
-                          (totalRevenue || 0) - (totalDiscount || 0),
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center font-bold">
-                        {" "}
-                        -
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+      if (
+        !productAnalysisData?.productStats ||
+        productAnalysisData.productStats.length === 0
+      ) {
+        return (
+          <div className="text-center py-8">
+            <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {t("reports.noDataTitle")}
+            </h3>
+            <p className="text-gray-500 max-w-sm mx-auto">
+              📊 {t("reports.noDataDescription")}
+              <br />({formatDate(startDate)} - {formatDate(endDate)})
+              <br />
+              Thử chọn khoảng thời gian khác hoặc kiểm tra dữ liệu đơn hàng và hóa
+              đơn
+            </p>
+            <div className="mt-4 text-sm text-gray-400">
+              Không có dữ liệu sản phẩm
             </div>
           </div>
-
-          {/* Pagination Controls for Product Report */}
-          {data.length > 0 && (
-            <div className="flex items-center justify-between space-x-6 py-4">
-              <div className="flex items-center space-x-2">
-                <p className="text-sm font-medium"> {t("common.show")} </p>
-                <Select
-                  value={productPageSize.toString()}
-                  onValueChange={(value) => {
-                    setProductPageSize(Number(value));
-                    setProductCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-[70px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent side="top">
-                    <SelectItem value="15"> 15 </SelectItem>
-                    <SelectItem value="20"> 20 </SelectItem>
-                    <SelectItem value="30"> 30 </SelectItem>
-                    <SelectItem value="50"> 50 </SelectItem>
-                    <SelectItem value="100"> 100 </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm font-medium"> {t("common.rows")} </p>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <p className="text-sm font-medium">
-                  {t("common.page")} {productCurrentPage} / {totalPages}
-                </p>
-                <div className="flex items-center space-x-1">
-                  <button
-                    onClick={() => setProductCurrentPage(1)}
-                    disabled={productCurrentPage === 1}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
-                  >
-                    «
-                  </button>
-                  <button
-                    onClick={() =>
-                      setProductCurrentPage((prev) => Math.max(prev - 1, 1))
-                    }
-                    disabled={productCurrentPage === 1}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
-                  >
-                    ‹
-                  </button>
-                  <button
-                    onClick={() =>
-                      setProductCurrentPage((prev) =>
-                        Math.min(prev + 1, totalPages),
-                      )
-                    }
-                    disabled={productCurrentPage === totalPages}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
-                  >
-                    {">"}
-                  </button>
-                  <button
-                    onClick={() => setProductCurrentPage(totalPages)}
-                    disabled={productCurrentPage === totalPages}
-                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
-                  >
-                    »
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  };
-
-  // Render Chart component
-  const renderChart = () => {
-    try {
-      const chartData = getChartData();
-
-      console.log("Chart data for", analysisType, ":", chartData);
-
-      // Validate chart data
-      const isValidChartData =
-        Array.isArray(chartData) &&
-        chartData.length > 0 &&
-        chartData.every(
-          (item) => item && typeof item === "object" && item.name,
         );
+      }
 
-      // Always render the chart container, even with no data
+      const {
+        productStats,
+        totalRevenue,
+        totalQuantity,
+        totalDiscount,
+        totalProducts,
+      } = productAnalysisData;
+
+      const getSalesData = () => {
+        return productStats || [];
+      };
+      console.log("Product Analysis Data:", productAnalysisData);
+
+      const data = getSalesData();
+      const totalPages = Math.ceil(data.length / productPageSize);
+      const startIndex = (productCurrentPage - 1) * productPageSize;
+      const endIndex = startIndex + productPageSize;
+      const paginatedData = data.slice(startIndex, endIndex);
+
       return (
-        <Card className="shadow-xl border-0 bg-gradient-to-br from-blue-50/50 to-indigo-50/30">
-          <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-lg">
-            <CardTitle className="flex items-center gap-3 text-lg font-semibold">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <TrendingUp className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="text-white/90 text-sm font-normal">
-                  {t("reports.chartView")}
-                </div>
-                <div className="text-white font-semibold">
-                  {getReportTitle()}
-                </div>
-              </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5" />
+              {t("reports.salesReportByProduct")}
             </CardTitle>
-            <CardDescription className="text-blue-100 mt-2">
-              {t("reports.visualRepresentation")} - {t("reports.fromDate")}:{" "}
-              {formatDate(startDate)} {t("reports.toDate")}:{" "}
-              {formatDate(endDate)}
+            <CardDescription className="flex items-center justify-between">
+              <span>
+                {t("reports.fromDate")}: {formatDate(startDate)} -{" "}
+                {t("reports.toDate")}: {formatDate(endDate)}
+              </span>
+              <Button
+                onClick={() => {
+                  const dataWithSummary = [
+                    ...data.map((product: any) => ({
+                      "Mã hàng": product.productSku,
+                      "Tên hàng": product.productName,
+                      "Đơn vị tính": t("common.perUnit"),
+                      "Số lượng bán": product.quantity,
+                      "Thành tiền": formatCurrency(
+                        (product.unitPrice || 0) * (product.quantity || 1),
+                      ),
+                      "Giảm giá": formatCurrency(product.discount),
+                      "Doanh thu": formatCurrency(
+                        (product.unitPrice || 0) * (product.quantity || 1) -
+                          (product.discount || 0),
+                      ),
+                      "Nhóm hàng": product.categoryName,
+                    })),
+                    // Add summary row
+                    {
+                      "Mã hàng": "TỔNG CỘNG",
+                      "Tên hàng": `${totalProducts} sản phẩm`,
+                      "Đơn vị tính": "-",
+                      "Số lượng bán": totalQuantity,
+                      "Thành tiền": formatCurrency(totalRevenue),
+                      "Giảm giá": formatCurrency(totalDiscount),
+                      "Doanh thu": formatCurrency(
+                        (totalRevenue || 0) - (totalDiscount || 0),
+                      ),
+                      "Nhóm hàng": "-",
+                    },
+                  ];
+                  exportToExcel(
+                    dataWithSummary,
+                    `ProductAnalysis_${startDate}_to_${endDate}`,
+                  );
+                }}
+                className="inline-flex items-center gap-2 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                {t("common.exportExcel")}
+              </Button>
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-8 bg-white/80 backdrop-blur-sm">
-            {!isValidChartData ? (
-              <div className="h-[450px] w-full bg-white/90 rounded-xl border-0 shadow-lg p-6 flex flex-col justify-center items-center">
-                <div className="text-gray-500 mb-4 text-center">
-                  <BarChart3 className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                  <div className="text-lg font-medium mb-2">
-                    {t("reports.noDataDescription")}
-                  </div>
-                  <div className="text-sm text-orange-600 mb-2">
-                    📊 Không có dữ liệu trong khoảng thời gian đã chọn
-                  </div>
-                  <div className="text-sm text-gray-400">
-                    ({formatDate(startDate)} - {formatDate(endDate)})
-                  </div>
-                  <div className="text-xs text-gray-400 mt-2">
-                    Thử chọn khoảng thời gian khác hoặc kiểm tra dữ liệu đơn
-                    hàng và hóa đơn
-                  </div>
+          <CardContent>
+            <div className="w-full">
+              <div className="overflow-x-auto xl:overflow-x-visible">
+                <Table className="w-full min-w-[1000px] xl:min-w-full">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead> {t("reports.productCode")} </TableHead>
+                      <TableHead> {t("reports.productName")} </TableHead>
+                      <TableHead className="text-center">
+                        {t("common.unit")}
+                      </TableHead>
+                      <TableHead className="text-center">
+                        {t("reports.quantitySold")}
+                      </TableHead>
+                      <TableHead className="text-right">
+                        {t("reports.thanhTien")}
+                      </TableHead>
+                      {analysisType !== "employee" && (
+                        <TableHead className="text-right">
+                          {t("reports.discount")}
+                        </TableHead>
+                      )}
+                      <TableHead className="text-right">
+                        {t("reports.revenue")}
+                      </TableHead>
+                      <TableHead className="text-center">
+                        {t("reports.productGroup")}
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedData.length > 0 ? (
+                      paginatedData.map((product: any, index: number) => (
+                        <TableRow key={product.productId || index}>
+                          <TableCell className="font-medium">
+                            <button
+                              onClick={() => {
+                                // Map product analysis data to modal format
+                                const productForModal = {
+                                  id: product.productId,
+                                  name: product.productName,
+                                  sku: product.productSku,
+                                  price: product.unitPrice || 0,
+                                  stock: 0, // Not available in analysis data
+                                  categoryId: 0, // Not available in analysis data
+                                  categoryName: product.categoryName,
+                                  imageUrl: null,
+                                  isActive: true,
+                                  productType: 1,
+                                  trackInventory: false,
+                                  taxRate: product,
+                                  priceIncludesTax: false,
+                                  afterTaxPrice: product.unitPrice || 0,
+                                  createdAt: null,
+                                  updatedAt: null,
+                                };
+                                // setSelectedProduct(productForModal);
+                                // setShowProductDetail(true);
+                                setSearchSKU(product.productSku);
+                                setShowProductManager(true);
+                              }}
+                              className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                            >
+                              {product.productSku}
+                            </button>
+                          </TableCell>
+                          <TableCell> {product.productName} </TableCell>
+                          <TableCell className="text-center">
+                            {t("common.perUnit")}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline"> {product.quantity} </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold">
+                            {formatCurrency(
+                              (product.unitPrice || 0) * (product.quantity || 1),
+                            )}
+                          </TableCell>
+                          {analysisType !== "employee" && (
+                            <TableCell className="text-right text-red-600">
+                              {formatCurrency(product.discount)}
+                            </TableCell>
+                          )}
+                          <TableCell className="text-right font-semibold text-green-600">
+                            {formatCurrency(
+                              (product.unitPrice || 0) * (product.quantity || 1) -
+                                (product.discount || 0),
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {product.categoryName}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={8}
+                          className="text-center text-gray-500 italic"
+                        >
+                          {t("reports.noDataDescription")}
+                        </TableCell>
+                      </TableRow>
+                    )}
+
+                    {/* Summary Row */}
+                    {data.length > 0 && (
+                      <TableRow className="bg-gray-100 font-bold border-t-2">
+                        <TableCell className="text-center font-bold">
+                          TỔNG CỘNG
+                        </TableCell>
+                        <TableCell className="text-center font-bold">
+                          {totalProducts} sản phẩm
+                        </TableCell>
+                        <TableCell className="text-center font-bold">
+                          Món
+                        </TableCell>
+                        <TableCell className="text-center font-bold">
+                          <Badge variant="outline" className="font-bold">
+                            {totalQuantity}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-bold text-blue-600">
+                          {formatCurrency(totalRevenue)}
+                        </TableCell>
+                        {analysisType !== "employee" && (
+                          <TableCell className="text-right font-bold text-red-600">
+                            {formatCurrency(totalDiscount)}
+                          </TableCell>
+                        )}
+                        <TableCell className="text-right font-bold text-green-600">
+                          {formatCurrency(
+                            (totalRevenue || 0) - (totalDiscount || 0),
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center font-bold">
+                          {" "}
+                          -
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            {/* Pagination Controls for Product Report */}
+            {data.length > 0 && (
+              <div className="flex items-center justify-between space-x-6 py-4">
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm font-medium"> {t("common.show")} </p>
+                  <Select
+                    value={productPageSize.toString()}
+                    onValueChange={(value) => {
+                      setProductPageSize(Number(value));
+                      setProductCurrentPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent side="top">
+                      <SelectItem value="15"> 15 </SelectItem>
+                      <SelectItem value="20"> 20 </SelectItem>
+                      <SelectItem value="30"> 30 </SelectItem>
+                      <SelectItem value="50"> 50 </SelectItem>
+                      <SelectItem value="100"> 100 </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm font-medium"> {t("common.rows")} </p>
                 </div>
-              </div>
-            ) : analysisType === "salesMethod" ? (
-              <div className="h-[450px] w-full bg-white/90 rounded-xl border-0 shadow-lg p-6 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 to-purple-50/20 rounded-xl"></div>
-                <ChartContainer
-                  config={chartConfig}
-                  className="h-full w-full relative z-10"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={chartData}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={120}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, value, count }) =>
-                          `${name}: ${formatCurrency(value)} (${count} đơn)`
-                        }
-                      >
-                        {chartData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={COLORS[index % COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <ChartTooltip
-                        content={({ active, payload, label }) => {
-                          if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            return (
-                              <div className="bg-white/95 backdrop-blur-sm p-4 rounded-lg border border-gray-200 shadow-lg">
-                                <p className="font-semibold text-gray-800 mb-2">
-                                  {data.name}
-                                </p>
-                                <p className="text-sm text-blue-600">
-                                  Doanh thu: {formatCurrency(data.value)}
-                                </p>
-                                <p className="text-sm text-green-600">
-                                  Số đơn: {data.count}
-                                </p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
-              </div>
-            ) : (
-              <div className="h-[450px] w-full bg-white/90 rounded-xl border-0 shadow-lg p-6 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 to-purple-50/20 rounded-xl"></div>
-                <ChartContainer
-                  config={chartConfig}
-                  className="h-full w-full relative z-10"
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={chartData}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm font-medium">
+                    {t("common.page")} {productCurrentPage} / {totalPages}
+                  </p>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => setProductCurrentPage(1)}
+                      disabled={productCurrentPage === 1}
+                      className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
                     >
-                      <defs>
-                        <linearGradient
-                          id="revenueGradient"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="5%"
-                            stopColor="#10b981"
-                            stopOpacity={0.9}
-                          />
-                          <stop
-                            offset="95%"
-                            stopColor="#10b981"
-                            stopOpacity={0.6}
-                          />
-                        </linearGradient>
-                        <linearGradient
-                          id="ordersGradient"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="5%"
-                            stopColor="#3b82f6"
-                            stopOpacity={0.9}
-                          />
-                          <stop
-                            offset="95%"
-                            stopColor="#3b82f6"
-                            stopOpacity={0.6}
-                          />
-                        </linearGradient>
-                        <linearGradient
-                          id="quantityGradient"
-                          x1="0"
-                          y1="0"
-                          x2="0"
-                          y2="1"
-                        >
-                          <stop
-                            offset="5%"
-                            stopColor="#f59e0b"
-                            stopOpacity={0.9}
-                          />
-                          <stop
-                            offset="95%"
-                            stopColor="#f59e0b"
-                            stopOpacity={0.6}
-                          />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="#e5e7eb"
-                        opacity={0.5}
-                      />
-                      <XAxis
-                        dataKey="name"
-                        stroke="#6b7280"
-                        fontSize={12}
-                        angle={-45}
-                        textAnchor="end"
-                        height={50}
-                      />
-                      <YAxis stroke="#6b7280" fontSize={12} />
-                      <ChartTooltip
-                        content={({ active, payload, label }) => {
-                          if (active && payload && payload.length) {
-                            return (
-                              <div className="bg-white/95 backdrop-blur-sm p-4 rounded-lg border border-gray-200 shadow-lg">
-                                <p className="font-semibold text-gray-800 mb-2">
-                                  {label}
-                                </p>
-                                {payload.map((entry, index) => {
-                                  const translatedName =
-                                    entry.dataKey === "revenue"
-                                      ? t("reports.revenue")
-                                      : entry.dataKey === "orders"
-                                        ? t("reports.orders")
-                                        : entry.dataKey === "quantity"
-                                          ? t("reports.quantity")
-                                          : entry.name;
-                                  return (
-                                    <p
-                                      key={index}
-                                      className="text-sm"
-                                      style={{ color: entry.color }}
-                                    >
-                                      {translatedName}:{" "}
-                                      {entry.dataKey === "revenue" ||
-                                      entry.dataKey === "netRevenue"
-                                        ? formatCurrency(Number(entry.value))
-                                        : entry.value}
-                                    </p>
-                                  );
-                                })}
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-
-                      {/* Revenue bar - always show */}
-                      <Bar
-                        dataKey="revenue"
-                        fill="url(#revenueGradient)"
-                        radius={[4, 4, 0, 0]}
-                        maxBarSize={60}
-                      />
-
-                      {/* Additional bars based on analysis type */}
-                      {analysisType === "time" && (
-                        <Bar
-                          dataKey="orders"
-                          fill="url(#ordersGradient)"
-                          radius={[4, 4, 0, 0]}
-                          maxBarSize={60}
-                        />
-                      )}
-
-                      {(analysisType === "employee" ||
-                        analysisType === "customer" ||
-                        analysisType === "salesDetail") && (
-                        <Bar
-                          dataKey="orders"
-                          fill="url(#ordersGradient)"
-                          radius={[4, 4, 0, 0]}
-                          maxBarSize={60}
-                        />
-                      )}
-                    </BarChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
+                      «
+                    </button>
+                    <button
+                      onClick={() =>
+                        setProductCurrentPage((prev) => Math.max(prev - 1, 1))
+                      }
+                      disabled={productCurrentPage === 1}
+                      className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                    >
+                      ‹
+                    </button>
+                    <button
+                      onClick={() =>
+                        setProductCurrentPage((prev) =>
+                          Math.min(prev + 1, totalPages),
+                        )
+                      }
+                      disabled={productCurrentPage === totalPages}
+                      className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                    >
+                      {">"}
+                    </button>
+                    <button
+                      onClick={() => setProductCurrentPage(totalPages)}
+                      disabled={productCurrentPage === totalPages}
+                      className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8"
+                    >
+                      »
+                    </button>
+                  </div>
+                </div>{" "}
               </div>
             )}
           </CardContent>
         </Card>
       );
-    } catch (error) {
-      console.error("Error in renderChart:", error);
-      return (
-        <Card className="shadow-xl border-0 bg-gradient-to-br from-red-50/50 to-pink-50/30">
-          <CardHeader className="bg-gradient-to-r from-red-600 to-pink-600 rounded-t-lg">
-            <CardTitle className="flex items-center gap-3 text-lg font-semibold">
-              <div className="p-2 bg-white/20 rounded-lg">
-                <TrendingUp className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="text-white/90 text-sm font-normal">
-                  {t("reports.chartView")}
+    };
+
+    // Render Chart component
+    const renderChart = () => {
+      try {
+        const chartData = getChartData();
+
+        console.log("Chart data for", analysisType, ":", chartData);
+
+        // Validate chart data
+        const isValidChartData =
+          Array.isArray(chartData) &&
+          chartData.length > 0 &&
+          chartData.every(
+            (item) => item && typeof item === "object" && item.name,
+          );
+
+        // Always render the chart container, even with no data
+        return (
+          <Card className="shadow-xl border-0 bg-gradient-to-br from-blue-50/50 to-indigo-50/30">
+            <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-lg">
+              <CardTitle className="flex items-center gap-3 text-lg font-semibold">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <TrendingUp className="w-6 h-6" />
                 </div>
-                <div className="text-white font-semibold">
-                  Lỗi hiển thị biểu đồ
+                <div>
+                  <div className="text-white/90 text-sm font-normal">
+                    {t("reports.chartView")}
+                  </div>
+                  <div className="text-white font-semibold">
+                    {getReportTitle()}
+                  </div>
                 </div>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-8 bg-white/80 backdrop-blur-sm">
-            <div className="h-[450px] w-full bg-white/90 rounded-xl border-0 shadow-lg p-6 flex flex-col justify-center items-center">
-              <div className="text-red-500 text-center">
-                <p className="text-lg font-medium mb-2">
-                  Lỗi khi hiển thị biểu đồ
-                </p>
-                <p className="text-sm">{error?.message || "Unknown error"}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      );
-    }
-  };
+              </CardTitle>
+              <CardDescription className="text-blue-100 mt-2">
+                {t("reports.visualRepresentation")} - {t("reports.fromDate")}:{" "}
+                {formatDate(startDate)} {t("reports.toDate")}:{" "}
+                {formatDate(endDate)}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-8 bg-white/80 backdrop-blur-sm">
+              {!isValidChartData ? (
+                <div className="h-[450px] w-full bg-white/90 rounded-xl border-0 shadow-lg p-6 flex flex-col justify-center items-center">
+                  <div className="text-gray-500 mb-4 text-center">
+                    <BarChart3 className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                    <div className="text-lg font-medium mb-2">
+                      {t("reports.noDataDescription")}
+                    </div>
+                    <div className="text-sm text-orange-600 mb-2">
+                      📊 Không có dữ liệu trong khoảng thời gian đã chọn
+                    </div>
+                    <div className="text-sm text-gray-400">
+                      ({formatDate(startDate)} - {formatDate(endDate)})
+                    </div>
+                    <div className="text-xs text-gray-400 mt-2">
+                      Thử chọn khoảng thời gian khác hoặc kiểm tra dữ liệu đơn
+                      hàng và hóa đơn
+                    </div>
+                  </div>
+                </div>
+              ) : analysisType === "salesMethod" ? (
+                <div className="h-[450px] w-full bg-white/90 rounded-xl border-0 shadow-lg p-6 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 to-purple-50/20 rounded-xl"></div>
+                  <ChartContainer
+                    config={chartConfig}
+                    className="h-full w-full relative z-10"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={chartData}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={120}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, value, count }) =>
+                            `${name}: ${formatCurrency(value)} (${count} đơn)`
+                          }
+                        >
+                          {chartData.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={COLORS[index % COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <ChartTooltip
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              return (
+                                <div className="bg-white/95 backdrop-blur-sm p-4 rounded-lg border border-gray-200 shadow-lg">
+                                  <p className="font-semibold text-gray-800 mb-2">
+                                    {data.name}
+                                  </p>
+                                  <p className="text-sm text-blue-600">
+                                    Doanh thu: {formatCurrency(data.value)}
+                                  </p>
+                                  <p className="text-sm text-green-600">
+                                    Số đơn: {data.count}
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </div>
+              ) : (
+                <div className="h-[450px] w-full bg-white/90 rounded-xl border-0 shadow-lg p-6 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 to-purple-50/20 rounded-xl"></div>
+                  <ChartContainer
+                    config={chartConfig}
+                    className="h-full w-full relative z-10"
+                  >
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={chartData}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                      >
+                        <defs>
+                          <linearGradient
+                            id="revenueGradient"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="5%"
+                              stopColor="#10b981"
+                              stopOpacity={0.9}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="#10b981"
+                              stopOpacity={0.6}
+                            />
+                          </linearGradient>
+                          <linearGradient
+                            id="ordersGradient"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="5%"
+                              stopColor="#3b82f6"
+                              stopOpacity={0.9}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="#3b82f6"
+                              stopOpacity={0.6}
+                            />
+                          </linearGradient>
+                          <linearGradient
+                            id="quantityGradient"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="5%"
+                              stopColor="#f59e0b"
+                              stopOpacity={0.9}
+                            />
+                            <stop
+                              offset="95%"
+                              stopColor="#f59e0b"
+                              stopOpacity={0.6}
+                            />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="#e5e7eb"
+                          opacity={0.5}
+                        />
+                        <XAxis
+                          dataKey="name"
+                          stroke="#6b7280"
+                          fontSize={12}
+                          angle={-45}
+                          textAnchor="end"
+                          height={50}
+                        />
+                        <YAxis stroke="#6b7280" fontSize={12} />
+                        <ChartTooltip
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white/95 backdrop-blur-sm p-4 rounded-lg border border-gray-200 shadow-lg">
+                                  <p className="font-semibold text-gray-800 mb-2">
+                                    {label}
+                                  </p>
+                                  {payload.map((entry, index) => {
+                                    const translatedName =
+                                      entry.dataKey === "revenue"
+                                        ? t("reports.revenue")
+                                        : entry.dataKey === "orders"
+                                          ? t("reports.orders")
+                                          : entry.dataKey === "quantity"
+                                            ? t("reports.quantity")
+                                            : entry.name;
+                                    return (
+                                      <p
+                                        key={index}
+                                        className="text-sm"
+                                        style={{ color: entry.color }}
+                                      >
+                                        {translatedName}:{" "}
+                                        {entry.dataKey === "revenue" ||
+                                        entry.dataKey === "netRevenue"
+                                          ? formatCurrency(Number(entry.value))
+                                          : entry.value}
+                                      </p>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
 
-  // Main render function
-  const renderReportContent = () => {
-    try {
-      console.log(
-        "Rendering report content for analysisType:",
-        analysisType,
-        "concernType:",
-        concernType,
-      );
+                        {/* Revenue bar - always show */}
+                        <Bar
+                          dataKey="revenue"
+                          fill="url(#revenueGradient)"
+                          radius={[4, 4, 0, 0]}
+                          maxBarSize={60}
+                        />
 
-      switch (analysisType) {
-        case "time":
-          // Handle concernType for time-based analysis
-          if (concernType === "employee") {
-            return renderEmployeeReport();
-          } else if (concernType === "salesDetail") {
-            return renderSalesDetailReport();
-          }
-          return renderSalesReport();
-        case "product":
-          return renderProductReport();
-        case "employee":
-          return renderEmployeeReport();
-        case "customer":
-          return renderCustomerReport();
-        case "salesMethod":
-          return renderSalesChannelReport(); // Reuse channel report logic
-        case "salesDetail":
-          return renderSalesDetailReport();
-        default:
-          return renderSalesReport();
-      }
-    } catch (error) {
-      console.error("Error in renderReportContent:", error);
-      return (
-        <div className="flex justify-center py-8">
-          <div className="text-red-500">
-            <p>Có lỗi xảy ra khi hiển thị báo cáo</p>
-            <p className="text-sm">{error?.message || "Unknown error"}</p>
-          </div>
-        </div>
-      );
-    }
-  };
+                        {/* Additional bars based on analysis type */}
+                        {analysisType === "time" && (
+                          <Bar
+                            dataKey="orders"
+                            fill="url(#ordersGradient)"
+                            radius={[4, 4, 0, 0]}
+                            maxBarSize={60}
+                          />
+                        )}
 
-  return (
-    <div className="space-y-6">
-      {/* Filters */}
-      <Card className="border-blue-100 shadow-sm">
-        <CardContent className="pt-6">
-          <div className="space-y-6">
-            {/* Main Filter Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Analysis Type */}
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  {t("reports.analyzeBy")}
-                </Label>
-                <Select
-                  value={analysisType}
-                  onValueChange={(value) => {
-                    setAnalysisType(value);
-                    // Reset concernType when analysisType changes if necessary
-                    if (value === "time") {
-                      setConcernType("time"); // Default for time analysis
-                    } else if (value === "salesDetail") {
-                      setConcernType("sales"); // Default for sales detail analysis
-                    } else {
-                      // If moving away from 'time', ensure concernType is sensible or reset
-                      setConcernType("sales"); // Or a more appropriate default
-                    }
-                  }}
-                >
-                  <SelectTrigger className="h-10 text-sm border-gray-200 hover:border-blue-300 transition-colors">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="time">
-                      {t("reports.timeAnalysis")}
-                    </SelectItem>
-                    <SelectItem value="product">
-                      {t("reports.productAnalysis")}
-                    </SelectItem>
-                    <SelectItem value="employee">
-                      {t("reports.employeeAnalysis")}
-                    </SelectItem>
-                    <SelectItem value="customer">
-                      {t("reports.customerAnalysis")}
-                    </SelectItem>
-                    <SelectItem value="salesMethod">
-                      {t("reports.salesMethod")}
-                    </SelectItem>
-                    <SelectItem value="salesDetail">
-                      {t("reports.salesDetailReport")}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Date Range */}
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  {t("reports.startDate")}
-                </Label>
-                <Input
-                  type="datetime-local"
-                  value={
-                    startDate && startTime ? `${startDate}T${startTime}` : ""
-                  }
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      const [date, time] = e.target.value.split("T");
-                      setStartDate(date);
-                      setStartTime(time || "00:00");
-                    }
-                  }}
-                  className="h-10 text-sm border-gray-200 hover:border-green-300 focus:border-green-500 transition-colors"
-                  placeholder="dd/MM/yyyy HH:mm"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  {t("reports.endDate")}
-                </Label>
-                <Input
-                  type="datetime-local"
-                  value={endDate && endTime ? `${endDate}T${endTime}` : ""}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      const [date, time] = e.target.value.split("T");
-                      setEndDate(date);
-                      setEndTime(time || "23:59");
-                    }
-                  }}
-                  className="h-10 text-sm border-gray-200 hover:border-green-300 focus:border-green-500 transition-colors"
-                  placeholder="dd/MM/yyyy HH:mm"
-                />
-              </div>
-
-              {/* Floor Filter */}
-              <div className="space-y-2">
-                <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
-                  {t("tables.floorLabel")}
-                </Label>
-                <Select
-                  value={selectedFloor}
-                  onValueChange={setSelectedFloor}
-                  disabled={tablesLoading}
-                >
-                  <SelectTrigger>
-                    <SelectValue
-                      placeholder={tablesLoading ? "Đang tải..." : "Chọn tầng"}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tất cả</SelectItem>
-                    {tablesLoading ? (
-                      <SelectItem value="loading" disabled>
-                        Đang tải dữ liệu...
-                      </SelectItem>
-                    ) : tablesError ? (
-                      <SelectItem value="error" disabled>
-                        Lỗi tải dữ liệu
-                      </SelectItem>
-                    ) : (
-                      getAvailableFloors().map((floor) => (
-                        <SelectItem key={floor} value={floor}>
-                          {floor}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                {tablesError && (
-                  <p className="text-xs text-red-500 mt-1">
-                    Không thể tải dữ liệu tầng
+                        {(analysisType === "employee" ||
+                          analysisType === "customer" ||
+                          analysisType === "salesDetail") && (
+                          <Bar
+                            dataKey="orders"
+                            fill="url(#ordersGradient)"
+                            radius={[4, 4, 0, 0]}
+                            maxBarSize={60}
+                          />
+                        )}
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      } catch (error) {
+        console.error("Error in renderChart:", error);
+        return (
+          <Card className="shadow-xl border-0 bg-gradient-to-br from-red-50/50 to-pink-50/30">
+            <CardHeader className="bg-gradient-to-r from-red-600 to-pink-600 rounded-t-lg">
+              <CardTitle className="flex items-center gap-3 text-lg font-semibold">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <TrendingUp className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="text-white/90 text-sm font-normal">
+                    {t("reports.chartView")}
+                  </div>
+                  <div className="text-white font-semibold">
+                    Lỗi hiển thị biểu đồ
+                  </div>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-8 bg-white/80 backdrop-blur-sm">
+              <div className="h-[450px] w-full bg-white/90 rounded-xl border-0 shadow-lg p-6 flex flex-col justify-center items-center">
+                <div className="text-red-500 text-center">
+                  <p className="text-lg font-medium mb-2">
+                    Lỗi khi hiển thị biểu đồ
                   </p>
-                )}
+                  <p className="text-sm">{error?.message || "Unknown error"}</p>
+                </div>
               </div>
+            </CardContent>
+          </Card>
+        );
+      }
+    };
+
+    // Main render function
+    const renderReportContent = () => {
+      try {
+        console.log(
+          "Rendering report content for analysisType:",
+          analysisType,
+          "concernType:",
+          concernType,
+        );
+
+        switch (analysisType) {
+          case "time":
+            // Handle concernType for time-based analysis
+            if (concernType === "employee") {
+              return renderEmployeeReport();
+            } else if (concernType === "salesDetail") {
+              return renderSalesDetailReport();
+            }
+            return renderSalesReport();
+          case "product":
+            return renderProductReport();
+          case "employee":
+            return renderEmployeeReport();
+          case "customer":
+            return renderCustomerReport();
+          case "salesMethod":
+            return renderSalesChannelReport(); // Reuse channel report logic
+          case "salesDetail":
+            return renderSalesDetailReport();
+          default:
+            return renderSalesReport();
+        }
+      } catch (error) {
+        console.error("Error in renderReportContent:", error);
+        return (
+          <div className="flex justify-center py-8">
+            <div className="text-red-500">
+              <p>Có lỗi xảy ra khi hiển thị báo cáo</p>
+              <p className="text-sm">{error?.message || "Unknown error"}</p>
             </div>
           </div>
+        );
+      }
+    };
 
-          {/* Secondary Filter Row - Show based on analysis type */}
-          {analysisType === "employee" && (
-            <div className="pt-4 border-t border-gray-100">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    return (
+      <div className="space-y-6">
+        {/* Filters */}
+        <Card className="border-blue-100 shadow-sm">
+          <CardContent className="pt-6">
+            <div className="space-y-6">
+              {/* Main Filter Row */}
+              <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {/* Store Filter - Only show for admin users */}
+                {isAdmin && (
+                  <div>
+                    <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                      <div className="w-2 h-2 bg-cyan-500 rounded-full"></div>
+                      Cửa hàng
+                    </Label>
+                    <Select
+                      value={storeFilter}
+                      onValueChange={setStoreFilter}
+                      disabled={storesLoading}
+                    >
+                      <SelectTrigger className="h-10 text-sm border-gray-200 hover:border-cyan-300 transition-colors">
+                        <SelectValue
+                          placeholder={
+                            storesLoading
+                              ? "Đang tải..."
+                              : storeFilter === "all"
+                                ? "Tất cả"
+                                : storesFilterData
+                                    ?.filter((store: any) => store.typeUser !== 1)
+                                    .find(
+                                      (store: any) =>
+                                        store.storeCode === storeFilter,
+                                    )?.storeName
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {storesFilterData &&
+                          Array.isArray(storesFilterData) &&
+                          storesFilterData.length > 1 && (
+                            <SelectItem value="all">{t("common.all")}</SelectItem>
+                          )}
+                        {storesFilterData &&
+                          Array.isArray(storesFilterData) &&
+                          storesFilterData.map((store: any) => (
+                            <SelectItem key={store.id} value={store.storeCode}>
+                              {store.storeName}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    {storesLoading && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Đang tải danh sách cửa hàng...
+                      </p>
+                    )}
+                    {!storesLoading && !storesFilterData && (
+                      <p className="text-xs text-red-500 mt-1">
+                        Lỗi khi tải danh sách cửa hàng
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Analysis Type */}
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                    {t("reports.employeeFilter")}
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    {t("reports.analyzeBy")}
                   </Label>
-                  <div className="relative">
-                    {" "}
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <Input
-                      placeholder={t("reports.employeeFilterPlaceholder")}
-                      value={selectedEmployee === "all" ? "" : selectedEmployee}
-                      onChange={(e) =>
-                        setSelectedEmployee(e.target.value || "all")
+                  <Select
+                    value={analysisType}
+                    onValueChange={(value) => {
+                      setAnalysisType(value);
+                      // Reset concernType when analysisType changes if necessary
+                      if (value === "time") {
+                        setConcernType("time"); // Default for time analysis
+                      } else if (value === "salesDetail") {
+                        setConcernType("sales"); // Default for sales detail analysis
+                      } else {
+                        // If moving away from 'time', ensure concernType is sensible or reset
+                        setConcernType("sales"); // Or a more appropriate default
                       }
-                      className="pl-10 h-10 text-sm border-gray-200 hover:border-purple-300 focus:border-purple-500 transition-colors"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {analysisType === "customer" && (
-            <div className="pt-4 border-t border-gray-100">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                    {t("reports.customerFilter")}
-                  </Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <Input
-                      placeholder={t("reports.customerFilterPlaceholder")}
-                      value={customerSearch}
-                      onChange={(e) => setCustomerSearch(e.target.value)}
-                      className="pl-10 h-10 text-sm border-gray-200 hover:border-orange-300 focus:border-orange-500 transition-colors"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {analysisType === "product" && (
-            <div className="pt-4 border-t border-gray-100">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-                    {t("reports.productFilter")}
-                  </Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <Input
-                      placeholder={t("reports.productFilterPlaceholder")}
-                      value={productSearch}
-                      onChange={(e) => setProductSearch(e.target.value)}
-                      className="pl-10 h-10 text-sm border-gray-200 hover:border-indigo-300 focus:border-indigo-500 transition-colors"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-                    {t("common.productType")}
-                  </Label>
-                  <Select value={productType} onValueChange={setProductType}>
-                    <SelectTrigger className="h-10 text-sm border-gray-200 hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+                    }}
+                  >
+                    <SelectTrigger className="h-10 text-sm border-gray-200 hover:border-blue-300 transition-colors">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">{t("common.all")}</SelectItem>
-                      <SelectItem value="combo">
-                        {t("reports.combo")}
+                      <SelectItem value="time">
+                        {t("reports.timeAnalysis")}
                       </SelectItem>
                       <SelectItem value="product">
-                        {t("reports.product")}
+                        {t("reports.productAnalysis")}
                       </SelectItem>
-                      <SelectItem value="service">
-                        {t("reports.service")}
+                      {/* <SelectItem value="employee">
+                      {t("reports.employeeAnalysis")}
+                    </SelectItem> */}
+                      <SelectItem value="customer">
+                        {t("reports.customerAnalysis")}
+                      </SelectItem>
+                      {/* <SelectItem value="salesMethod">
+                      {t("reports.salesMethod")}
+                    </SelectItem> */}
+                      <SelectItem value="salesDetail">
+                        {t("reports.salesDetailReport")}
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                {/* Date Range */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    {t("reports.startDate")}
+                  </Label>
+                  <Input
+                    type="datetime-local"
+                    value={
+                      startDate && startTime ? `${startDate}T${startTime}` : ""
+                    }
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const [date, time] = e.target.value.split("T");
+                        setStartDate(date);
+                        setStartTime(time || "00:00");
+                      }
+                    }}
+                    className="h-10 text-sm border-gray-200 hover:border-green-300 focus:border-green-500 transition-colors"
+                    placeholder="dd/MM/yyyy HH:mm"
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
-                    {t("reports.productGroup")}
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    {t("reports.endDate")}
+                  </Label>
+                  <Input
+                    type="datetime-local"
+                    value={endDate && endTime ? `${endDate}T${endTime}` : ""}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const [date, time] = e.target.value.split("T");
+                        setEndDate(date);
+                        setEndTime(time || "23:59");
+                      }
+                    }}
+                    className="h-10 text-sm border-gray-200 hover:border-green-300 focus:border-green-500 transition-colors"
+                    placeholder="dd/MM/yyyy HH:mm"
+                  />
+                </div>
+
+                {/* Shop Filter */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                    <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                    {t("common.shop")}
                   </Label>
                   <Select
-                    value={selectedCategory}
-                    onValueChange={setSelectedCategory}
+                    value={selectedShop}
+                    onValueChange={setSelectedShop}
+                    disabled={tablesLoading}
                   >
-                    <SelectTrigger className="h-10 text-sm border-gray-200 hover:border-indigo-300 focus:border-indigo-500 transition-colors">
-                      <SelectValue placeholder={t("reports.productGroup")} />
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          tablesLoading
+                            ? t("common.loading")
+                            : t("common.selectShop")
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">{t("common.all")}</SelectItem>
-                      {categories &&
-                        Array.isArray(categories) &&
-                        categories.map((category: any) => (
+                      {tablesLoading ? (
+                        <SelectItem value="loading" disabled>
+                          {t("common.loadingData")}
+                        </SelectItem>
+                      ) : tablesError ? (
+                        <SelectItem value="error" disabled>
+                          {t("common.errorLoadingData")}
+                        </SelectItem>
+                      ) : (
+                        getStoresFilter().map((stores: any) => (
                           <SelectItem
-                            key={category.id}
-                            value={category.id.toString()}
+                            key={stores.storeCode}
+                            value={stores.storeCode}
                           >
-                            {category.name}
+                            {stores.storeName}
                           </SelectItem>
-                        ))}
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
+                  {tablesError && (
+                    <p className="text-xs text-red-500 mt-1">
+                      Không thể tải dữ liệu cửa hàng
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
-          )}
 
-          {analysisType === "salesMethod" && (
-            <div className="pt-4 border-t border-gray-100">
-              {/* No additional filters for sales method analysis */}
-            </div>
-          )}
-
-          {/* Sales Detail Report Filters */}
-          {analysisType === "salesDetail" && (
-            <div className="pt-4 border-t border-gray-100">
-              <div className="space-y-4">
-                {/* Employee and Order Code */}
+            {/* Secondary Filter Row - Show based on analysis type */}
+            {analysisType === "employee" && (
+              <div className="pt-4 border-t border-gray-100">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                      <div className="w-2 h-2 bg-pink-500 rounded-full"></div>
+                      <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
                       {t("reports.employeeFilter")}
                     </Label>
                     <div className="relative">
+                      {" "}
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <Input
                         placeholder={t("reports.employeeFilterPlaceholder")}
-                        value={
-                          selectedEmployee === "all" ? "" : selectedEmployee
-                        }
+                        value={selectedEmployee === "all" ? "" : selectedEmployee}
                         onChange={(e) =>
                           setSelectedEmployee(e.target.value || "all")
                         }
-                        className="pl-10 h-10 text-sm border-gray-200 hover:border-pink-300 focus:border-pink-500 transition-colors"
+                        className="pl-10 h-10 text-sm border-gray-200 hover:border-purple-300 focus:border-purple-500 transition-colors"
                       />
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {analysisType === "customer" && (
+              <div className="pt-4 border-t border-gray-100">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                      <div className="w-2 h-2 bg-pink-500 rounded-full"></div>
-                      {t("reports.orderCode")}
+                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                      {t("reports.customerFilter")}
                     </Label>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                       <Input
-                        placeholder="Tìm theo mã đơn hàng..."
-                        value={orderSearch}
-                        onChange={(e) => setOrderSearch(e.target.value)}
-                        className="pl-10 h-10 text-sm border-gray-200 hover:border-pink-300 focus:border-pink-500 transition-colors"
+                        placeholder={t("reports.customerFilterPlaceholder")}
+                        value={customerSearch}
+                        onChange={(e) => setCustomerSearch(e.target.value)}
+                        className="pl-10 h-10 text-sm border-gray-200 hover:border-orange-300 focus:border-orange-500 transition-colors"
                       />
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {analysisType === "product" && (
+              <div className="pt-4 border-t border-gray-100">
+                <div className="grid grid-cols-1 md:grid-grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                      <div className="w-2 h-2 bg-pink-500 rounded-full"></div>
+                      <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                      {t("reports.productFilter")}
+                    </Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <Input
+                        placeholder={t("reports.productFilterPlaceholder")}
+                        value={productSearch}
+                        onChange={(e) => setProductSearch(e.target.value)}
+                        className="pl-10 h-10 text-sm border-gray-200 hover:border-indigo-300 focus:border-indigo-500 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                      <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
+                      {t("common.productType")}
+                    </Label>
+                    <Select value={productType} onValueChange={setProductType}>
+                      <SelectTrigger className="h-10 text-sm border-gray-200 hover:border-indigo-300 focus:border-indigo-500 transition-colors">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">{t("common.all")}</SelectItem>
+                        <SelectItem value="combo">
+                          {t("reports.combo")}
+                        </SelectItem>
+                        <SelectItem value="product">
+                          {t("reports.product")}
+                        </SelectItem>
+                        <SelectItem value="service">
+                          {t("reports.service")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                      <div className="w-2 h-2 bg-indigo-500 rounded-full"></div>
                       {t("reports.productGroup")}
                     </Label>
                     <Select
                       value={selectedCategory}
                       onValueChange={setSelectedCategory}
                     >
-                      <SelectTrigger className="h-10 text-sm border-gray-200 hover:border-pink-300 focus:border-pink-500 transition-colors">
+                      <SelectTrigger className="h-10 text-sm border-gray-200 hover:border-indigo-300 focus:border-indigo-500 transition-colors">
                         <SelectValue placeholder={t("reports.productGroup")} />
                       </SelectTrigger>
                       <SelectContent>
@@ -6758,102 +7053,179 @@ export function SalesChartReport() {
                     </Select>
                   </div>
                 </div>
+              </div>
+            )}
 
-                {/* Customer Search and Product Search */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                      <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
-                      {t("reports.customerSearch")}
-                    </Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <Input
-                        placeholder="Tìm theo tên, mã KH, SĐT..."
-                        value={customerSearch}
-                        onChange={(e) => setCustomerSearch(e.target.value)}
-                        className="pl-10 h-10 text-sm border-gray-200 hover:border-teal-300 focus:border-teal-500 transition-colors"
-                      />
+            {analysisType === "salesMethod" && (
+              <div className="pt-4 border-t border-gray-100">
+                {/* No additional filters for sales method analysis */}
+              </div>
+            )}
+
+            {/* Sales Detail Report Filters */}
+            {analysisType === "salesDetail" && (
+              <div className="pt-4 border-t border-gray-100">
+                <div className="space-y-4">
+                  {/* Employee and Order Code */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                        <div className="w-2 h-2 bg-pink-500 rounded-full"></div>
+                        {t("reports.employeeFilter")}
+                      </Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          placeholder={t("reports.employeeFilterPlaceholder")}
+                          value={
+                            selectedEmployee === "all" ? "" : selectedEmployee
+                          }
+                          onChange={(e) =>
+                            setSelectedEmployee(e.target.value || "all")
+                          }
+                          className="pl-10 h-10 text-sm border-gray-200 hover:border-pink-300 focus:border-pink-500 transition-colors"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                        <div className="w-2 h-2 bg-pink-500 rounded-full"></div>
+                        {t("reports.orderCode")}
+                      </Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          placeholder="Tìm theo mã đơn hàng..."
+                          value={orderSearch}
+                          onChange={(e) => setOrderSearch(e.target.value)}
+                          className="pl-10 h-10 text-sm border-gray-200 hover:border-pink-300 focus:border-pink-500 transition-colors"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                        <div className="w-2 h-2 bg-pink-500 rounded-full"></div>
+                        {t("reports.productGroup")}
+                      </Label>
+                      <Select
+                        value={selectedCategory}
+                        onValueChange={setSelectedCategory}
+                      >
+                        <SelectTrigger className="h-10 text-sm border-gray-200 hover:border-pink-300 focus:border-pink-500 transition-colors">
+                          <SelectValue placeholder={t("reports.productGroup")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">{t("common.all")}</SelectItem>
+                          {categories &&
+                            Array.isArray(categories) &&
+                            categories.map((category: any) => (
+                              <SelectItem
+                                key={category.id}
+                                value={category.id.toString()}
+                              >
+                                {category.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                      <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
-                      {t("reports.productFilter")}
-                    </Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <Input
-                        placeholder={t("reports.productFilterPlaceholder")}
-                        value={productSearch}
-                        onChange={(e) => setProductSearch(e.target.value)}
-                        className="pl-10 h-10 text-sm border-gray-200 hover:border-teal-300 focus:border-teal-500 transition-colors"
-                      />
+
+                  {/* Customer Search and Product Search */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                        <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                        {t("reports.customerSearch")}
+                      </Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          placeholder="Tìm theo tên, mã KH, SĐT..."
+                          value={customerSearch}
+                          onChange={(e) => setCustomerSearch(e.target.value)}
+                          className="pl-10 h-10 text-sm border-gray-200 hover:border-teal-300 focus:border-teal-500 transition-colors"
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-                      <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
-                      {t("reports.status")}
-                    </Label>
-                    <Select
-                      value={orderStatusFilter}
-                      onValueChange={setOrderStatusFilter}
-                      defaultValue="all"
-                    >
-                      <SelectTrigger className="h-10 text-sm border-gray-200 hover:border-teal-300 focus:border-teal-500 transition-colors">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{t("common.all")}</SelectItem>
-                        <SelectItem value="completed">
-                          {t("reports.completed")}
-                        </SelectItem>
-                        <SelectItem value="cancelled">
-                          {t("reports.cancelled")}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                        <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                        {t("reports.productFilter")}
+                      </Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          placeholder={t("reports.productFilterPlaceholder")}
+                          value={productSearch}
+                          onChange={(e) => setProductSearch(e.target.value)}
+                          className="pl-10 h-10 text-sm border-gray-200 hover:border-teal-300 focus:border-teal-500 transition-colors"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                        <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                        {t("reports.status")}
+                      </Label>
+                      <Select
+                        value={orderStatusFilter}
+                        onValueChange={setOrderStatusFilter}
+                        defaultValue="all"
+                      >
+                        <SelectTrigger className="h-10 text-sm border-gray-200 hover:border-teal-300 focus:border-teal-500 transition-colors">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">{t("common.all")}</SelectItem>
+                          <SelectItem value="completed">
+                            {t("reports.completed")}
+                          </SelectItem>
+                          <SelectItem value="cancelled">
+                            {t("reports.cancelled")}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Report Content */}
+        <div className="space-y-6">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="text-gray-500">{t("reports.loading")}...</div>
             </div>
+          ) : (
+            <>
+              {/* Chart Display */}
+              {(analysisType === "time" ||
+                analysisType === "product" ||
+                analysisType === "employee" ||
+                analysisType === "customer" ||
+                analysisType === "salesMethod") &&
+                renderChart()}
+
+              {/* Data Tables */}
+              {renderReportContent()}
+            </>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Report Content */}
-      <div className="space-y-6">
-        {isLoading ? (
-          <div className="flex justify-center py-8">
-            <div className="text-gray-500">{t("reports.loading")}...</div>
-          </div>
-        ) : (
-          <>
-            {/* Chart Display */}
-            {(analysisType === "time" ||
-              analysisType === "product" ||
-              analysisType === "employee" ||
-              analysisType === "customer" ||
-              analysisType === "salesMethod") &&
-              renderChart()}
-
-            {/* Data Tables */}
-            {renderReportContent()}
-          </>
+        {showProductManager && (
+          <ProductManagerModal
+            isOpen={showProductManager}
+            onClose={() => {
+              setShowProductManager(false);
+              setSearchSKU("");
+            }}
+            initialSearchSKU={searchSKU}
+          />
         )}
       </div>
-
-      {showProductManager && (
-        <ProductManagerModal
-          isOpen={showProductManager}
-          onClose={() => {
-            setShowProductManager(false);
-            setSearchSKU("");
-          }}
-          initialSearchSKU={searchSKU}
-        />
-      )}
-    </div>
-  );
-}
+    );
+  }

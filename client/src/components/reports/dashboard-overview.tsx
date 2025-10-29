@@ -65,35 +65,71 @@ export function DashboardOverview() {
   const [endDate, setEndDate] = useState<string>(
     new Date().toISOString().split("T")[0],
   );
+  const [storeFilter, setStoreFilter] = useState("all");
   const queryClient = useQueryClient();
 
-  // Query orders by date range - using proper order data
-  const {
-    data: orders = [],
-    isLoading: ordersLoading,
-    error: ordersError,
-  } = useQuery({
-    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range", startDate, endDate, "all"],
+  // Fetch stores for filtering
+  const { data: storesData = [] } = useQuery({
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings/list"],
     queryFn: async () => {
       try {
-        const response = await fetch(
-          `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range/${startDate}/${endDate}/all`,
-        );
+        const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings/list");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        console.log("Dashboard - Orders loaded:", data?.length || 0);
-        return Array.isArray(data) ? data : [];
+        // Filter out stores with typeUser = 1
+        return Array.isArray(data) ? data.filter((store: any) => store.typeUser !== 1) : [];
+      } catch (error) {
+        console.error("Error fetching stores:", error);
+        return [];
+      }
+    },
+  });
+
+  // Query orders by date range - using proper order data with store filtering
+  const {
+    data: ordersResponse,
+    isLoading: ordersLoading,
+    error: ordersError,
+  } = useQuery({
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list", startDate, endDate, "all", storeFilter],
+    queryFn: async () => {
+      try {
+        const params = new URLSearchParams({
+          startDate,
+          endDate,
+          status: "all",
+        });
+
+        // Handle store filter based on conditions:
+        // 1. If "all" selected -> pass "all" to server (server will handle admin vs non-admin logic)
+        // 2. If specific store selected -> pass exact storeCode
+        if (storeFilter === "all") {
+          params.append("storeFilter", "all");
+        } else if (storeFilter) {
+          params.append("storeFilter", storeFilter);
+        }
+
+        const response = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list?${params.toString()}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log("Dashboard - Orders loaded:", data?.orders?.length || 0);
+        return data;
       } catch (error) {
         console.error("Dashboard - Error fetching orders:", error);
-        return [];
+        return { orders: [], pagination: {} };
       }
     },
     retry: 3,
     retryDelay: 1000,
     staleTime: 5 * 60 * 1000,
   });
+
+  // Extract orders array from response
+  const orders = ordersResponse?.orders || [];
 
   // Query order items for all orders
   const { data: orderItems = [], isLoading: orderItemsLoading } = useQuery({
@@ -151,7 +187,13 @@ export function DashboardOverview() {
       }
 
       // Ensure we have valid arrays
-      const validOrders = Array.isArray(orders) ? orders : [];
+      let validOrders = Array.isArray(orders) ? orders : [];
+
+      // Apply store filter
+      if (storeFilter !== "all") {
+        validOrders = validOrders.filter((order: any) => order.storeCode === storeFilter);
+      }
+
       const validOrderItems = Array.isArray(orderItems) ? orderItems : [];
       const validTables = Array.isArray(tables) ? tables : [];
 
@@ -425,6 +467,26 @@ export function DashboardOverview() {
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              <Label htmlFor="store-filter">
+                {t("reports.storeLabel")}
+              </Label>
+              <select
+                id="store-filter"
+                value={storeFilter}
+                onChange={(e) => setStoreFilter(e.target.value)}
+                className="h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                {storesData.filter((store: any) => store.typeUser !== 1).length > 1 && (
+                  <option value="all">{t("reports.all")}</option>
+                )}
+                {storesData
+                  .filter((store: any) => store.typeUser !== 1)
+                  .map((store: any) => (
+                    <option key={store.id} value={store.storeCode}>
+                      {store.storeName}
+                    </option>
+                  ))}
+              </select>
               <Label htmlFor="start-date-picker">
                 {t("reports.startDate")}:
               </Label>

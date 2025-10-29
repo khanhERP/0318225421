@@ -114,46 +114,13 @@ export function ProductGrid({
         });
       }
 
-      // Apply search filter if exists - word by word matching
+      // Apply search filter if exists
       if (searchQuery) {
-        let searchWords = searchQuery.trim().split(/\s+/);
+        const searchLower = searchQuery.toLowerCase();
         filteredProducts = filteredProducts.filter((product: any) => {
-          const productNameLower = product.name.toLowerCase();
-          const productSkuLower = product.sku.toLowerCase();
-
-          // Check if all search words exist in product name or SKU
           return (
-            searchWords.every((word) => productNameLower.includes(word)) ||
-            searchWords.every((word) => productSkuLower.includes(word))
-          );
-        });
-      }
-
-      if (searchQuery) {
-        // Tách các từ và chuẩn hóa
-        const searchWords = searchQuery
-          .toLowerCase()
-          .normalize("NFD") // chuẩn hóa dấu tiếng Việt
-          .replace(/\p{Diacritic}/gu, "") // bỏ dấu (optional)
-          .trim()
-          .split(/\s+/);
-
-        filteredProducts = filteredProducts.filter((product: any) => {
-          // Chuẩn hóa tên sản phẩm tương tự
-          const productNameLower = product.name
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/\p{Diacritic}/gu, "");
-
-          const productSkuLower = product.sku
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/\p{Diacritic}/gu, "");
-
-          // Tất cả các từ phải xuất hiện trong tên
-          return (
-            searchWords.every((word) => productNameLower.includes(word)) ||
-            searchWords.every((word) => productSkuLower.includes(word))
+            product.name.toLowerCase().includes(searchLower) ||
+            product.sku.toLowerCase().includes(searchLower)
           );
         });
       }
@@ -190,7 +157,6 @@ export function ProductGrid({
     // Pass productId to onAddToCart as expected by the interface
     // Toast notification will be handled by the usePOS hook only
     onAddToCart(product.id);
-    // Toast notification removed as per user request
   };
 
   // Function to calculate the display price based on store settings
@@ -375,58 +341,56 @@ export function ProductGrid({
   };
 
   return (
-    <main className="h-full flex flex-col bg-gray-50">
-      <div className="bg-white p-2 md:p-3 border-b border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-sm flex-shrink-0">
-        <div className="w-full sm:w-auto">
-          <h2 className="font-semibold text-gray-800 text-sm md:text-base">
+    <main className="flex-1 flex flex-col">
+      <div className="bg-white p-4 border-b pos-border flex items-center justify-between pt-[22px] pb-[22px] mt-2">
+        <div>
+          <h2 className="font-medium pos-text-primary text-[14px]">
             {getCategoryName()}
           </h2>
-          <p className="text-xs md:text-sm text-gray-500 mt-0.5">
+          <p className="text-sm pos-text-secondary">
             {products.length} {t("pos.productsAvailable")}
           </p>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
+        <div className="flex items-center space-x-3">
           <Button
             variant={viewMode === "grid" ? "default" : "outline"}
             size="sm"
-            className="flex items-center h-8 md:h-9 px-2 md:px-3 whitespace-nowrap"
+            className="flex items-center"
             onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
           >
             {viewMode === "grid" ? (
-              <Grid3X3 className="mr-1 md:mr-1.5" size={14} />
+              <Grid3X3 className="mr-2" size={16} />
             ) : (
-              <List className="mr-1 md:mr-1.5" size={14} />
+              <List className="mr-2" size={16} />
             )}
-            <span className="text-xs md:text-sm hidden sm:inline">{viewMode === "grid" ? t("pos.gridView") : t("pos.listView")}</span>
+            {viewMode === "grid" ? t("pos.gridView") : t("pos.listView")}
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="flex items-center h-8 md:h-9 px-2 md:px-3 whitespace-nowrap"
+            className="flex items-center"
             onClick={handleSort}
           >
-            <ArrowUpDown className="mr-1 md:mr-1.5" size={14} />
-            <span className="text-xs md:text-sm hidden sm:inline">
-              {sortBy === "name"
-                ? t("pos.sortByName")
-                : sortBy === "price"
-                  ? t("pos.sortByPrice")
-                  : t("pos.sortByStock")}{" "}
-              ({sortOrder === "asc" ? "↑" : "↓"})
-            </span>
+            <ArrowUpDown className="mr-2" size={16} />
+            {sortBy === "name"
+              ? t("pos.sortByName")
+              : sortBy === "price"
+                ? t("pos.sortByPrice")
+                : t("pos.sortByStock")}{" "}
+            ({sortOrder === "asc" ? "↑" : "↓"})
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-2 md:p-3 lg:max-h-[calc(100vh-140px)] max-h-[calc(100vh-300px)]">
+      <div className="flex-1 overflow-y-auto p-4">
         {products.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="text-gray-300 mb-4">
-              <Grid3X3 size={64} className="mx-auto" />
+          <div className="text-center py-12">
+            <div className="text-gray-400 mb-4">
+              <Grid3X3 size={48} className="mx-auto" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-600 mb-2">
+            <h3 className="text-lg font-medium pos-text-secondary mb-2">
               {t("pos.noProductsFound")}
             </h3>
-            <p className="text-gray-500">
+            <p className="pos-text-tertiary">
               {searchQuery
                 ? "Thử điều chỉnh từ khóa tìm kiếm"
                 : t("pos.noProductsInCategory")}
@@ -436,7 +400,7 @@ export function ProductGrid({
           <div
             className={
               viewMode === "grid"
-                ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 md:gap-3 lg:gap-4"
+                ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
                 : "flex flex-col space-y-2"
             }
           >

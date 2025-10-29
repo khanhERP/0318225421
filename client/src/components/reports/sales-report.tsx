@@ -46,33 +46,78 @@ export function SalesReport() {
   const [endDate, setEndDate] = useState<string>(
     new Date().toISOString().split("T")[0],
   );
+  const [storeFilter, setStoreFilter] = useState<string>("all");
 
-  // Query orders by date range
+  // Get user info from localStorage to check if admin
+  const userStr = localStorage.getItem("user");
+  const user = userStr ? JSON.parse(userStr) : null;
+  const isAdmin = user?.isAdmin || user?.typeUser === 1;
+
+  // Fetch stores list for filter dropdown
+  const { data: storesData = [] } = useQuery({
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings/list"],
+    queryFn: async () => {
+      try {
+        const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings/list", {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        });
+        if (!response.ok) throw new Error("Failed to fetch stores");
+        const data = await response.json();
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error("Error fetching stores:", error);
+        return [];
+      }
+    },
+    retry: 2,
+  });
+
+  // Query orders by date range using /api/orders/list with proper store filtering
   const {
-    data: orders = [],
+    data: ordersResponse,
     isLoading: ordersLoading,
     error: ordersError,
     refetch: refetchOrders,
   } = useQuery({
-    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range", startDate, endDate, "all"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list", startDate, endDate, "all", storeFilter],
     queryFn: async () => {
       try {
-        const response = await fetch(
-          `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range/${startDate}/${endDate}/all`,
-        );
+        const params = new URLSearchParams({
+          startDate,
+          endDate,
+          status: "all",
+        });
+
+        // Handle store filter based on conditions:
+        // 1. If "all" selected -> pass "all" to server (server will handle admin vs non-admin logic)
+        // 2. If specific store selected -> pass exact storeCode
+        if (storeFilter === "all") {
+          params.append("storeFilter", "all");
+        } else if (storeFilter) {
+          params.append("storeFilter", storeFilter);
+        }
+
+        const response = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list?${params.toString()}`);
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        return Array.isArray(data) ? data : [];
+        console.log("Sales Report - Orders loaded:", data?.orders?.length || 0);
+        return data;
       } catch (error) {
-        console.error("Error fetching orders:", error);
-        return [];
+        console.error("Sales Report - Error fetching orders:", error);
+        return { orders: [], pagination: {} };
       }
     },
     retry: 3,
     retryDelay: 1000,
   });
+
+  // Extract orders array from response
+  const orders = ordersResponse?.orders || [];
 
   // Query order items by date range
   const {
@@ -487,7 +532,6 @@ export function SalesReport() {
 
   const handleRefresh = () => {
     refetchOrders();
-    refetchOrderItems();
   };
 
   const salesData = getSalesData();
@@ -552,6 +596,28 @@ export function SalesReport() {
             </div>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Label className="text-sm font-medium whitespace-nowrap">
+                  {t("reports.storeLabel")}
+                </Label>
+                <select
+                  value={storeFilter}
+                  onChange={(e) => setStoreFilter(e.target.value)}
+                  className="h-10 px-3 rounded-md border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500 cursor-pointer"
+                >
+                  {storesData.filter((store: any) => store.typeUser !== 1).length > 1 && (
+                    <option value="all">Tất cả</option>
+                  )}
+                  {storesData
+                    .filter((store: any) => store.typeUser !== 1)
+                    .map((store: any) => (
+                      <option key={store.id} value={store.storeCode}>
+                        {store.storeName}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-gray-500" />
                 <Select value={dateRange} onValueChange={handleDateRangeChange}>

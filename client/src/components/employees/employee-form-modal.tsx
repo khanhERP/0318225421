@@ -92,30 +92,32 @@ export function EmployeeFormModal({
 
   // Set employee ID for new employees or populate form for edit
   React.useEffect(() => {
-    if (mode === "create" && !employee?.employeeId) {
-      generateEmployeeId().then((nextId) => {
-        form.reset({
-          employeeId: nextId,
-          name: "",
-          email: "",
-          phone: null,
-          role: "cashier",
-          isActive: true,
-          hireDate: new Date(),
+    if (isOpen) {
+      if (mode === "create") {
+        generateEmployeeId().then((nextId) => {
+          form.reset({
+            employeeId: nextId,
+            name: "",
+            email: "",
+            phone: null,
+            role: "cashier",
+            isActive: true,
+            hireDate: new Date(),
+          });
         });
-      });
-    } else if (mode === "edit" && employee) {
-      form.reset({
-        employeeId: employee.employeeId,
-        name: employee.name,
-        email: employee.email || "",
-        phone: employee.phone || null,
-        role: employee.role,
-        isActive: employee.isActive ?? true,
-        hireDate: employee.hireDate ? new Date(employee.hireDate) : new Date(),
-      });
+      } else if (mode === "edit" && employee) {
+        form.reset({
+          employeeId: employee.employeeId,
+          name: employee.name,
+          email: employee.email || "",
+          phone: employee.phone || null,
+          role: employee.role,
+          isActive: employee.isActive ?? true,
+          hireDate: employee.hireDate ? new Date(employee.hireDate) : new Date(),
+        });
+      }
     }
-  }, [mode, employee, form]);
+  }, [isOpen, mode, employee?.id]);
 
   const createMutation = useMutation({
     mutationFn: async (data: InsertEmployee) => {

@@ -1,18 +1,19 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
-const BASE_URL = "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev"; // 👈 đổi theo domain backend của bạn
+const BASE_URL =
+  "https://edf98ba8-b42b-4552-af80-c80610cfb92a-00-2erzt6krhzqqr.pike.replit.dev"; // 👈 đổi theo domain backend của bạn
 
 export async function defaultFetcher({ queryKey }) {
   const [path] = queryKey;
 
   // Cho phép truyền cả path hoặc URL đầy đủ
   const url = path.startsWith("http") ? path : `${BASE_URL}${path}`;
-  const token = localStorage.getItem("token");
+  const token = localStorage.getItem("authToken");
 
   const res = await fetch(url, {
     headers: {
@@ -25,7 +26,7 @@ export async function defaultFetcher({ queryKey }) {
   // Xử lý token hết hạn hoặc lỗi xác thực
   if (res.status === 401) {
     console.warn("Token hết hạn hoặc không hợp lệ");
-    localStorage.removeItem("token");
+    localStorage.removeItem("authToken");
     window.location.href = "/";
     return;
   }

@@ -27,11 +27,29 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { format } from "date-fns";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function SpendingReport() {
   const { t } = useTranslation();
-  const [startDate, setStartDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [startDate, setStartDate] = useState<string>(
+    new Date().toISOString().split("T")[0],
+  );
+  const [endDate, setEndDate] = useState<string>(
+    new Date().toISOString().split("T")[0],
+  );
+  const [storeFilter, setStoreFilter] = useState("all");
+
+  // Fetch store settings list
+  const { data: storesData = [] } = useQuery({
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings/list"],
+    retry: 2,
+  });
 
   // Fetch purchase receipts
   const {
@@ -39,7 +57,7 @@ export function SpendingReport() {
     isLoading: isLoadingReceipts,
     refetch: refetchPurchaseReceipts,
   } = useQuery({
-    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/purchase-receipts", { startDate, endDate }],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/purchase-receipts", { startDate, endDate, storeFilter }],
     queryFn: async () => {
       const params = new URLSearchParams();
 
@@ -50,10 +68,14 @@ export function SpendingReport() {
       if (endDate) {
         params.append("endDate", endDate);
       }
+      if (storeFilter !== "all") {
+        params.append("storeCode", storeFilter);
+      }
 
-      console.log("📊 Fetching purchase receipts with date filter:", {
+      console.log("📊 Fetching purchase receipts with filter:", {
         startDate,
         endDate,
+        storeFilter,
         url: `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/purchase-receipts?${params.toString()}`,
       });
 
@@ -91,7 +113,7 @@ export function SpendingReport() {
   // Fetch expense vouchers for debt calculation with date filter
   const { data: expenseVouchers = [], refetch: refetchExpenseVouchers } =
     useQuery({
-      queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/expense-vouchers", { startDate, endDate }],
+      queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/expense-vouchers", { startDate, endDate, storeFilter }],
       queryFn: async () => {
         const params = new URLSearchParams();
 
@@ -101,10 +123,14 @@ export function SpendingReport() {
         if (endDate) {
           params.append("endDate", endDate);
         }
+        if (storeFilter !== "all") {
+          params.append("storeCode", storeFilter);
+        }
 
-        console.log("💰 Fetching expense vouchers with date filter:", {
+        console.log("💰 Fetching expense vouchers with filter:", {
           startDate,
           endDate,
+          storeFilter,
           url: `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/expense-vouchers?${params.toString()}`,
         });
 
@@ -125,10 +151,15 @@ export function SpendingReport() {
 
   // Fetch orders for revenue calculation
   const { data: orders = [], refetch: refetchOrders } = useQuery({
-    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range", startDate, endDate],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range", startDate, endDate, storeFilter],
     queryFn: async () => {
+      const params = new URLSearchParams();
+      if (startDate) params.append("startDate", startDate);
+      if (endDate) params.append("endDate", endDate);
+      if (storeFilter !== "all") params.append("storeCode", storeFilter);
+
       const response = await fetch(
-        `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range/${startDate}/${endDate}/all`,
+        `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range?${params.toString()}`,
       );
       if (!response.ok) throw new Error("Failed to fetch orders");
       return response.json();
@@ -159,14 +190,7 @@ export function SpendingReport() {
     }
 
     // Extract data from API response structure: { success: true, data: [...] }
-    let receiptsData = [];
-    if (purchaseReceipts?.success && Array.isArray(purchaseReceipts.data)) {
-      receiptsData = purchaseReceipts.data;
-    } else if (purchaseReceipts?.data && Array.isArray(purchaseReceipts.data)) {
-      receiptsData = purchaseReceipts.data;
-    } else if (Array.isArray(purchaseReceipts)) {
-      receiptsData = purchaseReceipts;
-    }
+    let receiptsData = purchaseReceipts;
 
     console.log("📊 Purchase Receipts API Response:", purchaseReceipts);
     console.log("📊 Extracted receipts data:", receiptsData);
@@ -183,6 +207,7 @@ export function SpendingReport() {
         receiptNumber: receipt.receiptNumber,
         purchaseType: receipt.purchaseType,
         itemsCount: receipt.items?.length,
+        storeCode: receipt.storeCode,
       });
 
       // Get supplier name from receipt.supplier object (API returns full supplier object)
@@ -346,10 +371,11 @@ export function SpendingReport() {
     const fixedExpenses = Array.from(fixedExpensesMap.values());
 
     // Calculate expense vouchers by supplier (số tiền đã chi)
-    // Filter expense vouchers by date range
+    // Filter expense vouchers by date range and store
     console.log("💰 Processing expense vouchers:", {
       total: expenseVouchers?.length || 0,
       dateRange: `${startDate} to ${endDate}`,
+      storeFilter,
     });
 
     if (Array.isArray(expenseVouchers)) {
@@ -376,6 +402,16 @@ export function SpendingReport() {
             });
             return; // Skip this voucher
           }
+        }
+
+        // Filter by store if a store filter is applied and the voucher has a storeCode
+        if (storeFilter !== "all" && voucher.storeCode !== storeFilter) {
+          console.log("💰 Voucher filtered out (store):", {
+            voucherNumber: voucher.voucherNumber,
+            storeCode: voucher.storeCode,
+            storeFilter,
+          });
+          return; // Skip this voucher
         }
 
         const supplierId = voucher.supplierId || voucher.supplier_id;
@@ -443,7 +479,7 @@ export function SpendingReport() {
       totalSupplierDebt,
       totalSpending,
     };
-  }, [purchaseReceipts, categories, suppliers, products, expenseVouchers]);
+  }, [purchaseReceipts, categories, suppliers, products, expenseVouchers, storeFilter]);
 
   // Calculate total revenue from orders
   const totalRevenue = useMemo(() => {
@@ -471,16 +507,36 @@ export function SpendingReport() {
 
   return (
     <div className="space-y-6">
-      {/* Date Range Filter */}
+      {/* Date Range Filter and Store Filter */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="w-5 h-5" />
-            {t("reports.dateRange")}
+            {t("reports.filter")}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
+        <CardContent className="space-y-4 pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label>{t("common.storeLabel")}</Label>
+              <Select value={storeFilter} onValueChange={setStoreFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn cửa hàng" />
+                </SelectTrigger>
+                <SelectContent>
+                  {storesData.filter((store: any) => store.typeUser !== 1).length > 1 && (
+                    <SelectItem value="all">{t("common.allStores")}</SelectItem>
+                  )}
+                  {storesData
+                    .filter((store: any) => store.typeUser !== 1)
+                    .map((store: any) => (
+                      <SelectItem key={store.id} value={store.storeCode}>
+                        {store.storeName}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <Label>{t("reports.startDate")}</Label>
               <Input
@@ -576,9 +632,9 @@ export function SpendingReport() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-20">STT</TableHead>
-                <TableHead>Tên sản phẩm</TableHead>
-                <TableHead className="text-right">Tổng tiền</TableHead>
+                <TableHead className="w-20">{t("common.no")}</TableHead>
+                <TableHead>{t("reports.productName")}</TableHead>
+                <TableHead className="text-right">{t("reports.totalValue")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -597,7 +653,7 @@ export function SpendingReport() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={3} className="text-center text-gray-500">
-                    Không có dữ liệu
+                    {t("reports.noDataAvailable")}
                   </TableCell>
                 </TableRow>
               )}
