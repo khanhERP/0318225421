@@ -39,10 +39,10 @@ function Router({ onLogout }: { onLogout: () => void }) {
     // Assuming you have a function to get your auth token
     const getAuthToken = () => localStorage.getItem("authToken");
     const { data: storeSettings } = useQuery<StoreSettings>({
-      queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/store-settings"],
+      queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/store-settings"],
       queryFn: async () => {
         const token = getAuthToken();
-        const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/store-settings", {
+        const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/store-settings", {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`, // Set the token in the Authorization header

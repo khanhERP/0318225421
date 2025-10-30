@@ -24,11 +24,11 @@ export default function ProductManagementContent() {
   const [pageSize, setPageSize] = useState(20);
 
   const { data: productsData, isLoading: productsLoading } = useQuery<Product[]>({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/products"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/products"],
   });
 
   const { data: categoriesData } = useQuery<Category[]>({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/categories"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/categories"],
   });
 
   const filteredProducts = productsData?.filter((product: Product) =>

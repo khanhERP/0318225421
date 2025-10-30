@@ -16,7 +16,7 @@ export async function apiRequest(
 ) {
   // Log payment method tracking for order status updates
   if (
-    url.includes("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/orders/") &&
+    url.includes("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/orders/") &&
     url.includes("/status") &&
     method === "PUT"
   ) {
@@ -52,7 +52,7 @@ export async function apiRequest(
 
     // Additional logging for payment method requests
     if (
-      url.includes("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/orders/") &&
+      url.includes("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/orders/") &&
       url.includes("/status") &&
       method === "PUT"
     ) {
