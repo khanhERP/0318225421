@@ -108,10 +108,10 @@ function MenuReport() {
 
   // Query categories
   const { data: categories = [] } = useQuery({
-    queryKey: ["https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/categories"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories"],
     queryFn: async () => {
       try {
-        const response = await apiRequest("GET", "https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/categories");
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories");
         if (!response.ok) throw new Error("Failed to fetch categories");
         const data = await response.json();
         return Array.isArray(data) ? data : [];
@@ -125,7 +125,7 @@ function MenuReport() {
 
   // Query products - filter by search term
   const { data: products = [] } = useQuery({
-    queryKey: ["https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/products", selectedCategory, productType, productSearch],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products", selectedCategory, productType, productSearch],
     queryFn: async () => {
       try {
         const searchParam = productSearch
@@ -133,7 +133,7 @@ function MenuReport() {
           : "";
         const response = await apiRequest(
           "GET",
-          `https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/products/${selectedCategory}/${productType}/${searchParam}`,
+          `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products/${selectedCategory}/${productType}/${searchParam}`,
         );
         if (!response.ok) throw new Error("Failed to fetch products");
         const data = await response.json();
@@ -155,7 +155,7 @@ function MenuReport() {
     refetch,
   } = useQuery({
     queryKey: [
-      "https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/menu-analysis",
+      "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/menu-analysis",
       startDate,
       endDate,
       selectedCategory,
@@ -173,7 +173,7 @@ function MenuReport() {
 
         const response = await apiRequest(
           "GET",
-          `https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/menu-analysis?${params.toString()}`,
+          `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/menu-analysis?${params.toString()}`,
         );
         if (!response.ok) {
           console.error(
@@ -269,9 +269,9 @@ function MenuReport() {
 
   const handleRefresh = () => {
     // Refresh both orders and order items data
-    queryClient.invalidateQueries({ queryKey: ["https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/orders/date-range"] });
+    queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range"] });
     queryClient.invalidateQueries({
-      queryKey: ["https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/order-items/date-range"],
+      queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items/date-range"],
     });
   };
 

@@ -48,10 +48,10 @@ export function PinAuth({ onAuthSuccess }: PinAuthProps) {
 
   // Fetch store settings để lấy PIN
   const { data: storeData } = useQuery({
-    queryKey: ["https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/store-settings"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings"],
     queryFn: async () => {
       try {
-        const response = await apiRequest("GET", "https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/store-settings");
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings");
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
@@ -98,7 +98,7 @@ export function PinAuth({ onAuthSuccess }: PinAuthProps) {
       });
 
       // Gọi API đăng nhập bằng PIN
-      const response = await fetch("https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/auth/login-pin", {
+      const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/auth/login-pin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

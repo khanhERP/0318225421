@@ -1,5 +1,5 @@
 export const loginPosAsync = async (request: LoginPosRequest): Promise<LoginResponse> => {
-  const response = await fetch('https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/pos/login', {
+  const response = await fetch('https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/pos/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -48,7 +48,7 @@ export const createQRPosAsync = async (request: CreateQRPosRequest, bankCode: st
     console.log('📤 Request payload:', { ...request, bankCode, clientID });
     
     // Use proxy route to avoid CORS issues
-    const response = await fetch(`https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/pos/create-qr-proxy`, {
+    const response = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/pos/create-qr-proxy`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -93,7 +93,7 @@ export const createQRPosAsync = async (request: CreateQRPosRequest, bankCode: st
     
     // Fallback to alternative internal API route
     try {
-      const fallbackResponse = await fetch(`https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/pos/create-qr?bankCode=${bankCode}&clientID=${clientID}`, {
+      const fallbackResponse = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/pos/create-qr?bankCode=${bankCode}&clientID=${clientID}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

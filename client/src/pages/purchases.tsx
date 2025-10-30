@@ -84,7 +84,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
     isLoading: isOrdersLoading,
   } = useQuery<{ data: PurchaseOrder[]; success: boolean; message: string }>({
     queryKey: [
-      "https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/purchase-receipts",
+      "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/purchase-receipts",
       {
         startDate,
         endDate,
@@ -116,7 +116,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
         console.log("🔍 Adding PO number search:", poNumberFilter.trim());
       }
 
-      const url = `https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/purchase-receipts${params.toString() ? `?${params.toString()}` : ""}`;
+      const url = `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/purchase-receipts${params.toString() ? `?${params.toString()}` : ""}`;
       console.log("🔍 Fetching purchase receipts with filters:", url);
 
       const response = await fetch(url);
@@ -152,14 +152,14 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
 
   // Fetch suppliers for filtering
   const { data: suppliers = [] } = useQuery<Supplier[]>({
-    queryKey: ["https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/suppliers"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/suppliers"],
   });
 
   // Fetch payment methods
   const { data: paymentMethodsData } = useQuery({
-    queryKey: ["https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/payment-methods"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/payment-methods"],
     queryFn: async () => {
-      const response = await fetch("https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/payment-methods");
+      const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/payment-methods");
       return response.json();
     },
   });
@@ -261,7 +261,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
   // Bulk delete mutation
   const bulkDeleteMutation = useMutation({
     mutationFn: async (orderIds: number[]) => {
-      return apiRequest("POST", "https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/purchase-receipts/bulk-delete", {
+      return apiRequest("POST", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/purchase-receipts/bulk-delete", {
         orderIds,
       });
     },
@@ -278,7 +278,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
       setSelectedOrders(new Set());
 
       // Refetch purchase receipts
-      queryClient.invalidateQueries({ queryKey: ["https://c4a08644-6f82-4c21-bf98-8d382f0008d1-00-2q0r6kl8z7wo.pike.replit.dev/api/purchase-receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/purchase-receipts"] });
 
       // Close dialog
       setShowDeleteDialog(false);
