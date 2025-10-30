@@ -19,7 +19,7 @@ export function EmployeeList() {
   const { t } = useTranslation();
 
   const { data: employeesData, isLoading } = useQuery<Employee[]>({
-    queryKey: ['https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/employees'],
+    queryKey: ['https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/employees'],
   });
 
   // Sort employees by ID descending (newest first)
@@ -27,11 +27,11 @@ export function EmployeeList() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest('DELETE', `https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/employees/${id}`);
+      const response = await apiRequest('DELETE', `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/employees/${id}`);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/employees'] });
       toast({
         title: t('common.success'),
         description: t('employees.deleteSuccess'),

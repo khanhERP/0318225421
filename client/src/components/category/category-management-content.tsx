@@ -42,11 +42,11 @@ export default function CategoryManagementContent() {
   const { data: categoriesData, isLoading: categoriesLoading } = useQuery<
     any[]
   >({
-    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/categories"],
   });
 
   const { data: productsData } = useQuery<any[]>({
-    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/products"],
   });
 
   const resetCategoryForm = () => {
@@ -65,7 +65,7 @@ export default function CategoryManagementContent() {
     }
 
     try {
-      const response = await fetch("https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories", {
+      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(categoryForm),
@@ -74,7 +74,7 @@ export default function CategoryManagementContent() {
       if (!response.ok)
         throw new Error(`HTTP error! status: ${response.status}`);
 
-      await queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories"] });
+      await queryClient.refetchQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/categories"] });
       toast({
         title: t("common.success"),
         description: t("settings.categoryCreateSuccess"),
@@ -101,7 +101,7 @@ export default function CategoryManagementContent() {
     }
 
     try {
-      const response = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories/${editingCategory.id}`, {
+      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/categories/${editingCategory.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(categoryForm),
@@ -112,7 +112,7 @@ export default function CategoryManagementContent() {
 
       setShowCategoryForm(false);
       resetCategoryForm();
-      await queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories"] });
+      await queryClient.refetchQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/categories"] });
       toast({
         title: t("common.success"),
         description: t("settings.categoryUpdateSuccess"),
@@ -161,7 +161,7 @@ export default function CategoryManagementContent() {
     if (!categoryToDelete) return;
 
     try {
-      const response = await fetch(`https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories/${categoryToDelete.id}`, {
+      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/categories/${categoryToDelete.id}`, {
         method: "DELETE",
       });
 
@@ -172,7 +172,7 @@ export default function CategoryManagementContent() {
         );
       }
 
-      await queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/categories"] });
+      await queryClient.refetchQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev//api/categories"] });
       toast({
         title: t("common.success"),
         description: t("settings.categoryDeleteSuccess"),
