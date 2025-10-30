@@ -176,26 +176,26 @@ export default function SalesOrders() {
       setPrintReceiptData(null);
 
       // Refresh data
-      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tables"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"] });
     };
 
     const handleEInvoiceModalClosed = async (event: CustomEvent) => {
       console.log("📧 Sales Orders: E-invoice modal closed, refreshing data");
 
       // Clear cache completely and force fresh fetch
-      queryClient.removeQueries({ queryKey: ["/api/orders"] });
-      queryClient.removeQueries({ queryKey: ["/api/order-items"] });
-      queryClient.removeQueries({ queryKey: ["/api/invoices"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/invoices"] });
 
       // Force immediate refetch with fresh data
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/order-items"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/invoices"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/tables"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/orders"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/invoices"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/invoices"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/invoices"] }),
       ]);
 
       console.log("✅ Sales Orders: Data refreshed successfully from database");
@@ -227,7 +227,7 @@ export default function SalesOrders() {
     const handleOrderUpdate = async () => {
       console.log("🔄 Sales Orders: Order updated, refetching data...");
       await queryClient.refetchQueries({
-        queryKey: ["/api/orders/list"],
+        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"],
         exact: false,
       });
     };
@@ -293,7 +293,7 @@ export default function SalesOrders() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await apiRequest("GET", "/api/store-settings");
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/store-settings");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -308,10 +308,10 @@ export default function SalesOrders() {
 
   // Query customers for datalist
   const { data: customers = [] } = useQuery({
-    queryKey: ["/api/customers"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/customers"],
     queryFn: async () => {
       try {
-        const response = await apiRequest("GET", "/api/customers");
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/customers");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -333,7 +333,7 @@ export default function SalesOrders() {
     error: ordersError,
   } = useQuery({
     queryKey: [
-      "/api/orders/list",
+      "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list",
       startDate,
       endDate,
       dateFilterMode,
@@ -422,10 +422,10 @@ export default function SalesOrders() {
 
   // Query all products to get tax rates
   const { data: products = [] } = useQuery({
-    queryKey: ["/api/products"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products"],
     queryFn: async () => {
       try {
-        const response = await apiRequest("GET", "/api/products");
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/products");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -450,10 +450,10 @@ export default function SalesOrders() {
 
   // Query tables to map tableId to table number
   const { data: tables = [] } = useQuery({
-    queryKey: ["/api/tables"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"],
     queryFn: async () => {
       try {
-        const response = await apiRequest("GET", "/api/tables");
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -495,7 +495,7 @@ export default function SalesOrders() {
     isLoading: orderItemsLoading,
     error: orderItemsError,
   } = useQuery({
-    queryKey: ["/api/order-items", selectedInvoice?.id],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", selectedInvoice?.id],
     queryFn: async () => {
       if (!selectedInvoice?.id) {
         console.log("❌ No selected invoice ID");
@@ -586,12 +586,12 @@ export default function SalesOrders() {
 
       // Only refetch orders list and order items for the specific order
       await queryClient.refetchQueries({
-        queryKey: ["/api/orders/list"],
+        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"],
         exact: false,
       });
 
       await queryClient.refetchQueries({
-        queryKey: ["/api/order-items", updatedOrder.id],
+        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", updatedOrder.id],
       });
 
       setIsEditing(false);
@@ -658,7 +658,7 @@ export default function SalesOrders() {
       setShowBulkCancelDialog(false);
       setSelectedOrderIds(new Set());
 
-      queryClient.invalidateQueries({ queryKey: ["/api/orders/list"] });
+      queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
 
       // Update selected order if it was cancelled
       if (selectedInvoice) {
@@ -695,7 +695,7 @@ export default function SalesOrders() {
     mutationFn: async (invoiceData: any) => {
       const response = await apiRequest(
         "POST",
-        "/api/einvoice/publish",
+        "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/einvoice/publish",
         invoiceData,
       );
       return response.json();
@@ -765,7 +765,7 @@ export default function SalesOrders() {
           setPrintReceiptData(receiptData);
           setShowPrintDialog(true);
 
-          queryClient.invalidateQueries({ queryKey: ["/api/orders/list"] });
+          queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
 
           setShowPublishDialog(false);
           setSelectedInvoice(null);
@@ -843,7 +843,7 @@ export default function SalesOrders() {
 
       // Only refetch orders list
       await queryClient.refetchQueries({
-        queryKey: ["/api/orders/list"],
+        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"],
         exact: false,
       });
 
@@ -1312,7 +1312,7 @@ export default function SalesOrders() {
 
     // Add to the orderItems query data temporarily for display
     queryClient.setQueryData(
-      ["/api/order-items", selectedInvoice.id],
+      ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", selectedInvoice.id],
       (oldData: any) => {
         const currentItems = Array.isArray(oldData) ? oldData : [];
         return [...currentItems, newEmptyItem];
@@ -1733,30 +1733,30 @@ export default function SalesOrders() {
       await updateOrderMutation.mutateAsync(orderData as Order);
 
       // Clear and refresh all related queries
-      queryClient.removeQueries({ queryKey: ["/api/orders"] });
-      queryClient.removeQueries({ queryKey: ["/api/orders/list"] });
-      queryClient.removeQueries({ queryKey: ["/api/order-items"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
+      queryClient.removeQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items"] });
       queryClient.removeQueries({
-        queryKey: ["/api/orders/date-range"],
+        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range"],
       });
 
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["/api/orders"] }),
-        queryClient.invalidateQueries({ queryKey: ["/api/orders/list"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
         queryClient.invalidateQueries({
-          queryKey: ["/api/order-items", editableInvoice.id],
+          queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", editableInvoice.id],
         }),
         queryClient.invalidateQueries({
-          queryKey: ["/api/orders/date-range"],
+          queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range"],
         }),
-        queryClient.refetchQueries({ queryKey: ["/api/orders"] }),
-        queryClient.refetchQueries({ queryKey: ["/api/orders/list"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] }),
+        queryClient.refetchQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] }),
         queryClient.refetchQueries({
-          queryKey: ["/api/order-items", editableInvoice.id],
+          queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", editableInvoice.id],
         }),
         queryClient.refetchQueries({
           queryKey: [
-            "/api/orders/date-range",
+            "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range",
             startDate,
             endDate,
             currentPage,
@@ -1796,7 +1796,7 @@ export default function SalesOrders() {
     setEditedOrderItems({}); // Clear local edits
     // Invalidate order items to reset them if any changes were made but not saved
     queryClient.invalidateQueries({
-      queryKey: ["/api/order-items", selectedInvoice?.id],
+      queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items", selectedInvoice?.id],
     });
   };
 
@@ -1848,10 +1848,10 @@ export default function SalesOrders() {
 
   // Query payment methods data
   const { data: paymentMethodsData = [] } = useQuery({
-    queryKey: ["/api/payment-methods"],
+    queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/payment-methods"],
     queryFn: async () => {
       try {
-        const response = await apiRequest("GET", "/api/payment-methods");
+        const response = await apiRequest("GET", "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/payment-methods");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -2849,8 +2849,8 @@ export default function SalesOrders() {
         console.log("✅ Order payment status updated successfully");
 
         // Refresh orders list
-        queryClient.invalidateQueries({ queryKey: ["/api/orders/list"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/tables"] });
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/tables"] });
 
         toast({
           title: "Thanh toán thành công",
@@ -2936,10 +2936,10 @@ export default function SalesOrders() {
 
       // Refresh orders list after a delay to avoid interfering with receipt modal
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/orders/list"] });
+        queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
         queryClient.invalidateQueries({
           queryKey: [
-            "/api/orders/date-range",
+            "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/date-range",
             startDate,
             endDate,
             currentPage,
@@ -3164,7 +3164,9 @@ export default function SalesOrders() {
                     <option value="all">{t("orders.allStatus")}</option>
                     <option value="paid">{t("orders.paidStatus")}</option>
                     <option value="pending">{t("orders.pendingStatus")}</option>
-                    <option value="cancelled">{t("orders.cancelledStatus")}</option>
+                    <option value="cancelled">
+                      {t("orders.cancelledStatus")}
+                    </option>
                   </select>
                 </div>
 
@@ -3179,8 +3181,12 @@ export default function SalesOrders() {
                     className="w-full h-8 px-2 rounded-md border border-green-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   >
                     <option value="all">{t("common.allEinvoiceStatus")}</option>
-                    <option value="0">{t("common.einvoiceStatus.notPublished")}</option>
-                    <option value="1">{t("common.einvoiceStatus.published")}</option>
+                    <option value="0">
+                      {t("common.einvoiceStatus.notPublished")}
+                    </option>
+                    <option value="1">
+                      {t("common.einvoiceStatus.published")}
+                    </option>
                   </select>
                 </div>
 
@@ -3256,7 +3262,7 @@ export default function SalesOrders() {
                   <Button
                     onClick={() => {
                       queryClient.invalidateQueries({
-                        queryKey: ["/api/orders/list"],
+                        queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"],
                       });
                     }}
                   >
@@ -3781,7 +3787,7 @@ export default function SalesOrders() {
                                           // Get order items for this order from cache
                                           const cachedItems =
                                             queryClient.getQueryData([
-                                              "/api/order-items",
+                                              "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items",
                                               item.id,
                                             ]) as any[];
                                           if (
@@ -4381,7 +4387,7 @@ export default function SalesOrders() {
                                                         queryClient.invalidateQueries(
                                                           {
                                                             queryKey: [
-                                                              "/api/order-items",
+                                                              "https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/order-items",
                                                               selectedInvoice?.id,
                                                             ],
                                                           },
@@ -6384,7 +6390,7 @@ export default function SalesOrders() {
             setOrderForPayment(null);
 
             // Refresh data after closing
-            // queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+            // queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders"] });
           }}
           onSelectMethod={handlePaymentComplete}
           total={
@@ -6454,7 +6460,7 @@ export default function SalesOrders() {
             setShowReceiptModal(false);
             setSelectedReceipt(null);
 
-            queryClient.invalidateQueries({ queryKey: ["/api/orders/list"] });
+            queryClient.invalidateQueries({ queryKey: ["https://796f2db4-7848-49ea-8b2b-4c67f6de26d7-00-248bpbd8f87mj.sisko.replit.dev/api/orders/list"] });
           }}
           receipt={selectedReceipt}
           isPreview={false}
