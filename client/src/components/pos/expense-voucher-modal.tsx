@@ -79,9 +79,9 @@ export default function ExpenseVoucherModal({
   // Load payment methods from localStorage (same as cash-book page)
   // Query payment methods from API
   const { data: paymentMethodsData } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/payment-methods"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods"],
     queryFn: async () => {
-      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/payment-methods");
+      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods");
       return response.json();
     },
   });
@@ -97,10 +97,10 @@ export default function ExpenseVoucherModal({
 
   // Fetch customers
   const { data: customers = [] } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/customers"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customers"],
     queryFn: async () => {
       try {
-        const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/customers");
+        const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customers");
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
         return Array.isArray(data) ? data : [];
@@ -113,10 +113,10 @@ export default function ExpenseVoucherModal({
 
   // Fetch employees
   const { data: employees = [] } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/employees"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/employees"],
     queryFn: async () => {
       try {
-        const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/employees");
+        const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/employees");
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
         return Array.isArray(data) ? data : [];
@@ -129,10 +129,10 @@ export default function ExpenseVoucherModal({
 
   // Fetch suppliers
   const { data: suppliers = [] } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/suppliers"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/suppliers"],
     queryFn: async () => {
       try {
-        const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/suppliers");
+        const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/suppliers");
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
         return Array.isArray(data) ? data : [];
@@ -190,7 +190,7 @@ export default function ExpenseVoucherModal({
   const createVoucherMutation = useMutation({
     mutationFn: async (data: ExpenseVoucher) => {
       console.log("Creating expense voucher with data:", data);
-      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/expense-vouchers", {
+      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -210,8 +210,8 @@ export default function ExpenseVoucherModal({
         title: "Thành công",
         description: `Đã tạo phiếu chi ${formData.voucherNumber} thành công`,
       });
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/expense-vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders"] });
       onClose();
     },
     onError: (error) => {
@@ -228,7 +228,7 @@ export default function ExpenseVoucherModal({
   const updateVoucherMutation = useMutation({
     mutationFn: async (data: ExpenseVoucher) => {
       console.log("Updating expense voucher with data:", data);
-      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/expense-vouchers/${data.id}`, {
+      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers/${data.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -248,8 +248,8 @@ export default function ExpenseVoucherModal({
         title: "Thành công",
         description: `Đã cập nhật phiếu chi ${formData.voucherNumber} thành công`,
       });
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/expense-vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders"] });
       setIsEditing(false);
     },
     onError: (error) => {
@@ -265,7 +265,7 @@ export default function ExpenseVoucherModal({
 
   const deleteVoucherMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/expense-vouchers/${id}`, {
+      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers/${id}`, {
         method: "DELETE",
       });
       if (!response.ok) throw new Error("Failed to delete expense voucher");
@@ -276,8 +276,8 @@ export default function ExpenseVoucherModal({
         title: "Thành công",
         description: "Đã xóa phiếu chi",
       });
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/expense-vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders"] });
       setShowDeleteDialog(false);
       onClose();
     },

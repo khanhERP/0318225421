@@ -20,14 +20,14 @@ export function CategoryStatsModal({ isOpen, onClose }: CategoryStatsModalProps)
 
   // Fetch categories
   const { data: categoriesData } = useQuery<any[]>({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/categories"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/categories"],
   });
 
   // Fetch products
   const { data: productsData } = useQuery<any[]>({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/products", { includeInactive: true }],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/products", { includeInactive: true }],
     queryFn: async () => {
-      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/products?includeInactive=true");
+      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/products?includeInactive=true");
       if (!response.ok) throw new Error("Failed to fetch products");
       return response.json();
     },

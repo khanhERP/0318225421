@@ -56,12 +56,12 @@ export default function CustomersPageContent() {
 
   // Fetch store settings to get user's store info
   const { data: userStore } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/store-settings"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/store-settings"],
   });
 
   // Fetch store list for admin users
   const { data: storesData, isLoading: storesLoading } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/store-settings/list"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/store-settings/list"],
   });
 
   const isAdmin = userStore?.isAdmin || false;
@@ -73,7 +73,7 @@ export default function CustomersPageContent() {
     refetch: refetchCustomers,
   } = useQuery({
     queryKey: [
-      "https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/customers",
+      "https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customers",
       currentPage,
       pageSize,
       customerSearchTerm,
@@ -96,7 +96,7 @@ export default function CustomersPageContent() {
         isAdmin,
       });
 
-      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/customers?${params}`);
+      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customers?${params}`);
       if (!response.ok) throw new Error("Failed to fetch customers");
       return response.json();
     },
@@ -122,13 +122,13 @@ export default function CustomersPageContent() {
     if (!confirm(t("customers.confirmDelete"))) return;
 
     try {
-      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/customers/${customerId}`, {
+      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customers/${customerId}`, {
         method: "DELETE",
       });
       if (!response.ok)
         throw new Error(`HTTP error! status: ${response.status}`);
 
-      await queryClient.refetchQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/customers"] });
+      await queryClient.refetchQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customers"] });
       toast({
         title: t("common.success"),
         description: t("settings.customerDeleteSuccess"),

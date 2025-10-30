@@ -38,9 +38,9 @@ export function PaymentMethodsSettingsContent() {
 
   // Query payment methods
   const { data: paymentMethods = [] } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/payment-methods"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods"],
     queryFn: async () => {
-      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/payment-methods");
+      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods");
       return response.json();
     },
   });
@@ -48,11 +48,11 @@ export function PaymentMethodsSettingsContent() {
   // Create payment method mutation
   const createPaymentMethodMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest("POST", "https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/payment-methods", data);
+      const response = await apiRequest("POST", "https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods", data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/payment-methods"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods"] });
       toast({
         title: "Thành công",
         description: "Đã thêm phương thức thanh toán mới",
@@ -71,11 +71,11 @@ export function PaymentMethodsSettingsContent() {
   // Update payment method mutation
   const updatePaymentMethodMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const response = await apiRequest("PUT", `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/payment-methods/${id}`, data);
+      const response = await apiRequest("PUT", `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods/${id}`, data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/payment-methods"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods"] });
       toast({
         title: "Thành công",
         description: "Đã cập nhật phương thức thanh toán",
@@ -94,11 +94,11 @@ export function PaymentMethodsSettingsContent() {
   // Delete payment method mutation
   const deletePaymentMethodMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest("DELETE", `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/payment-methods/${id}`);
+      const response = await apiRequest("DELETE", `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods/${id}`);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/payment-methods"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods"] });
       toast({
         title: "Thành công",
         description: "Đã xóa phương thức thanh toán",

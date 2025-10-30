@@ -118,7 +118,7 @@ export function ShoppingCart({
   const { data: storeSettings } = useQuery({
     queryKey: ["store-settings"],
     queryFn: async () => {
-      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/store-settings");
+      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/store-settings");
       if (!response.ok) {
         throw new Error("Failed to fetch store settings");
       }
@@ -130,7 +130,7 @@ export function ShoppingCart({
   const { data: userInfo } = useQuery({
     queryKey: ["user-info"],
     queryFn: async () => {
-      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/auth/me");
+      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/auth/me");
       if (!response.ok) {
         throw new Error("Failed to fetch user info");
       }
@@ -452,7 +452,7 @@ export function ShoppingCart({
   const { data: products } = useQuery<any[]>({
     queryKey: ["products"],
     queryFn: async () => {
-      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/products");
+      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/products");
       if (!response.ok) {
         throw new Error("Failed to fetch products");
       }
@@ -482,7 +482,7 @@ export function ShoppingCart({
     try {
       setIsSearching(true);
       const response = await fetch(
-        `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/customers?search=${encodeURIComponent(searchTerm)}`,
+        `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customers?search=${encodeURIComponent(searchTerm)}`,
         {
           method: "GET",
           headers: {
@@ -772,9 +772,9 @@ export function ShoppingCart({
 
   // Query payment methods from API
   const { data: paymentMethodsData } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/payment-methods"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods"],
     queryFn: async () => {
-      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/payment-methods");
+      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods");
       if (!response.ok) throw new Error("Failed to fetch payment methods");
       return response.json();
     },
@@ -985,7 +985,7 @@ export function ShoppingCart({
     // Generate next order number with BH prefix
     let orderNumber = `BH-0000001`; // Default fallback
     try {
-      const orderNumberResponse = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/orders/next-order-number");
+      const orderNumberResponse = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders/next-order-number");
       if (orderNumberResponse.ok) {
         const data = await orderNumberResponse.json();
         orderNumber = data.nextOrderNumber;
@@ -1183,7 +1183,7 @@ export function ShoppingCart({
         items: cartItemsForOrder,
       });
 
-      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/orders", {
+      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1245,7 +1245,7 @@ export function ShoppingCart({
       });
 
       // Refresh orders list
-      await queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/orders"] });
+      await queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders"] });
     } catch (error) {
       console.error("❌ Error placing order:", error);
       toast({
@@ -1280,7 +1280,7 @@ export function ShoppingCart({
     // Generate next order number with BH prefix
     let orderNumber = `BH-0000001`; // Default fallback
     try {
-      const orderNumberResponse = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/orders/next-order-number");
+      const orderNumberResponse = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders/next-order-number");
       if (orderNumberResponse.ok) {
         const data = await orderNumberResponse.json();
         orderNumber = data.nextOrderNumber;
@@ -1472,7 +1472,7 @@ export function ShoppingCart({
 
         console.log("📤 Creating order with data:", orderData);
 
-        const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/orders", {
+        const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1519,7 +1519,7 @@ export function ShoppingCart({
         });
 
         // Refresh orders list
-        await queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/orders"] });
+        await queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders"] });
       } catch (error) {
         console.error("❌ Error processing payment:", error);
         toast({

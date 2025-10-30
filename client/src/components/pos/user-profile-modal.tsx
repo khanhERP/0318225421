@@ -60,7 +60,7 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
 
   const updateUserMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/users/${userInfo.userId}`, {
+      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/users/${userInfo.userId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -86,7 +86,7 @@ export function UserProfileModal({ isOpen, onClose }: UserProfileModalProps) {
       });
       
       setIsEditing(false);
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.devapi/users"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/users"] });
     },
     onError: (error) => {
       toast({
