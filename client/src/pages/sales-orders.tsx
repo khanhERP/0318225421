@@ -28,6 +28,7 @@ import {
   X,
   Download,
   CreditCard, // Import CreditCard icon
+  Minus, // Import Minus icon
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -46,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator"; // Import Separator
 
 interface Invoice {
   id: number;
@@ -2166,6 +2168,13 @@ export default function SalesOrders() {
       if (totalBeforeDiscount > 0) {
         const newEditedItems: typeof editedOrderItems = {};
 
+        // Preserve deleted items - DON'T recalculate them
+        Object.keys(editedOrderItems).forEach((itemId) => {
+          if (editedOrderItems[parseInt(itemId)]?._deleted) {
+            newEditedItems[parseInt(itemId)] = editedOrderItems[parseInt(itemId)];
+          }
+        });
+
         visibleItems.forEach((item: any, index: number) => {
           const edited = editedOrderItems[item.id] || {};
           const unitPrice = parseFloat(
@@ -2277,8 +2286,17 @@ export default function SalesOrders() {
           };
         });
 
-        // Update all items at once
-        setEditedOrderItems(newEditedItems);
+        // Update all items at once - merge with existing deleted items
+        setEditedOrderItems((prev) => {
+          const merged = { ...newEditedItems };
+          // Ensure deleted items are preserved
+          Object.keys(prev).forEach((itemId) => {
+            if (prev[parseInt(itemId)]?._deleted) {
+              merged[parseInt(itemId)] = prev[parseInt(itemId)];
+            }
+          });
+          return merged;
+        });
       }
     }
 
@@ -2369,6 +2387,8 @@ export default function SalesOrders() {
         total: newTotal,
       };
     });
+
+    // No need to filter filteredInvoices here, it's for the main list
   }, [
     editedOrderItems,
     orderItems,
@@ -2377,6 +2397,7 @@ export default function SalesOrders() {
     editableInvoice?.priceIncludeTax,
     products,
     storeSettings,
+    selectedInvoice, // Include selectedInvoice to ensure calculations are based on the current context
   ]);
 
   const updateOrderItemField = (itemId: number, field: string, value: any) => {
@@ -5546,40 +5567,40 @@ export default function SalesOrders() {
                                                                     </td>
                                                                     <td className="text-center py-2 px-3 text-sm w-[80px]">
                                                                       {isEditing &&
-                                                                        selectedInvoice.displayStatus !==
-                                                                          1 && (
-                                                                          <Button
-                                                                            size="sm"
-                                                                            variant="ghost"
-                                                                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                                                            onClick={() => {
-                                                                              if (
-                                                                                window.confirm(
-                                                                                  `Bạn có chắc chắn muốn xóa "${item.productName}" khỏi đơn hàng?`,
-                                                                                )
-                                                                              ) {
-                                                                                setEditedOrderItems(
-                                                                                  (
-                                                                                    prev,
-                                                                                  ) => ({
-                                                                                    ...prev,
-                                                                                    [item.id]:
-                                                                                      {
-                                                                                        ...prev[
-                                                                                          item
-                                                                                            .id
-                                                                                        ],
-                                                                                        _deleted:
-                                                                                          true,
-                                                                                      },
-                                                                                  }),
-                                                                                );
-                                                                              }
-                                                                            }}
-                                                                          >
-                                                                            <X className="h-4 w-4" />
-                                                                          </Button>
-                                                                        )}
+                                                                      selectedInvoice.displayStatus !==
+                                                                        1 && (
+                                                                        <Button
+                                                                          size="sm"
+                                                                          variant="ghost"
+                                                                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                                          onClick={() => {
+                                                                            if (
+                                                                              window.confirm(
+                                                                                `Bạn có chắc chắn muốn xóa "${item.productName}" khỏi đơn hàng?`,
+                                                                              )
+                                                                            ) {
+                                                                              setEditedOrderItems(
+                                                                                (
+                                                                                  prev,
+                                                                                ) => ({
+                                                                                  ...prev,
+                                                                                  [item.id]:
+                                                                                    {
+                                                                                      ...prev[
+                                                                                        item
+                                                                                          .id
+                                                                                      ],
+                                                                                      _deleted:
+                                                                                        true,
+                                                                                    },
+                                                                                }),
+                                                                              );
+                                                                            }
+                                                                          }}
+                                                                        >
+                                                                          <X className="h-4 w-4" />
+                                                                        </Button>
+                                                                      )}
                                                                     </td>
                                                                   </tr>
                                                                 );
@@ -5917,6 +5938,30 @@ export default function SalesOrders() {
                                                                           ).toString(),
                                                                         total:
                                                                           calculatedTotal.toString(),
+                                                                        taxRate:
+                                                                          (taxRate *
+                                                                            100)
+                                                                            .toString(),
+                                                                        // Preserve other fields
+                                                                        productId:
+                                                                          edited.productId !==
+                                                                            undefined
+                                                                            ? edited.productId
+                                                                            : item.productId,
+                                                                        productName:
+                                                                          edited.productName !==
+                                                                            undefined
+                                                                            ? edited.productName
+                                                                            : item.productName,
+                                                                        sku:
+                                                                          edited.sku !==
+                                                                            undefined
+                                                                            ? edited.sku
+                                                                            : item.sku ||
+                                                                              item.productSku,
+                                                                        quantity: quantity,
+                                                                        unitPrice:
+                                                                          unitPrice.toString(),
                                                                       };
                                                                     },
                                                                   );
