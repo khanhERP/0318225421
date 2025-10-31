@@ -23,6 +23,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
     notReturned: "반환되지 않음",
     viewDetails: "자세히 보기",
     payment: "결제",
+    ngaychungtu: "증서 날짜",
     icon: "아이콘",
     paymentMethodLabel: "결제 방법",
     customerCodeSearchPlaceholder: "이름 또는 제품 코드로 검색",
@@ -709,6 +710,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
   },
   en: {
     save: "Save",
+    ngaychungtu: "Voucher Date",
     confirmCancelOrder: "Confirm Cancel Order",
     tryChangingFilters: "Try changing the filters",
     confirmCancelOrderDesc: "Are you sure you want to cancel this order?",
@@ -1280,6 +1282,7 @@ export const commonTranslations: { [key: string]: CommonTranslations } = {
   vi: {
     save: "Lưu",
     confirmCancelOrder: "Xác nhận hủy đơn hàng",
+    ngaychungtu: "Ngày chứng từ",
     tryChangingFilters: "Thử thay đổi bộ lọc",
     confirmCancelOrderDesc: "Bạn có chắc chắn muốn hủy đơn hàng này không?",
     confirmCancelOrderWarning: "Hành động này không thể hoàn tác.",

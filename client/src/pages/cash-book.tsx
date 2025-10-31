@@ -1405,7 +1405,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                           {t("common.voucherCode")}
                         </TableHead>
                         <TableHead className="w-[110px] font-bold">
-                          Ngày chứng từ
+                          {t("common.ngaychungtu")}
                         </TableHead>
                         <TableHead className="w-[110px] font-bold">
                           {t("common.dateTime")}
