@@ -324,7 +324,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
         transactions.push({
           id: order.orderNumber || `ORDER-${order.id}`, // Use actual order number
-          date: order.createdAt.toISOString().split("T")[0],
+          date: new Date(order.createdAt).toISOString().split("T")[0],
           updatedAt: order.updatedAt,
           description:
             order.salesChannel === "table"
