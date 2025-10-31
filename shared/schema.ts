@@ -1009,6 +1009,39 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   }),
 }));
 
+export const orderChangeHistory = pgTable("order_change_history", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id").notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  changedAt: timestamp("changed_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }).notNull(), // IPv4 or IPv6
+  userId: integer("user_id"), // Employee or user ID
+  userName: varchar("user_name", { length: 255 }).notNull(),
+  action: varchar("action", { length: 50 }).notNull().default("edit"), // 'edit', 'create', 'delete', 'cancel'
+  detailedDescription: text("detailed_description").notNull(), // JSON string with change details
+  storeCode: varchar("store_code", { length: 50 }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
+export const insertOrderChangeHistorySchema = createInsertSchema(
+  orderChangeHistory,
+)
+  .omit({
+    id: true,
+    createdAt: true,
+  })
+  .extend({
+    action: z.enum(["edit", "create", "delete", "cancel"]).default("edit"),
+  });
+
+export type OrderChangeHistory = typeof orderChangeHistory.$inferSelect;
+export type InsertOrderChangeHistory = z.infer<
+  typeof insertOrderChangeHistorySchema
+>;
+
 export const customersRelations = relations(customers, ({ many }) => ({
   pointTransactions: many(pointTransactions),
   orders: many(orders),
@@ -1265,18 +1298,12 @@ export type InsertPriceListItem = z.infer<typeof insertPriceListItemSchema>;
 // General Settings table
 export const generalSettings = pgTable("general_settings", {
   id: serial("id").primaryKey(),
-  settingCode: varchar("setting_code", { length: 100 }).notNull().unique(),
+  settingCode: varchar("setting_code", { length: 50 }).notNull().unique(),
   settingName: varchar("setting_name", { length: 255 }).notNull(),
-  settingValue: text("setting_value"),
   description: text("description"),
-  isActive: boolean("is_active").notNull().default(true),
-  storeCode: varchar("store_code", { length: 50 }),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const insertGeneralSettingSchema = createInsertSchema(generalSettings)
