@@ -52,6 +52,7 @@ interface CashBookPageProps {
 interface CashTransaction {
   id: string;
   date: string;
+  updatedAt?: string;
   description: string;
   source: string;
   type: "thu" | "chi";
@@ -86,7 +87,6 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
   });
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
-
   // Handle date range change
   const handleDateRangeChange = (value: string) => {
     setDateRange(value);
@@ -118,19 +118,35 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
         setEndDate(endOfLastWeek.toISOString().split("T")[0]);
         break;
       case "thisMonth":
-        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const firstDayOfMonth = new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          1,
+        );
         setStartDate(firstDayOfMonth.toISOString().split("T")[0]);
         setEndDate(today.toISOString().split("T")[0]);
         break;
       case "lastMonth":
-        const firstDayOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const lastDayOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+        const firstDayOfLastMonth = new Date(
+          today.getFullYear(),
+          today.getMonth() - 1,
+          1,
+        );
+        const lastDayOfLastMonth = new Date(
+          today.getFullYear(),
+          today.getMonth(),
+          0,
+        );
         setStartDate(firstDayOfLastMonth.toISOString().split("T")[0]);
         setEndDate(lastDayOfLastMonth.toISOString().split("T")[0]);
         break;
       case "thisQuarter":
         const currentQuarter = Math.floor(today.getMonth() / 3);
-        const firstDayOfQuarter = new Date(today.getFullYear(), currentQuarter * 3, 1);
+        const firstDayOfQuarter = new Date(
+          today.getFullYear(),
+          currentQuarter * 3,
+          1,
+        );
         setStartDate(firstDayOfQuarter.toISOString().split("T")[0]);
         setEndDate(today.toISOString().split("T")[0]);
         break;
@@ -147,7 +163,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
   // Query orders (thu - income from sales)
   const { data: orders = [] } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders", startDate, endDate],
     queryFn: async () => {
       try {
         const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders");
@@ -164,7 +180,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
   // Query purchase receipts (chi - expenses from purchases)
   const { data: purchaseReceipts = [] } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/purchase-receipts"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/purchase-receipts", startDate, endDate],
     queryFn: async () => {
       try {
         const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/purchase-receipts");
@@ -181,7 +197,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
   // Query income vouchers (thu - manual income entries)
   const { data: incomeVouchers = [] } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers", startDate, endDate],
     queryFn: async () => {
       try {
         const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers");
@@ -198,7 +214,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
   // Query expense vouchers (chi - manual expense entries)
   const { data: expenseVouchers = [] } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers", startDate, endDate],
     queryFn: async () => {
       try {
         const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers");
@@ -281,7 +297,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
         return true;
       })
       .forEach((order) => {
-        const orderDate = new Date(order.orderedAt || order.paidAt);
+        const orderDate = new Date(order.updatedAt);
 
         // Calculate amount based on payment method filter
         let transactionAmount = parseFloat(order.total || "0");
@@ -309,6 +325,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
         transactions.push({
           id: order.orderNumber || `ORDER-${order.id}`, // Use actual order number
           date: orderDate.toISOString().split("T")[0],
+          updatedAt: order.updatedAt,
           description:
             order.salesChannel === "table"
               ? "tableSalesTransaction"
@@ -339,6 +356,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
           transactions.push({
             id: voucher.voucherNumber, // Use actual voucher number instead of internal ID
             date: voucher.date || new Date().toISOString().split("T")[0],
+            updatedAt: voucher.updatedAt,
             description: voucher.category || "orther",
             source: voucher.recipient || "",
             type: "thu",
@@ -377,6 +395,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
           transactions.push({
             id: voucher.voucherNumber, // Use actual voucher number instead of internal ID
             date: voucher.date || new Date().toISOString().split("T")[0],
+            updatedAt: voucher.updatedAt,
             description: voucher.category || "other",
             source: voucher.recipient || "Không rõ",
             type: "chi",
@@ -501,6 +520,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
             transactions.push({
               id: receipt.receiptNumber || `PURCHASE-${receipt.id}`, // Use actual receipt number
               date: receiptDate.toISOString().split("T")[0],
+              updatedAt: receipt.updatedAt,
               description: "purchaseTransaction",
               source: supplier?.name || t("common.supplier"),
               type: "chi",
@@ -592,7 +612,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
     // Filter by voucher number
     if (voucherNumberFilter.trim() !== "") {
       filtered = filtered.filter((t) =>
-        t.id.toLowerCase().includes(voucherNumberFilter.toLowerCase().trim())
+        t.id.toLowerCase().includes(voucherNumberFilter.toLowerCase().trim()),
       );
     }
 
@@ -814,44 +834,72 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                     {t("common.dateRange")}
                   </Label>
                   <div className="flex gap-2">
-                    <Select 
-                      value={dateRange} 
+                    <Select
+                      value={dateRange}
                       onValueChange={handleDateRangeChange}
                     >
                       <SelectTrigger className="flex-1">
                         <SelectValue>
-                          {dateRange === "custom" 
+                          {dateRange === "custom"
                             ? t("reports.custom")
-                            : dateRange === "today" ? t("reports.toDay")
-                            : dateRange === "yesterday" ? t("reports.yesterday")
-                            : dateRange === "thisWeek" ? t("reports.thisWeek")
-                            : dateRange === "lastWeek" ? t("reports.lastWeek")
-                            : dateRange === "thisMonth" ? t("reports.thisMonth")
-                            : dateRange === "lastMonth" ? t("reports.lastMonth")
-                            : dateRange === "thisQuarter" ? t("reports.thisQuarter")
-                            : dateRange === "thisYear" ? t("reports.thisYear")
-                            : t("common.dateRange")
-                          }
+                            : dateRange === "today"
+                              ? t("reports.toDay")
+                              : dateRange === "yesterday"
+                                ? t("reports.yesterday")
+                                : dateRange === "thisWeek"
+                                  ? t("reports.thisWeek")
+                                  : dateRange === "lastWeek"
+                                    ? t("reports.lastWeek")
+                                    : dateRange === "thisMonth"
+                                      ? t("reports.thisMonth")
+                                      : dateRange === "lastMonth"
+                                        ? t("reports.lastMonth")
+                                        : dateRange === "thisQuarter"
+                                          ? t("reports.thisQuarter")
+                                          : dateRange === "thisYear"
+                                            ? t("reports.thisYear")
+                                            : t("common.dateRange")}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="today">{t("reports.toDay")}</SelectItem>
-                        <SelectItem value="yesterday">{t("reports.yesterday")}</SelectItem>
-                        <SelectItem value="thisWeek">{t("reports.thisWeek")}</SelectItem>
-                        <SelectItem value="lastWeek">{t("reports.lastWeek")}</SelectItem>
-                        <SelectItem value="thisMonth">{t("reports.thisMonth")}</SelectItem>
-                        <SelectItem value="lastMonth">{t("reports.lastMonth")}</SelectItem>
-                        <SelectItem value="thisQuarter">{t("reports.thisQuarter")}</SelectItem>
-                        <SelectItem value="thisYear">{t("reports.thisYear")}</SelectItem>
-                        <SelectItem value="custom">{t("reports.custom")}</SelectItem>
+                        <SelectItem value="today">
+                          {t("reports.toDay")}
+                        </SelectItem>
+                        <SelectItem value="yesterday">
+                          {t("reports.yesterday")}
+                        </SelectItem>
+                        <SelectItem value="thisWeek">
+                          {t("reports.thisWeek")}
+                        </SelectItem>
+                        <SelectItem value="lastWeek">
+                          {t("reports.lastWeek")}
+                        </SelectItem>
+                        <SelectItem value="thisMonth">
+                          {t("reports.thisMonth")}
+                        </SelectItem>
+                        <SelectItem value="lastMonth">
+                          {t("reports.lastMonth")}
+                        </SelectItem>
+                        <SelectItem value="thisQuarter">
+                          {t("reports.thisQuarter")}
+                        </SelectItem>
+                        <SelectItem value="thisYear">
+                          {t("reports.thisYear")}
+                        </SelectItem>
+                        <SelectItem value="custom">
+                          {t("reports.custom")}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
-                    
+
                     {dateRange === "custom" && (
-                      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                      <Popover
+                        open={isCalendarOpen}
+                        onOpenChange={setIsCalendarOpen}
+                      >
                         <PopoverTrigger asChild>
-                          <Button 
-                            variant="outline" 
+                          <Button
+                            variant="outline"
                             className="whitespace-nowrap"
                             onClick={() => setIsCalendarOpen(true)}
                           >
@@ -859,27 +907,38 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                             {formatDate(startDate)} - {formatDate(endDate)}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent 
-                          className="w-auto p-0" 
+                        <PopoverContent
+                          className="w-auto p-0"
                           align="start"
                           side="bottom"
                           sideOffset={5}
                         >
                           <div className="p-4">
                             <div className="text-sm font-medium mb-4">
-                              Từ ngày: {formatDate(startDate)} - Đến ngày: {formatDate(endDate)}
+                              Từ ngày: {formatDate(startDate)} - Đến ngày:{" "}
+                              {formatDate(endDate)}
                             </div>
                             <div className="flex gap-4">
                               <div>
-                                <p className="text-xs text-gray-500 mb-2">Từ ngày</p>
+                                <p className="text-xs text-gray-500 mb-2">
+                                  Từ ngày
+                                </p>
                                 <CalendarComponent
                                   mode="single"
-                                  selected={startDate ? new Date(startDate + "T00:00:00") : undefined}
+                                  selected={
+                                    startDate
+                                      ? new Date(startDate + "T00:00:00")
+                                      : undefined
+                                  }
                                   onSelect={(date) => {
                                     if (date) {
                                       const year = date.getFullYear();
-                                      const month = String(date.getMonth() + 1).padStart(2, '0');
-                                      const day = String(date.getDate()).padStart(2, '0');
+                                      const month = String(
+                                        date.getMonth() + 1,
+                                      ).padStart(2, "0");
+                                      const day = String(
+                                        date.getDate(),
+                                      ).padStart(2, "0");
                                       const newStartDate = `${year}-${month}-${day}`;
                                       setStartDate(newStartDate);
                                       if (newStartDate > endDate) {
@@ -891,15 +950,25 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                                 />
                               </div>
                               <div>
-                                <p className="text-xs text-gray-500 mb-2">Đến ngày</p>
+                                <p className="text-xs text-gray-500 mb-2">
+                                  Đến ngày
+                                </p>
                                 <CalendarComponent
                                   mode="single"
-                                  selected={endDate ? new Date(endDate + "T00:00:00") : undefined}
+                                  selected={
+                                    endDate
+                                      ? new Date(endDate + "T00:00:00")
+                                      : undefined
+                                  }
                                   onSelect={(date) => {
                                     if (date) {
                                       const year = date.getFullYear();
-                                      const month = String(date.getMonth() + 1).padStart(2, '0');
-                                      const day = String(date.getDate()).padStart(2, '0');
+                                      const month = String(
+                                        date.getMonth() + 1,
+                                      ).padStart(2, "0");
+                                      const day = String(
+                                        date.getDate(),
+                                      ).padStart(2, "0");
                                       const newEndDate = `${year}-${month}-${day}`;
                                       if (newEndDate >= startDate) {
                                         setEndDate(newEndDate);
@@ -908,7 +977,9 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                                   }}
                                   disabled={(date) => {
                                     if (!startDate) return false;
-                                    const compareDate = new Date(startDate + "T00:00:00");
+                                    const compareDate = new Date(
+                                      startDate + "T00:00:00",
+                                    );
                                     compareDate.setHours(0, 0, 0, 0);
                                     const checkDate = new Date(date);
                                     checkDate.setHours(0, 0, 0, 0);
@@ -1334,6 +1405,9 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                           {t("common.voucherCode")}
                         </TableHead>
                         <TableHead className="w-[110px] font-bold">
+                          Ngày chứng từ
+                        </TableHead>
+                        <TableHead className="w-[110px] font-bold">
                           {t("common.dateTime")}
                         </TableHead>
                         <TableHead className="w-[150px] font-bold">
@@ -1375,6 +1449,14 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                               <Calendar className="w-3 h-3 text-gray-400 flex-shrink-0" />
                               <span className="text-sm">
                                 {formatDate(transaction.date)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="w-[110px]">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                              <span className="text-sm">
+                                {transaction.updatedAt ? formatDate(transaction.updatedAt.split("T")[0]) : "-"}
                               </span>
                             </div>
                           </TableCell>
