@@ -52,7 +52,7 @@ interface CashBookPageProps {
 interface CashTransaction {
   id: string;
   date: string;
-  updatedAt?: string;
+  createdAt?: string;
   description: string;
   source: string;
   type: "thu" | "chi";
@@ -324,8 +324,8 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
         transactions.push({
           id: order.orderNumber || `ORDER-${order.id}`, // Use actual order number
-          date: new Date(order.createdAt).toISOString().split("T")[0],
-          updatedAt: order.updatedAt,
+          date: orderDate.toISOString().split("T")[0],
+          createdAt: order.createdAt,
           description:
             order.salesChannel === "table"
               ? "tableSalesTransaction"
@@ -356,7 +356,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
           transactions.push({
             id: voucher.voucherNumber, // Use actual voucher number instead of internal ID
             date: voucher.date || new Date().toISOString().split("T")[0],
-            updatedAt: voucher.updatedAt,
+            createdAt: voucher.createdAt,
             description: voucher.category || "orther",
             source: voucher.recipient || "",
             type: "thu",
@@ -395,7 +395,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
           transactions.push({
             id: voucher.voucherNumber, // Use actual voucher number instead of internal ID
             date: voucher.date || new Date().toISOString().split("T")[0],
-            updatedAt: voucher.updatedAt,
+            createdAt: voucher.createdAt,
             description: voucher.category || "other",
             source: voucher.recipient || "Không rõ",
             type: "chi",
@@ -520,7 +520,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
             transactions.push({
               id: receipt.receiptNumber || `PURCHASE-${receipt.id}`, // Use actual receipt number
               date: receiptDate.toISOString().split("T")[0],
-              updatedAt: receipt.updatedAt,
+              createdAt: receipt.createdAt,
               description: "purchaseTransaction",
               source: supplier?.name || t("common.supplier"),
               type: "chi",
@@ -1448,7 +1448,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                             <div className="flex items-center gap-1">
                               <Calendar className="w-3 h-3 text-gray-400 flex-shrink-0" />
                               <span className="text-sm">
-                                {formatDate(transaction.date)}
+                                {transaction.createdAt ? formatDate(transaction.createdAt.split("T")[0]) : "-"}
                               </span>
                             </div>
                           </TableCell>
@@ -1456,7 +1456,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                             <div className="flex items-center gap-1">
                               <Calendar className="w-3 h-3 text-gray-400 flex-shrink-0" />
                               <span className="text-sm">
-                                {transaction.updatedAt ? formatDate(transaction.updatedAt.split("T")[0]) : "-"}
+                                {formatDate(transaction.date)}
                               </span>
                             </div>
                           </TableCell>
