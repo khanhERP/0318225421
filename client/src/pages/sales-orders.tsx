@@ -2369,10 +2369,6 @@ export default function SalesOrders() {
         total: newTotal,
       };
     });
-
-    filteredInvoices = filteredInvoices.filter(
-      (item) => !editedOrderItems[item.id]?._deleted,
-    );
   }, [
     editedOrderItems,
     orderItems,
