@@ -813,124 +813,135 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                   <Label className="text-sm font-bold text-gray-800 mb-3 block">
                     {t("common.dateRange")}
                   </Label>
-                  <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                    <PopoverTrigger asChild>
-                      <div className="w-full">
-                        <Select 
-                          value={dateRange} 
-                          onValueChange={(value) => {
-                            if (value === "custom") {
-                              setIsCalendarOpen(true);
-                            } else {
-                              handleDateRangeChange(value);
-                            }
-                          }}
-                        >
-                          <SelectTrigger>
-                            <SelectValue>
-                              {dateRange === "custom" 
-                                ? `Từ ngày: ${formatDate(startDate)} - Đến ngày: ${formatDate(endDate)}`
-                                : dateRange === "today" ? t("reports.toDay")
-                                : dateRange === "yesterday" ? t("reports.yesterday")
-                                : dateRange === "thisWeek" ? t("reports.thisWeek")
-                                : dateRange === "lastWeek" ? t("reports.lastWeek")
-                                : dateRange === "thisMonth" ? t("reports.thisMonth")
-                                : dateRange === "lastMonth" ? t("reports.lastMonth")
-                                : dateRange === "thisQuarter" ? t("reports.thisQuarter")
-                                : dateRange === "thisYear" ? t("reports.thisYear")
-                                : t("common.dateRange")
-                              }
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="today">{t("reports.toDay")}</SelectItem>
-                            <SelectItem value="yesterday">{t("reports.yesterday")}</SelectItem>
-                            <SelectItem value="thisWeek">{t("reports.thisWeek")}</SelectItem>
-                            <SelectItem value="lastWeek">{t("reports.lastWeek")}</SelectItem>
-                            <SelectItem value="thisMonth">{t("reports.thisMonth")}</SelectItem>
-                            <SelectItem value="lastMonth">{t("reports.lastMonth")}</SelectItem>
-                            <SelectItem value="thisQuarter">{t("reports.thisQuarter")}</SelectItem>
-                            <SelectItem value="thisYear">{t("reports.thisYear")}</SelectItem>
-                            <SelectItem value="custom">{t("reports.custom")}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </PopoverTrigger>
-                    <PopoverContent 
-                      className="w-auto p-0" 
-                      align="start"
-                      side="bottom"
-                      sideOffset={5}
-                      onInteractOutside={(e) => e.preventDefault()}
-                      onEscapeKeyDown={(e) => e.preventDefault()}
+                  <div className="flex gap-2">
+                    <Select 
+                      value={dateRange} 
+                      onValueChange={handleDateRangeChange}
                     >
-                      <div className="p-4">
-                        <div className="text-sm font-medium mb-4">
-                          Từ ngày: {formatDate(startDate)} - Đến ngày: {formatDate(endDate)}
-                        </div>
-                        <div className="flex gap-4">
-                          <CalendarComponent
-                            mode="single"
-                            selected={new Date(startDate)}
-                            onSelect={(date) => {
-                              if (date) {
-                                const newStartDate = date.toISOString().split("T")[0];
-                                setStartDate(newStartDate);
-                                // Auto-adjust end date if it's before start date
-                                if (newStartDate > endDate) {
-                                  setEndDate(newStartDate);
-                                }
-                              }
-                            }}
-                            initialFocus
-                            numberOfMonths={1}
-                          />
-                          <CalendarComponent
-                            mode="single"
-                            selected={new Date(endDate)}
-                            onSelect={(date) => {
-                              if (date) {
-                                const newEndDate = date.toISOString().split("T")[0];
-                                setEndDate(newEndDate);
-                                // Auto-adjust start date if it's after end date
-                                if (newEndDate < startDate) {
-                                  setStartDate(newEndDate);
-                                }
-                              }
-                            }}
-                            numberOfMonths={1}
-                            disabled={(date) => {
-                              // Disable dates before start date
-                              return date < new Date(startDate);
-                            }}
-                          />
-                        </div>
-                        <div className="flex justify-end gap-2 pt-4 border-t mt-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setIsCalendarOpen(false);
-                              setDateRange("thisMonth");
-                              handleDateRangeChange("thisMonth");
-                            }}
+                      <SelectTrigger className="flex-1">
+                        <SelectValue>
+                          {dateRange === "custom" 
+                            ? t("reports.custom")
+                            : dateRange === "today" ? t("reports.toDay")
+                            : dateRange === "yesterday" ? t("reports.yesterday")
+                            : dateRange === "thisWeek" ? t("reports.thisWeek")
+                            : dateRange === "lastWeek" ? t("reports.lastWeek")
+                            : dateRange === "thisMonth" ? t("reports.thisMonth")
+                            : dateRange === "lastMonth" ? t("reports.lastMonth")
+                            : dateRange === "thisQuarter" ? t("reports.thisQuarter")
+                            : dateRange === "thisYear" ? t("reports.thisYear")
+                            : t("common.dateRange")
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="today">{t("reports.toDay")}</SelectItem>
+                        <SelectItem value="yesterday">{t("reports.yesterday")}</SelectItem>
+                        <SelectItem value="thisWeek">{t("reports.thisWeek")}</SelectItem>
+                        <SelectItem value="lastWeek">{t("reports.lastWeek")}</SelectItem>
+                        <SelectItem value="thisMonth">{t("reports.thisMonth")}</SelectItem>
+                        <SelectItem value="lastMonth">{t("reports.lastMonth")}</SelectItem>
+                        <SelectItem value="thisQuarter">{t("reports.thisQuarter")}</SelectItem>
+                        <SelectItem value="thisYear">{t("reports.thisYear")}</SelectItem>
+                        <SelectItem value="custom">{t("reports.custom")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    {dateRange === "custom" && (
+                      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                        <PopoverTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            className="whitespace-nowrap"
+                            onClick={() => setIsCalendarOpen(true)}
                           >
-                            Hủy
+                            <Calendar className="w-4 h-4 mr-2" />
+                            {formatDate(startDate)} - {formatDate(endDate)}
                           </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setDateRange("custom");
-                              setIsCalendarOpen(false);
-                            }}
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                          >
-                            Xác nhận
-                          </Button>
-                        </div>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                        </PopoverTrigger>
+                        <PopoverContent 
+                          className="w-auto p-0" 
+                          align="start"
+                          side="bottom"
+                          sideOffset={5}
+                        >
+                          <div className="p-4">
+                            <div className="text-sm font-medium mb-4">
+                              Từ ngày: {formatDate(startDate)} - Đến ngày: {formatDate(endDate)}
+                            </div>
+                            <div className="flex gap-4">
+                              <div>
+                                <p className="text-xs text-gray-500 mb-2">Từ ngày</p>
+                                <CalendarComponent
+                                  mode="single"
+                                  selected={startDate ? new Date(startDate + "T00:00:00") : undefined}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      const year = date.getFullYear();
+                                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                                      const day = String(date.getDate()).padStart(2, '0');
+                                      const newStartDate = `${year}-${month}-${day}`;
+                                      setStartDate(newStartDate);
+                                      if (newStartDate > endDate) {
+                                        setEndDate(newStartDate);
+                                      }
+                                    }
+                                  }}
+                                  initialFocus
+                                />
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-500 mb-2">Đến ngày</p>
+                                <CalendarComponent
+                                  mode="single"
+                                  selected={endDate ? new Date(endDate + "T00:00:00") : undefined}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      const year = date.getFullYear();
+                                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                                      const day = String(date.getDate()).padStart(2, '0');
+                                      const newEndDate = `${year}-${month}-${day}`;
+                                      if (newEndDate >= startDate) {
+                                        setEndDate(newEndDate);
+                                      }
+                                    }
+                                  }}
+                                  disabled={(date) => {
+                                    if (!startDate) return false;
+                                    const compareDate = new Date(startDate + "T00:00:00");
+                                    compareDate.setHours(0, 0, 0, 0);
+                                    const checkDate = new Date(date);
+                                    checkDate.setHours(0, 0, 0, 0);
+                                    return checkDate < compareDate;
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setIsCalendarOpen(false);
+                                  setDateRange("thisMonth");
+                                  handleDateRangeChange("thisMonth");
+                                }}
+                              >
+                                Hủy
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => setIsCalendarOpen(false)}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                Xác nhận
+                              </Button>
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>
