@@ -1003,33 +1003,15 @@ export function ShoppingCart({
     }
 
     // Get storeCode from authenticated user
-    const storeCode =
-      userInfo?.storeCode || storeSettings?.storeCode || "STORE001";
+    const storeCode = userInfo?.storeCode || storeSettings?.storeCode || "";
 
     // Use the EXACT same calculation logic as checkout
     const calculatedTax = tax;
-    const finalDiscount = parseFloat(
+    let finalDiscount = parseFloat(
       activeOrderId
         ? orderDiscounts[activeOrderId] || "0"
         : discountAmount || "0",
     );
-    const calculatedSubtotal = subtotal + finalDiscount;
-    const baseTotal = Math.round(
-      calculatedSubtotal - finalDiscount + calculatedTax,
-    );
-    const finalTotal = Math.max(0, baseTotal);
-
-    console.log("📝 Place Order Calculation:", {
-      subtotal: calculatedSubtotal,
-      tax: calculatedTax,
-      discount: finalDiscount,
-      total: finalTotal,
-      customer: selectedCustomer.name,
-      customerPhone: selectedCustomer.phone,
-      customerTaxCode: selectedCustomer.customerTaxCode,
-      storeCode: storeCode,
-      paymentMethod: paymentMethod, // Log payment method
-    });
 
     // Prepare cart items for order - USE EDITED PRICES FROM UI
     const cartItemsForOrder = cart.map((item) => {
@@ -1155,6 +1137,30 @@ export function ShoppingCart({
         tax: itemTax.toString(),
         priceBeforeTax: itemPriceBeforeTax.toString(),
       };
+    });
+
+    if (finalDiscount == 0) {
+      finalDiscount = cartItemsForOrder.reduce((sum, item) => {
+        return sum + parseFloat(item.discount);
+      }, 0);
+    }
+
+    const calculatedSubtotal = subtotal + finalDiscount;
+    const baseTotal = Math.round(
+      calculatedSubtotal - finalDiscount + calculatedTax,
+    );
+    const finalTotal = Math.max(0, baseTotal);
+
+    console.log("📝 Place Order Calculation:", {
+      subtotal: calculatedSubtotal,
+      tax: calculatedTax,
+      discount: finalDiscount,
+      total: finalTotal,
+      customer: selectedCustomer.name,
+      customerPhone: selectedCustomer.phone,
+      customerTaxCode: selectedCustomer.customerTaxCode,
+      storeCode: storeCode,
+      paymentMethod: paymentMethod, // Log payment method
     });
 
     // Create order with "pending" status (đặt hàng chưa thanh toán)
@@ -1306,19 +1312,8 @@ export function ShoppingCart({
       userInfo?.storeCode || storeSettings?.storeCode || "STORE001";
 
     // SỬ DỤNG ĐÚNG GIÁ TRỊ ĐÃ HIỂN THỊ - KHÔNG TÍNH LẠI
-    const displayedSubtotal = subtotal;
+    let displayedDiscount = parseFloat(currentOrderDiscount || "0");
     const displayedTax = tax;
-    const displayedDiscount = parseFloat(currentOrderDiscount || "0");
-    const displayedTotal = total;
-
-    console.log("💰 Using DISPLAYED values:", {
-      subtotal: displayedSubtotal,
-      tax: displayedTax,
-      discount: displayedDiscount,
-      total: displayedTotal,
-      storeCode: storeCode,
-      businessType: storeSettings?.businessType,
-    });
 
     // Chuẩn bị items với đúng thông tin đã tính toán và hiển thị - USE EDITED PRICES FROM UI
     const cartItemsForReceipt = cart.map((item) => {
@@ -1448,6 +1443,24 @@ export function ShoppingCart({
       };
     });
 
+    if (displayedDiscount == 0) {
+      displayedDiscount = cartItemsForReceipt.reduce((sum, item) => {
+        return sum + parseFloat(item.discount);
+      }, 0);
+    }
+
+    const displayedSubtotal = subtotal + displayedDiscount;
+    const displayedTotal = displayedSubtotal - displayedDiscount + displayedTax;
+
+    console.log("💰 Using DISPLAYED values:", {
+      subtotal: displayedSubtotal,
+      tax: displayedTax,
+      discount: displayedDiscount,
+      total: displayedTotal,
+      storeCode: storeCode,
+      businessType: storeSettings?.businessType,
+    });
+
     // Check if laundry business - process payment directly
     if (storeSettings?.businessType === "laundry") {
       console.log("🧺 LAUNDRY BUSINESS - Processing direct payment");
@@ -1470,7 +1483,7 @@ export function ShoppingCart({
           subtotal: Math.floor(displayedSubtotal).toString(),
           tax: displayedTax.toString(),
           discount: displayedDiscount.toString(),
-          total: Math.round(displayedSubtotal + displayedTax).toString(), // baseTotal = subtotal + tax (before discount)
+          total: Math.round(displayedTotal).toString(),
           paymentMethod: paymentMethod,
           salesChannel: "pos",
           priceIncludeTax: priceIncludesTax,
@@ -2110,7 +2123,9 @@ export function ShoppingCart({
                   {order.name}
                 </span>
                 <span className="ml-1.5 text-xs opacity-90">
-                  ({order.cart.length})
+                  (
+                  {order.cart.reduce((total, item) => total + item.quantity, 0)}
+                  )
                 </span>
                 {orders.length > 1 && (
                   <button
@@ -2363,9 +2378,33 @@ export function ShoppingCart({
                             }
                           }
 
-                          // Trigger cart update
+                          // Force immediate re-render to update tax display
                           setTimeout(() => {
-                            broadcastCartUpdate();
+                            const productId =
+                              typeof item.id === "string"
+                                ? parseInt(item.id)
+                                : item.id;
+                            onUpdateQuantity(productId, item.quantity);
+
+                            setTimeout(() => {
+                              broadcastCartUpdate();
+                            }, 50);
+                          }, 50);
+                        }}
+                        onBlur={() => {
+                          // Trigger cart update and recalculate tax when user finishes editing
+                          setTimeout(() => {
+                            // Force re-render to recalculate tax with new discount
+                            const productId =
+                              typeof item.id === "string"
+                                ? parseInt(item.id)
+                                : item.id;
+                            onUpdateQuantity(productId, item.quantity);
+
+                            // Broadcast updated cart with recalculated tax
+                            setTimeout(() => {
+                              broadcastCartUpdate();
+                            }, 50);
                           }, 100);
                         }}
                         onFocus={(e) => {
@@ -2439,8 +2478,25 @@ export function ShoppingCart({
                             currentOrderDiscount || "0",
                           );
 
-                          // Calculate discount for this item
-                          let itemDiscountAmount = 0;
+                          // Calculate per-item discount FIRST
+                          let perItemDiscount = 0;
+                          const itemDiscountConfig = itemDiscounts[item.id];
+                          if (itemDiscountConfig && itemDiscountConfig.value) {
+                            const discountValue =
+                              parseFloat(itemDiscountConfig.value) || 0;
+                            if (itemDiscountConfig.type === "percent") {
+                              // Calculate percentage discount
+                              perItemDiscount = Math.round(
+                                (unitPrice * quantity * discountValue) / 100,
+                              );
+                            } else {
+                              // Direct amount discount
+                              perItemDiscount = discountValue;
+                            }
+                          }
+
+                          // Calculate order-level discount for this item
+                          let orderLevelDiscount = 0;
                           if (orderDiscount > 0) {
                             const totalBeforeDiscount = cart.reduce(
                               (total, cartItem) => {
@@ -2474,12 +2530,12 @@ export function ShoppingCart({
                                     : 0;
                                 previousDiscounts += prevItemDiscount;
                               }
-                              itemDiscountAmount =
+                              orderLevelDiscount =
                                 orderDiscount - previousDiscounts;
                             } else {
                               // Regular calculation for non-last items
                               const itemTotal = unitPrice * quantity;
-                              itemDiscountAmount =
+                              orderLevelDiscount =
                                 totalBeforeDiscount > 0
                                   ? Math.round(
                                       (orderDiscount * itemTotal) /
@@ -2489,11 +2545,15 @@ export function ShoppingCart({
                             }
                           }
 
+                          // TOTAL discount = per-item discount + order-level discount
+                          const totalItemDiscount =
+                            perItemDiscount + orderLevelDiscount;
+
                           if (priceIncludesTax) {
                             // When price includes tax:
                             // giá bao gồm thuế = (price - (discount/quantity)) * quantity
                             const discountPerUnit =
-                              itemDiscountAmount / quantity;
+                              totalItemDiscount / quantity;
                             const adjustedPrice = Math.max(
                               0,
                               unitPrice - discountPerUnit,
@@ -2509,7 +2569,7 @@ export function ShoppingCart({
                             // When price doesn't include tax:
                             // subtotal = (price - (discount/quantity)) * quantity
                             const discountPerUnit =
-                              itemDiscountAmount / quantity;
+                              totalItemDiscount / quantity;
                             const adjustedPrice = Math.max(
                               0,
                               unitPrice - discountPerUnit,
@@ -2836,46 +2896,10 @@ export function ShoppingCart({
                       wsRef.current &&
                       wsRef.current.readyState === WebSocket.OPEN
                     ) {
-                      const validatedCart = cart.map((item) => ({
-                        ...item,
-                        name:
-                          item.name ||
-                          item.productName ||
-                          item.product?.name ||
-                          `Sản phẩm ${item.id}`,
-                        productName:
-                          item.name ||
-                          item.productName ||
-                          item.product?.name ||
-                          `Sản phẩm ${item.id}`,
-                        price: item.price || "0",
-                        quantity: item.quantity || 1,
-                        total: item.total || "0",
-                      }));
-
-                      wsRef.current.send(
-                        JSON.stringify({
-                          type: "cart_update",
-                          cart: validatedCart,
-                          subtotal: Math.floor(subtotal),
-                          tax: Math.floor(tax),
-                          total: Math.floor(total),
-                          discount: finalDiscountAmount,
-                          orderNumber: activeOrderId || `ORD-${Date.now()}`,
-                          timestamp: new Date().toISOString(),
-                          updateType: "discount_update",
-                        }),
-                      );
-
-                      console.log(
-                        "📡 Shopping Cart: Discount update broadcasted:",
-                        {
-                          discount: finalDiscountAmount,
-                          discountType: discountType,
-                          cartItems: validatedCart.length,
-                          total: Math.floor(total),
-                        },
-                      );
+                      // Trigger a timeout to allow React to re-render and recalculate
+                      setTimeout(() => {
+                        broadcastCartUpdate();
+                      }, 50);
                     }
                   }}
                   className="flex-1 text-right h-9"
