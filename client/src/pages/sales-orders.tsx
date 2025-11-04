@@ -1855,10 +1855,7 @@ export default function SalesOrders() {
 
       // Step 6: Update order totals in database
       // Determine isPaid status: if paymentStatus is 'paid' or status is 'paid', then isPaid should be true
-      const updatedIsPaid =
-        editableInvoice.paymentStatus === "paid" ||
-        editableInvoice.status === "paid" ||
-        editableInvoice.isPaid === true;
+      const updatedIsPaid = editableInvoice.isPaid === true;
 
       // Ensure we get the latest values from editableInvoice state
       const finalCustomerName =
@@ -1952,30 +1949,30 @@ export default function SalesOrders() {
           `Số điện thoại: từ <${originalOrder?.customerPhone || ""}> thành <${editableInvoice.customerPhone || ""}>`,
         );
         hasChanges = true;
-        // Check isPaid status change (for laundry business)
-        if (
-          storeSettings?.businessType === "laundry" &&
-          originalOrder?.isPaid !== editableInvoice.isPaid
-        ) {
-          generalChanges.push(
-            `Đã trả đồ: từ <${originalOrder?.isPaid ? "Đã trả" : "Chưa trả"}> thành <${editableInvoice.isPaid ? "Đã trả" : "Chưa trả"}>`,
-          );
-          hasChanges = true;
-        }
+      }
+      // Check isPaid status change (for laundry business)
+      if (
+        storeSettings?.businessType === "laundry" &&
+        originalOrder?.isPaid !== editableInvoice.isPaid
+      ) {
+        generalChanges.push(
+          `Đã trả đồ: từ <${originalOrder?.isPaid ? "Đã trả" : "Chưa trả"}> thành <${editableInvoice.isPaid ? "Đã trả" : "Chưa trả"}>`,
+        );
+        hasChanges = true;
+      }
 
-        if (originalOrder?.symbol !== editableInvoice.symbol) {
-          generalChanges.push(
-            `Ký hiệu hóa đơn: từ <${originalOrder?.symbol || ""}> thành <${editableInvoice.symbol || ""}>`,
-          );
-          hasChanges = true;
-        }
+      if (originalOrder?.symbol !== editableInvoice.symbol) {
+        generalChanges.push(
+          `Ký hiệu hóa đơn: từ <${originalOrder?.symbol || ""}> thành <${editableInvoice.symbol || ""}>`,
+        );
+        hasChanges = true;
+      }
 
-        if (originalOrder?.invoiceNumber !== editableInvoice.invoiceNumber) {
-          generalChanges.push(
-            `Số hóa đơn: từ <${originalOrder?.invoiceNumber || ""}> thành <${editableInvoice.invoiceNumber || ""}>`,
-          );
-          hasChanges = true;
-        }
+      if (originalOrder?.invoiceNumber !== editableInvoice.invoiceNumber) {
+        generalChanges.push(
+          `Số hóa đơn: từ <${originalOrder?.invoiceNumber || ""}> thành <${editableInvoice.invoiceNumber || ""}>`,
+        );
+        hasChanges = true;
       }
 
       if (originalOrder?.notes !== editableInvoice.notes) {
@@ -1987,7 +1984,7 @@ export default function SalesOrders() {
 
       if (generalChanges.length > 0) {
         changeDescriptionParts.push(
-          "Thông tin chung: " + generalChanges.join("; "),
+          "Thông tin chung:\n" + generalChanges.join("; "),
         );
       }
 
@@ -2088,22 +2085,38 @@ export default function SalesOrders() {
             ? changeDescriptionParts.join("\n\n")
             : "Không có thay đổi";
 
+        // Get order number from multiple sources with priority
+        const currentOrderNumber =
+          editableInvoice.orderNumber ||
+          selectedInvoice?.orderNumber ||
+          editableInvoice.displayNumber ||
+          selectedInvoice?.displayNumber ||
+          `ORD-${String(editableInvoice.id).padStart(13, "0")}`;
+
         try {
           console.log("📝 Logging order change history:", {
             orderId: editableInvoice.id,
+            orderNumber: currentOrderNumber,
             detailedDescriptionLength: detailedDescription.length,
             detailedDescriptionPreview: detailedDescription.substring(0, 200),
           });
 
-          await apiRequest("POST", "https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/order-change-history", {
+          // Create change history record
+          const changeHistoryPayload = {
             orderId: editableInvoice.id,
+            orderNumber: currentOrderNumber, // Add order number to payload
             action: "edit",
             detailedDescription: detailedDescription,
-            ipAddress: window.location.hostname,
-            userName: "User", // Get from auth context if available
-          });
+            userName: "User",
+            storeCode: editableInvoice.storeCode || selectedInvoice?.storeCode,
+            // TODO: Get actual client IP and userId from auth context
+            ipAddress: "client-ip",
+            userId: null,
+          };
 
-          console.log("✅ Order change history logged successfully");
+          await apiRequest("POST", "https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/order-change-history", changeHistoryPayload);
+
+          console.log("✅ Order change history logged successfully with order number:", currentOrderNumber);
         } catch (historyError) {
           console.error("❌ Failed to log order change history:", historyError);
           // Don't fail the whole operation if history logging fails
@@ -2140,11 +2153,6 @@ export default function SalesOrders() {
 
       // Dispatch custom event to force refresh
       window.dispatchEvent(new CustomEvent("forceRefresh"));
-
-      toast({
-        title: "Lưu thành công",
-        description: "Đơn hàng đã được cập nhật và danh sách đã được làm mới",
-      });
     } catch (error) {
       console.error("❌ Error saving order:", error);
       toast({
@@ -4252,15 +4260,20 @@ export default function SalesOrders() {
                                         : ""
                                     }`}
                                     onClick={() => {
-                                      const itemWithType = {
-                                        ...item,
-                                        type:
-                                          item.type ||
-                                          (item.orderNumber
-                                            ? "order"
-                                            : "invoice"),
-                                      };
-                                      setSelectedInvoice(itemWithType);
+                                      // Toggle: if clicking the same order, close it; otherwise open the new one
+                                      if (selectedInvoice?.id === item.id && selectedInvoice?.type === item.type) {
+                                        setSelectedInvoice(null);
+                                      } else {
+                                        const itemWithType = {
+                                          ...item,
+                                          type:
+                                            item.type ||
+                                            (item.orderNumber
+                                              ? "order"
+                                              : "invoice"),
+                                        };
+                                        setSelectedInvoice(itemWithType);
+                                      }
                                     }}
                                   >
                                     <td className="px-3 py-3 text-center">
@@ -4491,7 +4504,10 @@ export default function SalesOrders() {
                                                             )}
                                                           </td>
                                                           <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
-                                                            {t("common.date")}:
+                                                            {t(
+                                                              "common.date",
+                                                            )}
+                                                            :
                                                           </td>
                                                           <td className="py-2 pr-6 text-base">
                                                             {isEditing &&
@@ -4722,8 +4738,7 @@ export default function SalesOrders() {
                                                                 };
                                                               return (
                                                                 statusLabels[
-                                                                  selectedInvoice
-                                                                    .displayStatus
+                                                                  selectedInvoice.displayStatus
                                                                 ] ||
                                                                 "Đang phục vụ"
                                                               );
@@ -5661,8 +5676,7 @@ export default function SalesOrders() {
                                                                           editedOrderItems[
                                                                             item
                                                                               .id
-                                                                          ] ||
-                                                                          {};
+                                                                          ] || {};
                                                                         if (
                                                                           editedItem.tax !==
                                                                           undefined
@@ -6078,6 +6092,18 @@ export default function SalesOrders() {
                                                                         priceBeforeTax +
                                                                         itemTax;
 
+                                                                      if (
+                                                                        orderDiscount ===
+                                                                        sumDiscountItem
+                                                                      ) {
+                                                                        itemDiscountAmount =
+                                                                          parseFloat(
+                                                                            item.discount ||
+                                                                              "0",
+                                                                          );
+                                                                      }
+
+                                                                      // Update item with recalculated values
                                                                       newEditedItems[
                                                                         item.id
                                                                       ] = {
@@ -6115,8 +6141,7 @@ export default function SalesOrders() {
                                                                             ? edited.sku
                                                                             : item.sku ||
                                                                               item.productSku,
-                                                                        quantity:
-                                                                          quantity,
+                                                                        quantity: quantity,
                                                                         unitPrice:
                                                                           unitPrice.toString(),
                                                                       };
@@ -6213,7 +6238,9 @@ export default function SalesOrders() {
                                                             :
                                                           </span>
                                                           <span className="font-bold text-blue-600">
-                                                            {isEditing ? (
+                                                            {isEditing &&
+                                                            editableInvoice.status !=
+                                                              "pending" ? (
                                                               <Select
                                                                 value={
                                                                   editableInvoice.paymentMethod !==
@@ -6261,13 +6288,6 @@ export default function SalesOrders() {
                                                                   />
                                                                 </SelectTrigger>
                                                                 <SelectContent side="top">
-                                                                  {/* chưa thanh toán option */}
-                                                                  {/* <SelectItem value="unpaid">
-                                                                    {t(
-                                                                      "common.unpaid",
-                                                                    )}
-                                                                  </SelectItem> */}
-
                                                                   {enabledPaymentMethods.map(
                                                                     (
                                                                       method: any,

@@ -169,20 +169,15 @@ export function ReceiptModal({
   }, [receipt?.tableNumber, tableInfo?.tableNumber]);
 
   // Log receipt modal state for debugging - ALWAYS CALL THIS HOOK
-  useEffect(() => {
-    const domainConnect = window.location.hostname;
-    setDomainName(domainConnect);
-    let selectBank = lstBank.find((item) => item.domain === domainName);
-    if (selectBank) {
-      setBankAccounts(selectBank);
-    } else if (
-      domainName != "0108670987-004.edpos.vn" ||
-      domainName != "0108670987-008.edpos.vn"
-    ) {
-      setBankAccounts(lstBank[0]);
-    }
 
+  useEffect(() => {
     if (isOpen) {
+      const domainConnect = window.location.hostname;
+      setDomainName(domainConnect);
+      let selectBank = lstBank.find((item) => item.domain === domainConnect);
+      if (selectBank) {
+        setBankAccounts(selectBank);
+      }
       console.log("=== RECEIPT MODAL RENDERED ===");
       console.log(
         "Receipt Modal Mode:",

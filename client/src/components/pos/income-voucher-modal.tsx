@@ -87,10 +87,12 @@ export default function IncomeVoucherModal({
     console.log("📋 All payment methods from API:", paymentMethods);
 
     // Filter to only return enabled payment methods
-    const enabledMethods = paymentMethods.filter((method: any) => method.enabled === true);
-    
+    const enabledMethods = paymentMethods.filter(
+      (method: any) => method.enabled === true,
+    );
+
     console.log("✅ Enabled payment methods:", enabledMethods);
-    
+
     return enabledMethods;
   };
 
@@ -112,19 +114,47 @@ export default function IncomeVoucherModal({
     if (voucher && mode === "edit") {
       setFormData(voucher);
       setIsEditing(false);
-    } else if (mode === "create") {
-      // Generate voucher number for new voucher
-      const today = new Date();
-      const dateStr = today.toISOString().split("T")[0].replace(/-/g, "");
-      const timeStr = Date.now().toString().slice(-3);
-      setFormData((prev) => ({
-        ...prev,
-        voucherNumber: `PT${dateStr}${timeStr}`,
-        account: "cash", // Use nameKey instead of hardcoded Vietnamese
-      }));
+    } else if (mode === "create" && isOpen) {
+      // Generate voucher number for new voucher with format PT-YYYYMMDD0001
+      const generateVoucherNumber = async () => {
+        try {
+          const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers/next-voucher-number");
+          if (response.ok) {
+            const data = await response.json();
+            setFormData((prev) => ({
+              ...prev,
+              voucherNumber: data.voucherNumber,
+              account: "cash",
+            }));
+          } else {
+            // Fallback to old format if API fails
+            const today = new Date();
+            const dateStr = today.toISOString().split("T")[0].replace(/-/g, "");
+            const timeStr = Date.now().toString().slice(-3);
+            setFormData((prev) => ({
+              ...prev,
+              voucherNumber: `PT${dateStr}${timeStr}`,
+              account: "cash",
+            }));
+          }
+        } catch (error) {
+          console.error("Error generating voucher number:", error);
+          // Fallback to old format
+          const today = new Date();
+          const dateStr = today.toISOString().split("T")[0].replace(/-/g, "");
+          const timeStr = Date.now().toString().slice(-3);
+          setFormData((prev) => ({
+            ...prev,
+            voucherNumber: `PT${dateStr}${timeStr}`,
+            account: "cash",
+          }));
+        }
+      };
+      
+      generateVoucherNumber();
       setIsEditing(true);
     }
-  }, [voucher, mode]);
+  }, [voucher, mode, isOpen]);
 
   const createVoucherMutation = useMutation({
     mutationFn: async (data: IncomeVoucher) => {
@@ -143,6 +173,25 @@ export default function IncomeVoucherModal({
       });
       queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders"] });
+
+      // Reset form to initial state
+      const today = new Date();
+      const dateStr = today.toISOString().split("T")[0].replace(/-/g, "");
+      const timeStr = Date.now().toString().slice(-3);
+      const autoVoucherNumber = `PT${dateStr}${timeStr}`;
+
+      setFormData({
+        voucherNumber: autoVoucherNumber,
+        date: new Date().toISOString().split("T")[0],
+        amount: 0,
+        account: "cash",
+        recipient: "",
+        receiverName: "",
+        phone: "",
+        category: "other",
+        description: "",
+      });
+
       onClose();
     },
     onError: (error) => {
@@ -181,6 +230,7 @@ export default function IncomeVoucherModal({
       queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders"] });
       setIsEditing(false);
+      onClose();
     },
     onError: (error) => {
       console.error("Failed to update income voucher:", error);
@@ -338,7 +388,7 @@ export default function IncomeVoucherModal({
                         voucherNumber: e.target.value,
                       }))
                     }
-                    disabled={!isEditing}
+                    disabled
                     className={`h-11 text-base font-bold ${!isEditing ? "bg-gray-100 text-gray-900" : "bg-white"}`}
                   />
                 </div>

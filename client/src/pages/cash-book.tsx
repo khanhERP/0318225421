@@ -105,17 +105,34 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
         break;
       case "thisWeek":
         const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
+        // Get day of week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+        const dayOfWeek = today.getDay();
+        // Calculate days to subtract to get to Monday (day 1)
+        // If Sunday (0), go back 6 days; otherwise go back (dayOfWeek - 1) days
+        const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        startOfWeek.setDate(today.getDate() - daysToMonday);
         setStartDate(startOfWeek.toISOString().split("T")[0]);
         setEndDate(today.toISOString().split("T")[0]);
         break;
       case "lastWeek":
-        const startOfLastWeek = new Date(today);
-        startOfLastWeek.setDate(today.getDate() - today.getDay() - 7);
-        const endOfLastWeek = new Date(startOfLastWeek);
-        endOfLastWeek.setDate(startOfLastWeek.getDate() + 6);
-        setStartDate(startOfLastWeek.toISOString().split("T")[0]);
-        setEndDate(endOfLastWeek.toISOString().split("T")[0]);
+        const currentDayOfWeek = today.getDay();
+        // Calculate days to subtract to get to Monday of current week
+        const daysToCurrentMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
+        
+        // Get Monday of current week
+        const currentMonday = new Date(today);
+        currentMonday.setDate(today.getDate() - daysToCurrentMonday);
+        
+        // Get Monday of last week (7 days before current Monday)
+        const lastWeekMonday = new Date(currentMonday);
+        lastWeekMonday.setDate(currentMonday.getDate() - 7);
+        
+        // Get Sunday of last week (6 days after last Monday)
+        const lastWeekSunday = new Date(lastWeekMonday);
+        lastWeekSunday.setDate(lastWeekMonday.getDate() + 6);
+        
+        setStartDate(lastWeekMonday.toISOString().split("T")[0]);
+        setEndDate(lastWeekSunday.toISOString().split("T")[0]);
         break;
       case "thisMonth":
         const firstDayOfMonth = new Date(
@@ -166,7 +183,11 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
     queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders", startDate, endDate],
     queryFn: async () => {
       try {
-        const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders");
+        const params = new URLSearchParams();
+        if (startDate) params.append("startDate", `${startDate} 00:00:00`);
+        if (endDate) params.append("endDate", `${endDate} 23:59:59`);
+        
+        const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders?${params.toString()}`);
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
@@ -183,7 +204,11 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
     queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/purchase-receipts", startDate, endDate],
     queryFn: async () => {
       try {
-        const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/purchase-receipts");
+        const params = new URLSearchParams();
+        if (startDate) params.append("startDate", `${startDate} 00:00:00`);
+        if (endDate) params.append("endDate", `${endDate} 23:59:59`);
+        
+        const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/purchase-receipts?${params.toString()}`);
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
@@ -200,7 +225,11 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
     queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers", startDate, endDate],
     queryFn: async () => {
       try {
-        const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers");
+        const params = new URLSearchParams();
+        if (startDate) params.append("startDate", `${startDate} 00:00:00`);
+        if (endDate) params.append("endDate", `${endDate} 23:59:59`);
+        
+        const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers?${params.toString()}`);
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
@@ -217,7 +246,11 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
     queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers", startDate, endDate],
     queryFn: async () => {
       try {
-        const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers");
+        const params = new URLSearchParams();
+        if (startDate) params.append("startDate", `${startDate} 00:00:00`);
+        if (endDate) params.append("endDate", `${endDate} 23:59:59`);
+        
+        const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers?${params.toString()}`);
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
@@ -1080,7 +1113,69 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
           {/* Action Buttons */}
           <div className="flex justify-end gap-3 mb-6">
             <Button
-              onClick={() => {
+              onClick={async () => {
+                // Helper function to get payment method for a transaction
+                const getPaymentMethod = (transaction: CashTransaction) => {
+                  if (transaction.voucherType === "income_voucher") {
+                    const voucher = incomeVouchers.find(v => v.voucherNumber === transaction.id);
+                    if (voucher && voucher.account) {
+                      const method = paymentMethods.find(m => m.nameKey === voucher.account);
+                      return method ? t(`common.${method.nameKey}`) : voucher.account;
+                    }
+                  } else if (transaction.voucherType === "expense_voucher") {
+                    const voucher = expenseVouchers.find(v => v.voucherNumber === transaction.id);
+                    if (voucher && voucher.account) {
+                      const method = paymentMethods.find(m => m.nameKey === voucher.account);
+                      return method ? t(`common.${method.nameKey}`) : voucher.account;
+                    }
+                  } else if (transaction.voucherType === "sales_order") {
+                    const order = orders.find(o => (o.orderNumber || `ORDER-${o.id}`) === transaction.id);
+                    if (order && order.paymentMethod) {
+                      if (order.paymentMethod.startsWith("[")) {
+                        try {
+                          const methods = JSON.parse(order.paymentMethod);
+                          return methods.map((pm: any) => {
+                            const method = paymentMethods.find(m => m.nameKey === pm.method);
+                            return method ? t(`common.${method.nameKey}`) : pm.method;
+                          }).join(", ");
+                        } catch (e) {
+                          return order.paymentMethod;
+                        }
+                      } else {
+                        const method = paymentMethods.find(m => m.nameKey === order.paymentMethod);
+                        return method ? t(`common.${method.nameKey}`) : order.paymentMethod;
+                      }
+                    }
+                  } else if (transaction.voucherType === "purchase_receipt") {
+                    const receipt = purchaseReceipts.find(r => (r.receiptNumber || `PURCHASE-${r.id}`) === transaction.id);
+                    if (receipt && receipt.paymentMethod) {
+                      if (receipt.paymentMethod.startsWith("{")) {
+                        try {
+                          const paymentData = JSON.parse(receipt.paymentMethod);
+                          const method = paymentMethods.find(m => m.nameKey === paymentData.method);
+                          return method ? t(`common.${method.nameKey}`) : paymentData.method;
+                        } catch (e) {
+                          return receipt.paymentMethod;
+                        }
+                      } else if (receipt.paymentMethod.startsWith("[")) {
+                        try {
+                          const methods = JSON.parse(receipt.paymentMethod);
+                          return methods.map((pm: any) => {
+                            const method = paymentMethods.find(m => m.nameKey === pm.method);
+                            return method ? t(`common.${method.nameKey}`) : pm.method;
+                          }).join(", ");
+                        } catch (e) {
+                          return receipt.paymentMethod;
+                        }
+                      } else {
+                        const method = paymentMethods.find(m => m.nameKey === receipt.paymentMethod);
+                        return method ? t(`common.${method.nameKey}`) : receipt.paymentMethod;
+                      }
+                    }
+                  }
+                  return "";
+                };
+
                 // Prepare export data
                 const exportData = filteredData.transactions.map(
                   (transaction) => ({
@@ -1088,21 +1183,22 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                     "Thời gian": formatDate(transaction.date),
                     "Loại thu chi": transaction.description,
                     "Người nộp/nhận": transaction.source,
+                    "Phương thức thanh toán": getPaymentMethod(transaction),
                     Thu:
                       transaction.type === "thu"
-                        ? formatCurrency(transaction.amount)
+                        ? transaction.amount
                         : "",
                     Chi:
                       transaction.type === "chi"
-                        ? formatCurrency(transaction.amount)
+                        ? transaction.amount
                         : "",
-                    "Tồn quỹ": formatCurrency(transaction.balance),
+                    "Tồn quỹ": transaction.balance,
                   }),
                 );
 
                 // Create summary data
                 const summaryData = [
-                  ["BÁO CÁO SỔ QUỸ TIỀN MẶT", "", "", "", "", "", ""],
+                  ["BÁO CÁO SỔ QUỸ TIỀN MẶT", "", "", "", "", "", "", ""],
                   [
                     `Từ ngày: ${formatDate(startDate)}`,
                     `Đến ngày: ${formatDate(endDate)}`,
@@ -1111,9 +1207,10 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                     "",
                     "",
                     "",
+                    "",
                   ],
-                  ["", "", "", "", "", "", ""],
-                  ["TỔNG KẾT:", "", "", "", "", "", ""],
+                  ["", "", "", "", "", "", "", ""],
+                  ["TỔNG KẾT:", "", "", "", "", "", "", ""],
                   [
                     "Quỹ đầu kỳ:",
                     "",
@@ -1121,7 +1218,8 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                     "",
                     "",
                     "",
-                    formatCurrency(cashBookData.openingBalance),
+                    "",
+                    cashBookData.openingBalance,
                   ],
                   [
                     "Tổng thu:",
@@ -1129,7 +1227,8 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                     "",
                     "",
                     "",
-                    formatCurrency(filteredData.totalIncome),
+                    "",
+                    filteredData.totalIncome,
                     "",
                   ],
                   [
@@ -1138,7 +1237,8 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                     "",
                     "",
                     "",
-                    formatCurrency(filteredData.totalExpense),
+                    "",
+                    filteredData.totalExpense,
                     "",
                   ],
                   [
@@ -1148,11 +1248,12 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                     "",
                     "",
                     "",
-                    formatCurrency(filteredData.endingBalance),
+                    "",
+                    filteredData.endingBalance,
                   ],
-                  ["", "", "", "", "", "", ""],
-                  ["CHI TIẾT GIAO DỊCH:", "", "", "", "", "", ""],
-                  ["", "", "", "", "", "", ""],
+                  ["", "", "", "", "", "", "", ""],
+                  ["CHI TIẾT GIAO DỊCH:", "", "", "", "", "", "", ""],
+                  ["", "", "", "", "", "", "", ""],
                 ];
 
                 // Create worksheet
@@ -1170,6 +1271,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                   { wch: 15 }, // Thời gian
                   { wch: 30 }, // Loại thu chi
                   { wch: 25 }, // Người nộp/nhận
+                  { wch: 20 }, // Phương thức thanh toán
                   { wch: 15 }, // Thu
                   { wch: 15 }, // Chi
                   { wch: 15 }, // Tồn quỹ
@@ -1181,7 +1283,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
                 // Style header rows
                 for (let row = 0; row < 3; row++) {
-                  for (let col = 0; col <= 6; col++) {
+                  for (let col = 0; col <= 7; col++) {
                     const cellAddress = XLSX.utils.encode_cell({
                       r: row,
                       c: col,
@@ -1202,7 +1304,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
                 // Style summary section
                 for (let row = 3; row < 9; row++) {
-                  for (let col = 0; col <= 6; col++) {
+                  for (let col = 0; col <= 7; col++) {
                     const cellAddress = XLSX.utils.encode_cell({
                       r: row,
                       c: col,
@@ -1221,13 +1323,17 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                         },
                         alignment: { horizontal: "left", vertical: "center" },
                       };
+                      // Format numbers in summary section
+                      if (typeof ws[cellAddress].v === "number") {
+                        ws[cellAddress].z = "#,##0";
+                      }
                     }
                   }
                 }
 
                 // Style transaction header
                 const headerRow = summaryData.length;
-                for (let col = 0; col <= 6; col++) {
+                for (let col = 0; col <= 7; col++) {
                   const cellAddress = XLSX.utils.encode_cell({
                     r: headerRow,
                     c: col,
@@ -1260,13 +1366,13 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                   const isEven = (row - headerRow - 1) % 2 === 0;
                   const bgColor = isEven ? "FFFFFF" : "F8F9FA";
 
-                  for (let col = 0; col <= 6; col++) {
+                  for (let col = 0; col <= 7; col++) {
                     const cellAddress = XLSX.utils.encode_cell({
                       r: row,
                       c: col,
                     });
                     if (ws[cellAddress]) {
-                      const isCurrency = [4, 5, 6].includes(col);
+                      const isCurrency = [5, 6, 7].includes(col);
                       ws[cellAddress].s = {
                         font: {
                           name: "Times New Roman",
@@ -1288,6 +1394,10 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                           right: { style: "thin", color: { rgb: "CCCCCC" } },
                         },
                       };
+                      // Format numbers with thousand separator
+                      if (typeof ws[cellAddress].v === "number") {
+                        ws[cellAddress].z = "#,##0";
+                      }
                     }
                   }
                 }
@@ -1333,7 +1443,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
               {t("common.exportExcel")}
             </Button>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 setSelectedVoucher(null);
                 setVoucherMode("create");
                 setShowIncomeVoucherModal(true);
@@ -1344,7 +1454,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
               {t("common.createIncomeVoucher")}
             </Button>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 setSelectedVoucher(null);
                 setVoucherMode("create");
                 setShowExpenseVoucherModal(true);
