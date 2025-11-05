@@ -1982,6 +1982,13 @@ export default function SalesOrders() {
         hasChanges = true;
       }
 
+      if (originalOrder.paymentMethod !== editableInvoice.paymentMethod) {
+        generalChanges.push(
+          `Phương thức thanh toán: từ <${getPaymentMethodName(originalOrder.paymentMethod)}> thành <${getPaymentMethodName(editableInvoice.paymentMethod)}>`,
+        );
+        hasChanges = true;
+      }
+
       if (generalChanges.length > 0) {
         changeDescriptionParts.push(
           "Thông tin chung:\n" + generalChanges.join("; "),
@@ -2114,9 +2121,16 @@ export default function SalesOrders() {
             userId: null,
           };
 
-          await apiRequest("POST", "https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/order-change-history", changeHistoryPayload);
+          await apiRequest(
+            "POST",
+            "https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/order-change-history",
+            changeHistoryPayload,
+          );
 
-          console.log("✅ Order change history logged successfully with order number:", currentOrderNumber);
+          console.log(
+            "✅ Order change history logged successfully with order number:",
+            currentOrderNumber,
+          );
         } catch (historyError) {
           console.error("❌ Failed to log order change history:", historyError);
           // Don't fail the whole operation if history logging fails
@@ -4250,7 +4264,10 @@ export default function SalesOrders() {
                                     }`}
                                     onClick={() => {
                                       // Toggle: if clicking the same order, close it; otherwise open the new one
-                                      if (selectedInvoice?.id === item.id && selectedInvoice?.type === item.type) {
+                                      if (
+                                        selectedInvoice?.id === item.id &&
+                                        selectedInvoice?.type === item.type
+                                      ) {
                                         setSelectedInvoice(null);
                                       } else {
                                         const itemWithType = {
@@ -4493,10 +4510,7 @@ export default function SalesOrders() {
                                                             )}
                                                           </td>
                                                           <td className="py-2 pr-4 font-semibold whitespace-nowrap text-base">
-                                                            {t(
-                                                              "common.date",
-                                                            )}
-                                                            :
+                                                            {t("common.date")}:
                                                           </td>
                                                           <td className="py-2 pr-6 text-base">
                                                             {isEditing &&
@@ -4727,7 +4741,8 @@ export default function SalesOrders() {
                                                                 };
                                                               return (
                                                                 statusLabels[
-                                                                  selectedInvoice.displayStatus
+                                                                  selectedInvoice
+                                                                    .displayStatus
                                                                 ] ||
                                                                 "Đang phục vụ"
                                                               );
@@ -5592,7 +5607,9 @@ export default function SalesOrders() {
                                                                       )}
                                                                     </td>
                                                                     <td className="text-right py-2 px-3 border-r text-base w-[120px]">
-                                                                      {isEditing ? (
+                                                                      {isEditing &&
+                                                                      storeSettings.isEdit ===
+                                                                        true ? (
                                                                         <Input
                                                                           type="text"
                                                                           value={Math.floor(
@@ -5665,7 +5682,8 @@ export default function SalesOrders() {
                                                                           editedOrderItems[
                                                                             item
                                                                               .id
-                                                                          ] || {};
+                                                                          ] ||
+                                                                          {};
                                                                         if (
                                                                           editedItem.tax !==
                                                                           undefined
@@ -6130,7 +6148,8 @@ export default function SalesOrders() {
                                                                             ? edited.sku
                                                                             : item.sku ||
                                                                               item.productSku,
-                                                                        quantity: quantity,
+                                                                        quantity:
+                                                                          quantity,
                                                                         unitPrice:
                                                                           unitPrice.toString(),
                                                                       };
