@@ -60,11 +60,11 @@ export function SalesReport() {
     error: ordersError,
     refetch: refetchOrders,
   } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders/date-range", startDate, endDate, "all"],
+    queryKey: ["https://laundry-be-234a.onrender.com/api/orders/date-range", startDate, endDate, "all"],
     queryFn: async () => {
       try {
         const response = await fetch(
-          `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders/date-range/${startDate}/${endDate}/all`,
+          `https://laundry-be-234a.onrender.com/api/orders/date-range/${startDate}/${endDate}/all`,
         );
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -81,9 +81,9 @@ export function SalesReport() {
   });
 
   const { data: generalSettings } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/general-settings"],
+    queryKey: ["https://laundry-be-234a.onrender.com/api/general-settings"],
     queryFn: async () => {
-      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/general-settings/ST-002");
+      const response = await fetch("https://laundry-be-234a.onrender.com/api/general-settings/ST-002");
       if (!response.ok) throw new Error("Failed to fetch general settings");
       return response.json();
     },
@@ -96,11 +96,11 @@ export function SalesReport() {
     isLoading: orderItemsLoading,
     refetch: refetchOrderItems,
   } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/order-items/date-range", startDate, endDate, "all"],
+    queryKey: ["https://laundry-be-234a.onrender.com/api/order-items/date-range", startDate, endDate, "all"],
     queryFn: async () => {
       try {
         const response = await fetch(
-          `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/order-items/${startDate}/${endDate}`,
+          `https://laundry-be-234a.onrender.com/api/order-items/${startDate}/${endDate}`,
         );
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);

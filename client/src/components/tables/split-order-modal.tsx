@@ -32,12 +32,12 @@ export function SplitOrderModal({
 
   // Fetch table info to get correct table number
   const { data: tablesData } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/tables"],
+    queryKey: ["https://laundry-be-234a.onrender.com/api/tables"],
   });
 
   // Fetch products to get correct tax rates
   const { data: productsData } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/products"],
+    queryKey: ["https://laundry-be-234a.onrender.com/api/products"],
   });
 
   const getTableNumber = () => {
