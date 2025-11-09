@@ -65,20 +65,20 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
 
   // Fetch store settings (will automatically use user's storeCode from token)
   const { data: storeSettings } = useQuery<StoreSettings>({
-    queryKey: ["https://laundry-be-234a.onrender.com/api/store-settings"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/store-settings"],
   });
 
   // Fetch employees
   const { data: employees } = useQuery<Employee[]>({
-    queryKey: ["https://laundry-be-234a.onrender.com/api/employees"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/employees"],
   });
 
   // Fetch today's attendance records
   const todayDate = new Date().toISOString().split("T")[0];
   const { data: todayAttendance } = useQuery<AttendanceRecord[]>({
-    queryKey: ["https://laundry-be-234a.onrender.com/api/attendance", todayDate],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/attendance", todayDate],
     queryFn: async () => {
-      const response = await fetch(`https://laundry-be-234a.onrender.com/api/attendance?date=${todayDate}`);
+      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/attendance?date=${todayDate}`);
       if (!response.ok) {
         throw new Error("Failed to fetch attendance records");
       }
@@ -182,7 +182,7 @@ export function POSHeader({ onLogout }: POSHeaderProps) {
   const handleLogout = async () => {
     try {
       // Gọi API logout để xóa cookie authToken từ server
-      await fetch("https://laundry-be-234a.onrender.com/api/auth/logout", {
+      await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/auth/logout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

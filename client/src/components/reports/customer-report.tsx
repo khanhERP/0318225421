@@ -61,23 +61,23 @@ export function CustomerReport() {
   const [debtTo, setDebtTo] = useState("");
 
   const { data: orders } = useQuery({
-    queryKey: ["https://laundry-be-234a.onrender.com/api/orders"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders"],
   });
 
   const { data: products } = useQuery({
-    queryKey: ["https://laundry-be-234a.onrender.com/api/products"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/products"],
   });
 
   const { data: categories } = useQuery({
-    queryKey: ["https://laundry-be-234a.onrender.com/api/categories"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/categories"],
   });
 
   const { data: customers } = useQuery({
-    queryKey: ["https://laundry-be-234a.onrender.com/api/customers"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customers"],
   });
 
   const { data: customerDebts } = useQuery({
-    queryKey: ["https://laundry-be-234a.onrender.com/api/customer-debts"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customer-debts"],
     enabled: concernType === "debt",
   });
 
