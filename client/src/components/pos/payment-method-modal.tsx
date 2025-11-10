@@ -22,7 +22,7 @@ import { ReceiptModal } from "./receipt-modal";
 import { usePopupSignal } from "@/hooks/use-popup-signal";
 import VirtualKeyboard from "@/components/ui/virtual-keyboard";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query"; // Import useQueryClient
 import { PrintDialog } from "./print-dialog"; // Assuming PrintDialog is in the same directory
 
 // Helper function for API requests (assuming it exists and handles headers, etc.)
@@ -173,6 +173,9 @@ export function PaymentMethodModal({
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptDataForModal, setReceiptDataForModal] = useState<any>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false); // Add showPrintDialog state
+
+  // Initialize queryClient
+  const queryClient = useQueryClient();
 
   // Query payment methods from API
   const { data: paymentMethodsData } = useQuery({
@@ -601,8 +604,7 @@ export function PaymentMethodModal({
             receipt?.exactTax ||
             (orderForPayment?.tax ??
               orderInfo?.exactTax ??
-              parseFloat(receipt?.tax || "0") ??
-              0);
+              parseFloat(receipt?.tax || "0"));
 
           const discount = parseFloat(
             receipt?.discount || orderForPayment?.discount || "0",
@@ -921,6 +923,10 @@ export function PaymentMethodModal({
             setReceiptDataForModal(receiptData);
             setShowReceiptModal(true);
 
+            // Invalidate queries to refresh sales orders list
+            queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders/list"] });
+            queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders"] });
+
             // Show success toast
             toast({
               title: "Thanh toán thành công",
@@ -931,6 +937,17 @@ export function PaymentMethodModal({
               `🏪 RESTAURANT BUSINESS - showing E-Invoice modal for ${method} payment`,
             );
 
+            // Invalidate queries to refresh sales orders list
+            queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders/list"] });
+            queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders"] });
+
+            // Show success toast
+            toast({
+              title: "Thanh toán thành công",
+              description: `Đã thanh toán bằng ${getPaymentMethodName(method)}`,
+            });
+
+            // Set payment method and show E-Invoice modal
             setSelectedPaymentMethod(method);
             setShowEInvoice(true);
             console.log(
@@ -1144,6 +1161,10 @@ export function PaymentMethodModal({
               setReceiptDataForModal(receiptData);
               setShowReceiptModal(true);
 
+              // Invalidate queries to refresh sales orders list
+              queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders/list"] });
+              queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders"] });
+
               // Show success toast
               toast({
                 title: "Thanh toán thành công",
@@ -1153,6 +1174,10 @@ export function PaymentMethodModal({
               console.log(
                 `🏪 RESTAURANT BUSINESS - showing E-Invoice modal for ${method} payment`,
               );
+
+              // Invalidate queries to refresh sales orders list
+              queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders/list"] });
+              queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders"] });
 
               // Show success toast
               toast({
@@ -1371,9 +1396,9 @@ export function PaymentMethodModal({
           setReceiptDataForModal(receiptData);
           setShowReceiptModal(true);
 
-          // Hide QR code display
-          setShowQRCode(false);
-          setQrCodeUrl("");
+          // Invalidate queries to refresh sales orders list
+          queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders/list"] });
+          queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders"] });
 
           // Show success toast
           toast({
@@ -1384,6 +1409,16 @@ export function PaymentMethodModal({
           console.log(
             `🏪 RESTAURANT BUSINESS - showing E-Invoice modal for QR payment`,
           );
+
+          // Invalidate queries to refresh sales orders list
+          queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders/list"] });
+          queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders"] });
+
+          // Show success toast
+          toast({
+            title: "Thanh toán thành công",
+            description: "Đã thanh toán bằng QR Code",
+          });
 
           setShowQRCode(false);
           setQrCodeUrl("");
@@ -1423,6 +1458,10 @@ export function PaymentMethodModal({
         if (statusResponse.ok) {
           const data = await statusResponse.json();
           console.log(`✅ Order status updated to paid successfully:`, data);
+
+          // Invalidate queries to refresh sales orders list
+          queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders/list"] });
+          queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders"] });
 
           setShowQRCode(false);
           setQrCodeUrl("");
@@ -1740,6 +1779,11 @@ export function PaymentMethodModal({
         receipt.id = createdOrder.id;
         orderForPayment.id = createdOrder.id;
         orderInfo.orderNumber = createdOrder.orderNumber;
+
+        // Invalidate queries to refresh sales orders list
+        queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders/list"] });
+        queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders"] });
+
         setShowMultiPayment(false);
         setSelectedPaymentMethods([]);
         setSelectedPaymentMethod("multi");
@@ -1761,6 +1805,10 @@ export function PaymentMethodModal({
       if (updateResponse.ok) {
         const updatedOrder = await updateResponse.json();
         console.log("✅ Multi-payment order updated:", updatedOrder);
+
+        // Invalidate queries to refresh sales orders list
+        queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders/list"] });
+        queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders"] });
 
         // ALWAYS update table status if order has a table - regardless of payment method
         if (updatedOrder.tableId) {
@@ -2133,6 +2181,10 @@ export function PaymentMethodModal({
         orderForPayment.id = createdOrder.id;
         orderInfo.orderNumber = createdOrder.orderNumber;
 
+        // Invalidate queries to refresh sales orders list
+        queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders/list"] });
+        queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders"] });
+
         // CHECK BUSINESS TYPE - if laundry, show receipt modal directly
         const businessType = storeSettings?.businessType;
         console.log(`🔍 Cash Payment: Business type is "${businessType}"`);
@@ -2214,6 +2266,10 @@ export function PaymentMethodModal({
             `✅ Order status updated to paid successfully:`,
             updatedOrder,
           );
+
+          // Invalidate queries to refresh sales orders list
+          queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders/list"] });
+          queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders"] });
 
           // ALWAYS update table status if order has a table - for cash payment
           if (updatedOrder.tableId) {
@@ -2446,6 +2502,10 @@ export function PaymentMethodModal({
       shouldShowReceipt: true,
       publishLater: invoiceData.publishLater,
     });
+
+    // Invalidate queries to refresh sales orders list
+    queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders/list"] });
+    queryClient.invalidateQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/orders"] });
 
     // Reset state
     setSelectedPaymentMethod("");
