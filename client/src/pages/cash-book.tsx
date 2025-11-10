@@ -306,7 +306,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
     orders
       .filter((order) => {
         const isPaid =
-          order.status === "paid" || order.paymentStatus === "paid";
+          order.status === "paid";
         if (!isPaid) return false;
 
         // Apply payment method filter
