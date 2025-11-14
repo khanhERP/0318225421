@@ -76,7 +76,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
   const [paymentMethodFilter, setPaymentMethodFilter] = useState("all"); // "all" or specific payment method
   const [voucherTypeFilter, setVoucherTypeFilter] = useState("all"); // "all", "income_voucher", "expense_voucher", "purchase_receipt", "sales_order"
   const [voucherNumberFilter, setVoucherNumberFilter] = useState(""); // Filter by voucher number
-  const [dateRange, setDateRange] = useState("thisMonth"); // "today", "thisWeek", "thisMonth", "lastMonth", "custom"
+  const [dateRange, setDateRange] = useState("today"); // "today", "thisWeek", "thisMonth", "lastMonth", "custom"
   const [startDate, setStartDate] = useState(() => {
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
