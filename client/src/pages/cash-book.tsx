@@ -117,20 +117,21 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
       case "lastWeek":
         const currentDayOfWeek = today.getDay();
         // Calculate days to subtract to get to Monday of current week
-        const daysToCurrentMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
-        
+        const daysToCurrentMonday =
+          currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1;
+
         // Get Monday of current week
         const currentMonday = new Date(today);
         currentMonday.setDate(today.getDate() - daysToCurrentMonday);
-        
+
         // Get Monday of last week (7 days before current Monday)
         const lastWeekMonday = new Date(currentMonday);
         lastWeekMonday.setDate(currentMonday.getDate() - 7);
-        
+
         // Get Sunday of last week (6 days after last Monday)
         const lastWeekSunday = new Date(lastWeekMonday);
         lastWeekSunday.setDate(lastWeekMonday.getDate() + 6);
-        
+
         setStartDate(lastWeekMonday.toISOString().split("T")[0]);
         setEndDate(lastWeekSunday.toISOString().split("T")[0]);
         break;
@@ -138,7 +139,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
         const firstDayOfMonth = new Date(
           today.getFullYear(),
           today.getMonth(),
-          1,
+          2,
         );
         setStartDate(firstDayOfMonth.toISOString().split("T")[0]);
         setEndDate(today.toISOString().split("T")[0]);
@@ -147,7 +148,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
         const firstDayOfLastMonth = new Date(
           today.getFullYear(),
           today.getMonth() - 1,
-          1,
+          2,
         );
         const lastDayOfLastMonth = new Date(
           today.getFullYear(),
@@ -162,13 +163,13 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
         const firstDayOfQuarter = new Date(
           today.getFullYear(),
           currentQuarter * 3,
-          1,
+          2,
         );
         setStartDate(firstDayOfQuarter.toISOString().split("T")[0]);
         setEndDate(today.toISOString().split("T")[0]);
         break;
       case "thisYear":
-        const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+        const firstDayOfYear = new Date(today.getFullYear(), 0, 2);
         setStartDate(firstDayOfYear.toISOString().split("T")[0]);
         setEndDate(today.toISOString().split("T")[0]);
         break;
