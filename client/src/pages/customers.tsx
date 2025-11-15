@@ -40,7 +40,7 @@ export default function CustomersPage({ onLogout }: CustomersPageProps) {
 
   // Fetch customers
   const { data: customersData, isLoading: customersLoading } = useQuery<Customer[]>({
-    queryKey: ["https://laundry-be-234a.onrender.com/api/customers"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customers"],
   });
 
   const handleEditCustomer = (customer: Customer) => {
@@ -52,7 +52,7 @@ export default function CustomersPage({ onLogout }: CustomersPageProps) {
     if (!confirm(t("customers.confirmDelete"))) return;
 
     try {
-      const response = await fetch(`https://laundry-be-234a.onrender.com/api/customers/${customerId}`, {
+      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customers/${customerId}`, {
         method: "DELETE",
       });
 
@@ -60,7 +60,7 @@ export default function CustomersPage({ onLogout }: CustomersPageProps) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      await queryClient.refetchQueries({ queryKey: ["https://laundry-be-234a.onrender.com/api/customers"] });
+      await queryClient.refetchQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customers"] });
 
       toast({
         title: t("common.success"),
