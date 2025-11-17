@@ -3265,97 +3265,117 @@ export default function SalesOrders() {
       origin: "A1",
     });
     if (!ws["!merges"]) ws["!merges"] = [];
-    ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 15 } });
+    ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 14 } });
 
     XLSX.utils.sheet_add_aoa(ws, [[]], { origin: "A2" });
 
     const headers = [
-      t("orders.orderNumberColumn"),
-      t("orders.createdDateColumn"),
-      t("orders.table"),
-      t("orders.customerCode"),
-      t("orders.customerName"),
-      t("common.phone"),
-      t("common.subtotalAmount"),
-      t("common.discount"),
-      t("common.tax"),
-      t("common.paid"),
-      t("common.paymentMethodLabel"),
-      t("orders.invoiceSymbol"),
-      t("orders.invoiceNumber"),
-      t("common.notes"),
-      t("common.status"),
-    ];
+      "Số đơn bán",
+      storeSettings?.businessType === "laundry" ? "Đã trả đồ" : "",
+      "Trạng thái",
+      "Ngày tạo đơn",
+      "Ngày hủy đơn/hoàn thành",
+      "Mã khách hàng",
+      "Tên khách hàng",
+      "Điện thoại",
+      "Thành tiền",
+      "Giảm giá",
+      "Thuế",
+      "Tổng tiền",
+      "Phương thức thanh toán",
+      "Ghi chú",
+    ].filter(h => h !== "");
+    
     XLSX.utils.sheet_add_aoa(ws, [headers], { origin: "A3" });
 
-    const dataRows = ordersToExport.map((item, index) => {
-      const orderNumber =
-        item.tradeNumber ||
-        item.invoiceNumber ||
-        item.orderNumber ||
-        `ORD-${String(item.id).padStart(8, "0")}`;
-      const orderDate = formatDate(item.date);
-      const table =
-        item.type === "order" && item.tableId
-          ? getTableNumber(item.tableId)
-          : "";
-      const customerCode = item.customerTaxCode;
+    const dataRows = ordersToExport.map((item) => {
+      const orderNumber = item.orderNumber || item.displayNumber || `ORD-${String(item.id).padStart(8, "0")}`;
+      const returnedStatus = storeSettings?.businessType === "laundry" 
+        ? (item.isPaid ? "Đã trả" : "Chưa trả")
+        : null;
+      const status = item.displayStatus === 1
+        ? "Hoàn thành"
+        : item.displayStatus === 2
+          ? "Đang phục vụ"
+          : "Đã hủy";
+      const createdDate = formatDate(item.createdAt);
+      const completedCancelledDate = (item.displayStatus === 1 || item.displayStatus === 3)
+        ? formatDate(item.updatedAt)
+        : "";
+      
+      // Get customer code from customers list if available
+      let customerCode = "";
+      if (item.customerId && customers && customers.length > 0) {
+        const customer = customers.find((c: any) => c.id === item.customerId || c.name === item.customerName);
+        if (customer && customer.customerId) {
+          customerCode = customer.customerId;
+        }
+      }
+      
       const customerName = item.customerName || "";
       const customerPhone = item.customerPhone || "";
       const subtotal = parseFloat(item.subtotal || "0");
       const discount = parseFloat(item.discount || "0");
       const tax = parseFloat(item.tax || "0");
       const total = parseFloat(item.total || "0");
-      const paid = total;
       const paymentMethod = getPaymentMethodName(item.paymentMethod);
-      const symbol = item.symbol || "";
-      const invoiceNumber =
-        item.invoiceNumber || String(item.id).padStart(8, "0");
-      const status =
-        item.displayStatus === 1
-          ? t("common.completed")
-          : item.displayStatus === 2
-            ? t("common.serving")
-            : t("common.cancelled");
+      const notes = item.notes || "";
 
-      return [
+      const row = [
         orderNumber,
-        orderDate,
-        table,
+        returnedStatus,
+        status,
+        createdDate,
+        completedCancelledDate,
         customerCode,
         customerName,
         customerPhone,
         subtotal,
         discount,
         tax,
-        paid,
+        total,
         paymentMethod,
-        symbol,
-        invoiceNumber,
-        item.notes || "",
-        status,
+        notes,
       ];
+      
+      return storeSettings?.businessType === "laundry" ? row : row.filter((_, i) => i !== 1);
     });
 
     XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A4" });
 
-    ws["!cols"] = [
-      { wch: 15 },
-      { wch: 13 },
-      { wch: 8 },
-      { wch: 12 },
-      { wch: 15 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 10 },
-      { wch: 10 },
-      { wch: 12 },
-      { wch: 15 },
-      { wch: 12 },
-      { wch: 12 },
-      { wch: 20 },
-      { wch: 12 },
-    ];
+    const numCols = storeSettings?.businessType === "laundry" ? 14 : 13;
+    ws["!cols"] = storeSettings?.businessType === "laundry" 
+      ? [
+          { wch: 18 }, // Số đơn bán
+          { wch: 12 }, // Đã trả đồ
+          { wch: 15 }, // Trạng thái
+          { wch: 20 }, // Ngày tạo đơn
+          { wch: 20 }, // Ngày hủy/hoàn thành
+          { wch: 15 }, // Mã khách hàng
+          { wch: 20 }, // Tên khách hàng
+          { wch: 13 }, // Điện thoại
+          { wch: 13 }, // Thành tiền
+          { wch: 12 }, // Giảm giá
+          { wch: 12 }, // Thuế
+          { wch: 13 }, // Tổng tiền
+          { wch: 18 }, // Phương thức thanh toán
+          { wch: 25 }, // Ghi chú
+        ]
+      : [
+          { wch: 18 }, // Số đơn bán
+          { wch: 15 }, // Trạng thái
+          { wch: 20 }, // Ngày tạo đơn
+          { wch: 20 }, // Ngày hủy/hoàn thành
+          { wch: 15 }, // Mã khách hàng
+          { wch: 20 }, // Tên khách hàng
+          { wch: 13 }, // Điện thoại
+          { wch: 13 }, // Thành tiền
+          { wch: 12 }, // Giảm giá
+          { wch: 12 }, // Thuế
+          { wch: 13 }, // Tổng tiền
+          { wch: 18 }, // Phương thức thanh toán
+          { wch: 25 }, // Ghi chú
+        ];
 
     ws["!rows"] = [
       { hpt: 25 },
@@ -3377,7 +3397,7 @@ export default function SalesOrders() {
       };
     }
 
-    for (let col = 0; col <= 14; col++) {
+    for (let col = 0; col < numCols; col++) {
       const cellAddress = XLSX.utils.encode_cell({ r: 2, c: col });
       if (ws[cellAddress]) {
         ws[cellAddress].s = {
@@ -3403,9 +3423,13 @@ export default function SalesOrders() {
       const isEven = (row - 3) % 2 === 0;
       const bgColor = isEven ? "FFFFFF" : "F2F2F2";
 
-      for (let col = 0; col <= 14; col++) {
+      for (let col = 0; col < numCols; col++) {
         const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-        const isCurrency = [6, 7, 8, 9].includes(col);
+        const currencyColsLaundry = [8, 9, 10, 11]; // Thành tiền, Giảm giá, Thuế, Tổng tiền (laundry)
+        const currencyColsNormal = [7, 8, 9, 10]; // Same columns but shifted for non-laundry
+        const isCurrency = storeSettings?.businessType === "laundry" 
+          ? currencyColsLaundry.includes(col)
+          : currencyColsNormal.includes(col);
 
         if (ws[cellAddress]) {
           ws[cellAddress].s = {
@@ -3453,13 +3477,18 @@ export default function SalesOrders() {
       console.log(
         "✅ Excel file exported successfully with Times New Roman formatting",
       );
-      alert(
-        `File Excel đã được xuất thành công với ${ordersToExport.length} đơn hàng!`,
-      );
+      toast({
+        title: "Xuất Excel thành công",
+        description: `Đã xuất ${ordersToExport.length} đơn hàng ra file Excel`,
+      });
     } catch (error) {
       console.error("❌ Error exporting Excel file:", error);
       XLSX.writeFile(wb, defaultFilename, { bookType: "xlsx" });
-      alert("File Excel đã được xuất nhưng có thể thiếu một số định dạng.");
+      toast({
+        title: "Cảnh báo",
+        description: "File Excel đã được xuất nhưng có thể thiếu một số định dạng",
+        variant: "destructive",
+      });
     }
   };
 
