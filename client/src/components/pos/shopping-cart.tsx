@@ -487,7 +487,7 @@ export function ShoppingCart({
     try {
       setIsSearching(true);
       const response = await fetch(
-        `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customers?search=${encodeURIComponent(searchTerm)}`,
+        `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customers?search=${encodeURIComponent(searchTerm)}&status=all`,
         {
           method: "GET",
           headers: {
@@ -546,8 +546,11 @@ export function ShoppingCart({
       return cleanPhone.startsWith(searchLower);
     }
 
-    // Otherwise search by name (case insensitive)
-    return customer.name?.toLowerCase().includes(searchLower);
+    // Otherwise search by name or address (case insensitive)
+    return (
+      customer.name?.toLowerCase().includes(searchLower) ||
+      customer.address?.toLowerCase().includes(searchLower)
+    );
   });
 
   // Function to handle customer selection
@@ -1174,7 +1177,7 @@ export function ShoppingCart({
       customerId: selectedCustomer?.id || null, // Ensure customerId is saved
       customerName: selectedCustomer?.name || "",
       customerPhone: selectedCustomer?.phone || null,
-      customerTaxCode: selectedCustomer?.address || null,
+      customerTaxCode: selectedCustomer?.address || null, // This might be incorrect, should be customer's tax code if available
       customerAddress: selectedCustomer?.address || null,
       customerEmail: selectedCustomer?.email || null,
       status: "pending", // Trạng thái: Đặt hàng
@@ -1234,7 +1237,7 @@ export function ShoppingCart({
         customerId: selectedCustomer.id,
         customerName: selectedCustomer.name,
         customerPhone: selectedCustomer.phone || null,
-        customerTaxCode: selectedCustomer.address || null,
+        customerTaxCode: selectedCustomer.address || null, // This might be incorrect
         customerAddress: selectedCustomer.address || null,
         customerEmail: selectedCustomer.email || null,
         items: cartItemsForOrder.map((item) => ({
@@ -1490,7 +1493,7 @@ export function ShoppingCart({
           customerId: selectedCustomer?.id || null, // Ensure customerId is saved
           customerName: selectedCustomer?.name || "",
           customerPhone: selectedCustomer?.phone || null,
-          customerTaxCode: selectedCustomer?.address || null,
+          customerTaxCode: selectedCustomer?.address || null, // This might be incorrect
           customerAddress: selectedCustomer?.address || null,
           customerEmail: selectedCustomer?.email || null,
           status: "paid",
@@ -1592,7 +1595,7 @@ export function ShoppingCart({
       customerName: selectedCustomer?.name || "",
       customerPhone: selectedCustomer?.phone || null,
       customerTaxCode:
-        selectedCustomer?.taxCode || selectedCustomer?.address || null,
+        selectedCustomer?.taxCode || selectedCustomer?.address || null, // This might be incorrect
       customerAddress: selectedCustomer?.address || null,
       customerEmail: selectedCustomer?.email || null,
       tableId: null,
@@ -1619,7 +1622,7 @@ export function ShoppingCart({
       customerName: selectedCustomer?.name || "",
       customerPhone: selectedCustomer?.phone || null,
       customerTaxCode:
-        selectedCustomer?.taxCode || selectedCustomer?.address || null,
+        selectedCustomer?.taxCode || selectedCustomer?.address || null, // This might be incorrect
       customerAddress: selectedCustomer?.address || null,
       customerEmail: selectedCustomer?.email || null,
       status: "pending",
@@ -1967,6 +1970,7 @@ export function ShoppingCart({
             </svg>
             <Input
               type="text"
+              placeholder="Tìm theo tên, SĐT hoặc địa chỉ..."
               value={customerSearchTerm}
               onChange={(e) => {
                 setCustomerSearchTerm(e.target.value);
@@ -1975,7 +1979,6 @@ export function ShoppingCart({
                   setSelectedCustomer(null);
                 }
               }}
-              placeholder={t("orders.pressPhoneOrCustomer")}
               className={`w-full pl-9 py-1.5 text-sm border-2 rounded-lg transition-colors ${
                 selectedCustomer
                   ? "pr-20 border-green-500 bg-gradient-to-r from-green-50 to-emerald-50 font-semibold text-green-900"
@@ -2065,12 +2068,8 @@ export function ShoppingCart({
                   {filteredSuggestedCustomers.map((customer, index) => (
                     <div
                       key={customer.id}
-                      className={`p-3 cursor-pointer hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200 ${
-                        index !== filteredSuggestedCustomers.length - 1
-                          ? "border-b border-gray-100"
-                          : ""
-                      }`}
                       onClick={() => handleCustomerSelect(customer)}
+                      className="p-3 cursor-pointer hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 transition-all duration-200"
                     >
                       <div className="flex justify-between items-start gap-3">
                         <div className="flex-1 min-w-0">
@@ -2087,6 +2086,11 @@ export function ShoppingCart({
                               </span>
                             )}
                           </div>
+                          {customer.address && (
+                            <div className="text-xs text-gray-400 mt-0.5">
+                              📍 {customer.address}
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center gap-1 text-blue-600">
                           <span className="text-xs font-medium">
