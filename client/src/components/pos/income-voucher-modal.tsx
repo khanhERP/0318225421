@@ -121,21 +121,34 @@ export default function IncomeVoucherModal({
           const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers/next-voucher-number");
           if (response.ok) {
             const data = await response.json();
-            setFormData((prev) => ({
-              ...prev,
+            setFormData({
               voucherNumber: data.voucherNumber,
-              account: "cash",
-            }));
+              date: new Date().toISOString().split("T")[0],
+              amount: 0,
+              account: "cash", // Use nameKey instead of hardcoded Vietnamese
+              recipient: "",
+              receiverName: "",
+              phone: "",
+              category: "other",
+              description: "",
+            });
           } else {
             // Fallback to old format if API fails
             const today = new Date();
             const dateStr = today.toISOString().split("T")[0].replace(/-/g, "");
             const timeStr = Date.now().toString().slice(-3);
-            setFormData((prev) => ({
-              ...prev,
+            
+            setFormData({
               voucherNumber: `PT${dateStr}${timeStr}`,
-              account: "cash",
-            }));
+              date: new Date().toISOString().split("T")[0],
+              amount: 0,
+              account: "cash", // Use nameKey instead of hardcoded Vietnamese
+              recipient: "",
+              receiverName: "",
+              phone: "",
+              category: "other",
+              description: "",
+            });
           }
         } catch (error) {
           console.error("Error generating voucher number:", error);
@@ -143,11 +156,17 @@ export default function IncomeVoucherModal({
           const today = new Date();
           const dateStr = today.toISOString().split("T")[0].replace(/-/g, "");
           const timeStr = Date.now().toString().slice(-3);
-          setFormData((prev) => ({
-            ...prev,
+          setFormData({
             voucherNumber: `PT${dateStr}${timeStr}`,
-            account: "cash",
-          }));
+            date: new Date().toISOString().split("T")[0],
+            amount: 0,
+            account: "cash", // Use nameKey instead of hardcoded Vietnamese
+            recipient: "",
+            receiverName: "",
+            phone: "",
+            category: "other",
+            description: "",
+          });
         }
       };
       
