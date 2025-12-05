@@ -99,6 +99,12 @@ export function ReceiptModal({
       bankAccountName: "SHIN INSUNG",
       domain: "0108670987-007.edpos.vn",
     },
+    {
+      bankId: "970407",
+      bankAccountNo: "3979258686",
+      bankAccountName: "LE THI TAM NHU",
+      domain: "0108670987-009.edpos.vn",
+    },
   ];
 
   // CRITICAL: Always use prop isPreview, completely ignore receipt.isPreview
