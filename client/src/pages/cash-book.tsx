@@ -148,13 +148,17 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
         const firstDayOfLastMonth = new Date(
           today.getFullYear(),
           today.getMonth() - 1,
-          2,
+          1,
         );
         const lastDayOfLastMonth = new Date(
           today.getFullYear(),
           today.getMonth(),
           0,
         );
+
+        firstDayOfLastMonth.setHours(12);
+        lastDayOfLastMonth.setHours(12);
+
         setStartDate(firstDayOfLastMonth.toISOString().split("T")[0]);
         setEndDate(lastDayOfLastMonth.toISOString().split("T")[0]);
         break;
