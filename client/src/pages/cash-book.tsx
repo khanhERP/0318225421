@@ -191,7 +191,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
         const params = new URLSearchParams();
         if (startDate) params.append("startDate", `${startDate} 00:00:00`);
         if (endDate) params.append("endDate", `${endDate} 23:59:59`);
-        
+
         const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders?${params.toString()}`);
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -212,8 +212,10 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
         const params = new URLSearchParams();
         if (startDate) params.append("startDate", `${startDate} 00:00:00`);
         if (endDate) params.append("endDate", `${endDate} 23:59:59`);
-        
-        const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/purchase-receipts?${params.toString()}`);
+
+        const response = await fetch(
+          `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/purchase-receipts?${params.toString()}`,
+        );
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
@@ -233,8 +235,10 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
         const params = new URLSearchParams();
         if (startDate) params.append("startDate", `${startDate} 00:00:00`);
         if (endDate) params.append("endDate", `${endDate} 23:59:59`);
-        
-        const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers?${params.toString()}`);
+
+        const response = await fetch(
+          `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers?${params.toString()}`,
+        );
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
@@ -254,8 +258,10 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
         const params = new URLSearchParams();
         if (startDate) params.append("startDate", `${startDate} 00:00:00`);
         if (endDate) params.append("endDate", `${endDate} 23:59:59`);
-        
-        const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers?${params.toString()}`);
+
+        const response = await fetch(
+          `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers?${params.toString()}`,
+        );
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
@@ -310,8 +316,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
     // Add income transactions from orders (thu)
     orders
       .filter((order) => {
-        const isPaid =
-          order.status === "paid";
+        const isPaid = order.status === "paid";
         if (!isPaid) return false;
 
         // Apply payment method filter
@@ -373,6 +378,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
           amount: transactionAmount,
           balance: 0, // Will be calculated later
           voucherType: "sales_order",
+          notes: order.notes,
         });
       });
 
@@ -402,6 +408,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
             balance: 0, // Will be calculated later
             voucherType: "income_voucher",
             internalId: voucher.id, // Keep internal ID for click handling
+            notes: voucher.description,
           });
         }
       });
@@ -441,6 +448,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
             balance: 0, // Will be calculated later
             voucherType: "expense_voucher",
             internalId: voucher.id, // Keep internal ID for click handling
+            notes: voucher.description,
           });
         }
       });
@@ -565,6 +573,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
               amount: transactionAmount,
               balance: 0, // Will be calculated later
               voucherType: "purchase_receipt",
+              notes: receipt.notes,
             });
           }
         }
@@ -1122,59 +1131,102 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                 // Helper function to get payment method for a transaction
                 const getPaymentMethod = (transaction: CashTransaction) => {
                   if (transaction.voucherType === "income_voucher") {
-                    const voucher = incomeVouchers.find(v => v.voucherNumber === transaction.id);
+                    const voucher = incomeVouchers.find(
+                      (v) => v.voucherNumber === transaction.id,
+                    );
                     if (voucher && voucher.account) {
-                      const method = paymentMethods.find(m => m.nameKey === voucher.account);
-                      return method ? t(`common.${method.nameKey}`) : voucher.account;
+                      const method = paymentMethods.find(
+                        (m) => m.nameKey === voucher.account,
+                      );
+                      return method
+                        ? t(`common.${method.nameKey}`)
+                        : voucher.account;
                     }
                   } else if (transaction.voucherType === "expense_voucher") {
-                    const voucher = expenseVouchers.find(v => v.voucherNumber === transaction.id);
+                    const voucher = expenseVouchers.find(
+                      (v) => v.voucherNumber === transaction.id,
+                    );
                     if (voucher && voucher.account) {
-                      const method = paymentMethods.find(m => m.nameKey === voucher.account);
-                      return method ? t(`common.${method.nameKey}`) : voucher.account;
+                      const method = paymentMethods.find(
+                        (m) => m.nameKey === voucher.account,
+                      );
+                      return method
+                        ? t(`common.${method.nameKey}`)
+                        : voucher.account;
                     }
                   } else if (transaction.voucherType === "sales_order") {
-                    const order = orders.find(o => (o.orderNumber || `ORDER-${o.id}`) === transaction.id);
+                    const order = orders.find(
+                      (o) =>
+                        (o.orderNumber || `ORDER-${o.id}`) === transaction.id,
+                    );
                     if (order && order.paymentMethod) {
                       if (order.paymentMethod.startsWith("[")) {
                         try {
                           const methods = JSON.parse(order.paymentMethod);
-                          return methods.map((pm: any) => {
-                            const method = paymentMethods.find(m => m.nameKey === pm.method);
-                            return method ? t(`common.${method.nameKey}`) : pm.method;
-                          }).join(", ");
+                          return methods
+                            .map((pm: any) => {
+                              const method = paymentMethods.find(
+                                (m) => m.nameKey === pm.method,
+                              );
+                              return method
+                                ? t(`common.${method.nameKey}`)
+                                : pm.method;
+                            })
+                            .join(", ");
                         } catch (e) {
                           return order.paymentMethod;
                         }
                       } else {
-                        const method = paymentMethods.find(m => m.nameKey === order.paymentMethod);
-                        return method ? t(`common.${method.nameKey}`) : order.paymentMethod;
+                        const method = paymentMethods.find(
+                          (m) => m.nameKey === order.paymentMethod,
+                        );
+                        return method
+                          ? t(`common.${method.nameKey}`)
+                          : order.paymentMethod;
                       }
                     }
                   } else if (transaction.voucherType === "purchase_receipt") {
-                    const receipt = purchaseReceipts.find(r => (r.receiptNumber || `PURCHASE-${r.id}`) === transaction.id);
+                    const receipt = purchaseReceipts.find(
+                      (r) =>
+                        (r.receiptNumber || `PURCHASE-${r.id}`) ===
+                        transaction.id,
+                    );
                     if (receipt && receipt.paymentMethod) {
                       if (receipt.paymentMethod.startsWith("{")) {
                         try {
                           const paymentData = JSON.parse(receipt.paymentMethod);
-                          const method = paymentMethods.find(m => m.nameKey === paymentData.method);
-                          return method ? t(`common.${method.nameKey}`) : paymentData.method;
+                          const method = paymentMethods.find(
+                            (m) => m.nameKey === paymentData.method,
+                          );
+                          return method
+                            ? t(`common.${method.nameKey}`)
+                            : paymentData.method;
                         } catch (e) {
                           return receipt.paymentMethod;
                         }
                       } else if (receipt.paymentMethod.startsWith("[")) {
                         try {
                           const methods = JSON.parse(receipt.paymentMethod);
-                          return methods.map((pm: any) => {
-                            const method = paymentMethods.find(m => m.nameKey === pm.method);
-                            return method ? t(`common.${method.nameKey}`) : pm.method;
-                          }).join(", ");
+                          return methods
+                            .map((pm: any) => {
+                              const method = paymentMethods.find(
+                                (m) => m.nameKey === pm.method,
+                              );
+                              return method
+                                ? t(`common.${method.nameKey}`)
+                                : pm.method;
+                            })
+                            .join(", ");
                         } catch (e) {
                           return receipt.paymentMethod;
                         }
                       } else {
-                        const method = paymentMethods.find(m => m.nameKey === receipt.paymentMethod);
-                        return method ? t(`common.${method.nameKey}`) : receipt.paymentMethod;
+                        const method = paymentMethods.find(
+                          (m) => m.nameKey === receipt.paymentMethod,
+                        );
+                        return method
+                          ? t(`common.${method.nameKey}`)
+                          : receipt.paymentMethod;
                       }
                     }
                   }
@@ -1189,21 +1241,16 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                     "Loại thu chi": transaction.description,
                     "Người nộp/nhận": transaction.source,
                     "Phương thức thanh toán": getPaymentMethod(transaction),
-                    Thu:
-                      transaction.type === "thu"
-                        ? transaction.amount
-                        : "",
-                    Chi:
-                      transaction.type === "chi"
-                        ? transaction.amount
-                        : "",
+                    Thu: transaction.type === "thu" ? transaction.amount : "",
+                    Chi: transaction.type === "chi" ? transaction.amount : "",
                     "Tồn quỹ": transaction.balance,
+                    "Diễn giải": transaction.notes,
                   }),
                 );
 
                 // Create summary data
                 const summaryData = [
-                  ["BÁO CÁO SỔ QUỸ TIỀN MẶT", "", "", "", "", "", "", ""],
+                  ["BÁO CÁO SỔ QUỸ TIỀN MẶT", "", "", "", "", "", "", "", ""],
                   [
                     `Từ ngày: ${formatDate(startDate)}`,
                     `Đến ngày: ${formatDate(endDate)}`,
@@ -1213,9 +1260,10 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                     "",
                     "",
                     "",
+                    "",
                   ],
-                  ["", "", "", "", "", "", "", ""],
-                  ["TỔNG KẾT:", "", "", "", "", "", "", ""],
+                  ["", "", "", "", "", "", "", "", ""],
+                  ["TỔNG KẾT:", "", "", "", "", "", "", "", ""],
                   [
                     "Quỹ đầu kỳ:",
                     "",
@@ -1225,6 +1273,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                     "",
                     "",
                     cashBookData.openingBalance,
+                    "",
                   ],
                   [
                     "Tổng thu:",
@@ -1234,6 +1283,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                     "",
                     "",
                     filteredData.totalIncome,
+                    "",
                     "",
                   ],
                   [
@@ -1245,6 +1295,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                     "",
                     filteredData.totalExpense,
                     "",
+                    "",
                   ],
                   [
                     "Tồn quỹ:",
@@ -1255,10 +1306,11 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                     "",
                     "",
                     filteredData.endingBalance,
+                    "",
                   ],
-                  ["", "", "", "", "", "", "", ""],
-                  ["CHI TIẾT GIAO DỊCH:", "", "", "", "", "", "", ""],
-                  ["", "", "", "", "", "", "", ""],
+                  ["", "", "", "", "", "", "", "", ""],
+                  ["CHI TIẾT GIAO DỊCH:", "", "", "", "", "", "", "", ""],
+                  ["", "", "", "", "", "", "", "", ""],
                 ];
 
                 // Create worksheet
@@ -1280,6 +1332,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
                   { wch: 15 }, // Thu
                   { wch: 15 }, // Chi
                   { wch: 15 }, // Tồn quỹ
+                  { wch: 15 }, // Ghi chú
                 ];
                 ws["!cols"] = colWidths;
 
