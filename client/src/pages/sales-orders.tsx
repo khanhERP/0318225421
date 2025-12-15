@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"; // Import ScrollBar
 import {
   AlertDialog,
   AlertDialogAction,
@@ -3250,12 +3249,14 @@ export default function SalesOrders() {
     selectedOrderIds.size < filteredInvoices.length;
 
   const exportSelectedOrdersToExcel = () => {
-    // If no orders selected, export all filtered orders
-    const ordersToExport = selectedOrderIds.size === 0 
-      ? filteredInvoices 
-      : filteredInvoices.filter((item) =>
-          selectedOrderIds.has(`${item.type}-${item.id}`),
-        );
+    if (selectedOrderIds.size === 0) {
+      alert("Vui lòng chọn ít nhất một đơn hàng để xuất Excel");
+      return;
+    }
+
+    const selectedOrders = filteredInvoices.filter((item) =>
+      selectedOrderIds.has(`${item.type}-${item.id}`),
+    );
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([]);
@@ -3270,118 +3271,97 @@ export default function SalesOrders() {
     XLSX.utils.sheet_add_aoa(ws, [[]], { origin: "A2" });
 
     const headers = [
-      "Số đơn bán",
-      storeSettings?.businessType === "laundry" ? "Đã trả đồ" : "",
-      "Trạng thái",
-      "Ngày tạo đơn",
-      "Ngày hủy đơn/hoàn thành",
-      "Mã khách hàng",
-      "Tên khách hàng",
-      "Điện thoại",
-      "Thành tiền",
-      "Giảm giá",
-      "Thuế",
-      "Tổng tiền",
-      "Phương thức thanh toán",
-      "Ghi chú",
-    ].filter(h => h !== "");
-    
+      t("orders.orderNumberColumn"),
+      t("orders.createdDateColumn"),
+      t("orders.table"),
+      t("orders.customerCode"),
+      t("orders.customerName"),
+      t("common.phone"), // Added phone header
+      t("common.subtotalAmount"),
+      t("common.discount"),
+      t("common.tax"),
+      t("common.paid"),
+      // Removed Employee Code and Name headers
+      t("orders.invoiceSymbol"),
+      t("orders.invoiceNumber"),
+      t("common.notes"),
+      t("common.status"),
+    ];
     XLSX.utils.sheet_add_aoa(ws, [headers], { origin: "A3" });
 
-    const dataRows = ordersToExport.map((item) => {
-      const orderNumber = item.orderNumber || item.displayNumber || `ORD-${String(item.id).padStart(8, "0")}`;
-      const returnedStatus = storeSettings?.businessType === "laundry" 
-        ? (item.isPaid ? "Đã trả" : "Chưa trả")
-        : null;
-      const status = item.displayStatus === 1
-        ? "Hoàn thành"
-        : item.displayStatus === 2
-          ? "Đang phục vụ"
-          : "Đã hủy";
-      const createdDate = formatDate(item.createdAt);
-      const completedCancelledDate = (item.displayStatus === 1 || item.displayStatus === 3)
-        ? formatDate(item.updatedAt)
-        : "";
-      
-      // Get customer code from customers list if available
-      let customerCode = "";
-      if (item.customerId && customers && customers.length > 0) {
-        const customer = customers.find((c: any) => c.id === item.customerId || c.name === item.customerName);
-        if (customer && customer.customerId) {
-          customerCode = customer.customerId;
-        }
-      }
-      
+    const dataRows = selectedOrders.map((item, index) => {
+      const orderNumber =
+        item.tradeNumber ||
+        item.invoiceNumber ||
+        item.orderNumber ||
+        `ORD-${String(item.id).padStart(8, "0")}`;
+      const orderDate = formatDate(item.date); // Use 'date' field for order date
+      const table =
+        item.type === "order" && item.tableId
+          ? getTableNumber(item.tableId)
+          : "";
+      const customerCode = item.customerTaxCode;
       const customerName = item.customerName || "";
-      const customerPhone = item.customerPhone || "";
+      const customerPhone = item.customerPhone || ""; // Get customer phone
       const subtotal = parseFloat(item.subtotal || "0");
       const discount = parseFloat(item.discount || "0");
       const tax = parseFloat(item.tax || "0");
       const total = parseFloat(item.total || "0");
-      const paymentMethod = getPaymentMethodName(item.paymentMethod);
-      const notes = item.notes || "";
+      const paid = total;
+      const symbol = item.symbol || "";
+      const invoiceNumber =
+        item.invoiceNumber || String(item.id).padStart(8, "0");
+      const status =
+        item.displayStatus === 1
+          ? t("common.completed")
+          : item.displayStatus === 2
+            ? t("common.serving")
+            : t("common.cancelled");
 
-      const row = [
+      return [
         orderNumber,
-        returnedStatus,
-        status,
-        createdDate,
-        completedCancelledDate,
+        orderDate,
+        table,
         customerCode,
         customerName,
-        customerPhone,
+        customerPhone, // Add customer phone data
         subtotal,
         discount,
         tax,
-        total,
-        paymentMethod,
-        notes,
+        paid,
+        // Removed Employee Code and Name data
+        symbol,
+        invoiceNumber,
+        item.notes || "",
+        status,
       ];
-      
-      return storeSettings?.businessType === "laundry" ? row : row.filter((_, i) => i !== 1);
     });
 
     XLSX.utils.sheet_add_aoa(ws, dataRows, { origin: "A4" });
 
-    const numCols = storeSettings?.businessType === "laundry" ? 14 : 13;
-    ws["!cols"] = storeSettings?.businessType === "laundry" 
-      ? [
-          { wch: 18 }, // Số đơn bán
-          { wch: 12 }, // Đã trả đồ
-          { wch: 15 }, // Trạng thái
-          { wch: 20 }, // Ngày tạo đơn
-          { wch: 20 }, // Ngày hủy/hoàn thành
-          { wch: 15 }, // Mã khách hàng
-          { wch: 20 }, // Tên khách hàng
-          { wch: 13 }, // Điện thoại
-          { wch: 13 }, // Thành tiền
-          { wch: 12 }, // Giảm giá
-          { wch: 12 }, // Thuế
-          { wch: 13 }, // Tổng tiền
-          { wch: 18 }, // Phương thức thanh toán
-          { wch: 25 }, // Ghi chú
-        ]
-      : [
-          { wch: 18 }, // Số đơn bán
-          { wch: 15 }, // Trạng thái
-          { wch: 20 }, // Ngày tạo đơn
-          { wch: 20 }, // Ngày hủy/hoàn thành
-          { wch: 15 }, // Mã khách hàng
-          { wch: 20 }, // Tên khách hàng
-          { wch: 13 }, // Điện thoại
-          { wch: 13 }, // Thành tiền
-          { wch: 12 }, // Giảm giá
-          { wch: 12 }, // Thuế
-          { wch: 13 }, // Tổng tiền
-          { wch: 18 }, // Phương thức thanh toán
-          { wch: 25 }, // Ghi chú
-        ];
+    ws["!cols"] = [
+      { wch: 15 },
+      { wch: 13 },
+      { wch: 8 },
+      { wch: 12 },
+      { wch: 15 },
+      { wch: 12 }, // Column for phone number
+      { wch: 12 },
+      { wch: 10 },
+      { wch: 10 },
+      { wch: 12 },
+      // Removed Employee Code and Name columns
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 20 },
+      { wch: 12 },
+    ];
 
     ws["!rows"] = [
       { hpt: 25 },
       { hpt: 15 },
       { hpt: 20 },
-      ...Array(ordersToExport.length).fill({ hpt: 18 }),
+      ...Array(selectedOrders.length).fill({ hpt: 18 }),
     ];
 
     if (ws["A1"]) {
@@ -3397,7 +3377,8 @@ export default function SalesOrders() {
       };
     }
 
-    for (let col = 0; col < numCols; col++) {
+    for (let col = 0; col <= 13; col++) {
+      // Adjusted loop to match new header count (0-13)
       const cellAddress = XLSX.utils.encode_cell({ r: 2, c: col });
       if (ws[cellAddress]) {
         ws[cellAddress].s = {
@@ -3419,17 +3400,14 @@ export default function SalesOrders() {
       }
     }
 
-    for (let row = 3; row < 3 + ordersToExport.length; row++) {
+    for (let row = 3; row < 3 + selectedOrders.length; row++) {
       const isEven = (row - 3) % 2 === 0;
       const bgColor = isEven ? "FFFFFF" : "F2F2F2";
 
-      for (let col = 0; col < numCols; col++) {
+      for (let col = 0; col <= 13; col++) {
+        // Adjusted loop to match new header count
         const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-        const currencyColsLaundry = [8, 9, 10, 11]; // Thành tiền, Giảm giá, Thuế, Tổng tiền (laundry)
-        const currencyColsNormal = [7, 8, 9, 10]; // Same columns but shifted for non-laundry
-        const isCurrency = storeSettings?.businessType === "laundry" 
-          ? currencyColsLaundry.includes(col)
-          : currencyColsNormal.includes(col);
+        const isCurrency = [6, 7, 8, 9].includes(col); // Indices for subtotal, discount, tax, paid
 
         if (ws[cellAddress]) {
           ws[cellAddress].s = {
@@ -3477,18 +3455,13 @@ export default function SalesOrders() {
       console.log(
         "✅ Excel file exported successfully with Times New Roman formatting",
       );
-      toast({
-        title: "Xuất Excel thành công",
-        description: `Đã xuất ${ordersToExport.length} đơn hàng ra file Excel`,
-      });
+      alert(
+        "File Excel đã được xuất thành công với định dạng Times New Roman!",
+      );
     } catch (error) {
       console.error("❌ Error exporting Excel file:", error);
       XLSX.writeFile(wb, defaultFilename, { bookType: "xlsx" });
-      toast({
-        title: "Cảnh báo",
-        description: "File Excel đã được xuất nhưng có thể thiếu một số định dạng",
-        variant: "destructive",
-      });
+      alert("File Excel đã được xuất nhưng có thể thiếu một số định dạng.");
     }
   };
 
@@ -3961,10 +3934,11 @@ export default function SalesOrders() {
                     size="sm"
                     variant="outline"
                     className="flex items-center gap-2 border-green-500 text-green-600 hover:bg-green-50"
+                    disabled={selectedOrderIds.size === 0}
                     onClick={exportSelectedOrdersToExcel}
                   >
                     <Download className="w-4 h-4" />
-                    {t("common.exportExcel")} ({selectedOrderIds.size > 0 ? selectedOrderIds.size : filteredInvoices.length})
+                    {t("common.exportExcel")} ({selectedOrderIds.size})
                   </Button>
                 </div>
               </div>
@@ -4482,17 +4456,16 @@ export default function SalesOrders() {
                                           }
                                           className="p-0"
                                         >
-                                          <div className="p-4 border-l-4 border-blue-500 bg-gray-50">
-                                            <Card className="shadow-lg">
+                                          <div className="p-4 border-l-4 border-blue-500 bg-gray-50 w-full max-w-[1400px] overflow-x-auto">
+                                            <Card className="shadow-lg overflow-x-auto">
                                               <CardHeader className="pb-3">
                                                 <CardTitle className="text-lg text-blue-700">
                                                   {t("common.orderDetails")}
                                                 </CardTitle>
                                               </CardHeader>
-                                              <CardContent className="space-y-4">
+                                              <CardContent className="space-y-4 min-w-[1900px]">
                                                 <div className="bg-white p-4 rounded-lg">
-                                                  <ScrollArea className="w-full">
-                                                    <div className="min-w-[1200px]">
+                                                  <div>
                                                     <table className="w-full text-base border-collapse">
                                                       <tbody>
                                                         <tr>
@@ -4567,7 +4540,7 @@ export default function SalesOrders() {
                                                                   );
                                                                 }}
                                                                 className="w-44"
-                                                                                                                              disabled={
+                                                                disabled={
                                                                   selectedInvoice.displayStatus ===
                                                                   1
                                                                 }
@@ -4967,8 +4940,6 @@ export default function SalesOrders() {
                                                       </tbody>
                                                     </table>
                                                   </div>
-                                                  <ScrollBar orientation="horizontal" />
-                                                  </ScrollArea>
                                                 </div>
 
                                                 <div>
@@ -5023,8 +4994,7 @@ export default function SalesOrders() {
                                                     </div>
                                                   ) : (
                                                     <div className="border rounded-lg">
-                                                      <ScrollArea className="w-full">
-                                                        <table className="w-full text-sm min-w-[1200px]">
+                                                      <table className="w-full text-sm">
                                                         <thead>
                                                           <tr className="bg-gray-50 border-b">
                                                             <th className="border-r px-2 py-2 font-medium text-base text-left sticky left-0 bg-green-50 z-10 w-12">
@@ -5711,7 +5681,8 @@ export default function SalesOrders() {
                                                                           editedOrderItems[
                                                                             item
                                                                               .id
-                                                                          ] || {};
+                                                                          ] ||
+                                                                          {};
                                                                         if (
                                                                           editedItem.tax !==
                                                                           undefined
@@ -5811,8 +5782,6 @@ export default function SalesOrders() {
                                                           })()}
                                                         </tbody>
                                                       </table>
-                                                      <ScrollBar orientation="horizontal" />
-                                                      </ScrollArea>
                                                     </div>
                                                   )}
                                                 </div>
@@ -6109,7 +6078,7 @@ export default function SalesOrders() {
                                                                           priceBeforeTax =
                                                                             Math.round(
                                                                               itemSubtotal -
-                                                                                                                                                    itemDiscountAmount,
+                                                                                itemDiscountAmount,
                                                                             );
                                                                           itemTax =
                                                                             Math.round(
