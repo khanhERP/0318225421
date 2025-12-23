@@ -5,7 +5,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-const BASE_URL = "api-demo.edpos.vn"; // 👈 đổi theo domain backend của bạn
+const BASE_URL = "https://api-demo.edpos.vn"; // 👈 đổi theo domain backend của bạn
 
 export async function defaultFetcher({ queryKey }) {
   const [path] = queryKey;
@@ -43,7 +43,7 @@ export async function defaultFetcher({ queryKey }) {
  */
 export async function completeOrderPayment(orderId, paymentData, apiRequest) {
   // Update order with payment completion
-  const response = await apiRequest("PUT", `api-demo.edpos.vn/api/orders/${orderId}`, {
+  const response = await apiRequest("PUT", `https://api-demo.edpos.vn/api/orders/${orderId}`, {
     status: "paid",
     paymentMethod: paymentData.paymentMethod,
     paymentStatus: "paid",

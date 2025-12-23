@@ -61,23 +61,23 @@ export function CustomerReport() {
   const [debtTo, setDebtTo] = useState("");
 
   const { data: orders } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/orders"],
+    queryKey: ["https://api-demo.edpos.vn/api/orders"],
   });
 
   const { data: products } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/products"],
+    queryKey: ["https://api-demo.edpos.vn/api/products"],
   });
 
   const { data: categories } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/categories"],
+    queryKey: ["https://api-demo.edpos.vn/api/categories"],
   });
 
   const { data: customers } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/customers"],
+    queryKey: ["https://api-demo.edpos.vn/api/customers"],
   });
 
   const { data: customerDebts } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/customer-debts"],
+    queryKey: ["https://api-demo.edpos.vn/api/customer-debts"],
     enabled: concernType === "debt",
   });
 

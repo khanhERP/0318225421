@@ -29,33 +29,33 @@ export default function SuppliersPage({ onLogout }: SuppliersPageProps) {
   const queryClient = useQueryClient();
 
   const { data: suppliers, isLoading } = useQuery({
-    queryKey: ['api-demo.edpos.vn/api/suppliers', { status: selectedStatus, search: searchQuery }],
+    queryKey: ['https://api-demo.edpos.vn/api/suppliers', { status: selectedStatus, search: searchQuery }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedStatus !== 'all') params.append('status', selectedStatus);
       if (searchQuery) params.append('search', searchQuery);
       
-      const response = await apiRequest('GET', `api-demo.edpos.vn/api/suppliers?${params}`);
+      const response = await apiRequest('GET', `https://api-demo.edpos.vn/api/suppliers?${params}`);
       return response.json();
     },
   });
 
   // Fetch purchase order statistics for suppliers
   const { data: supplierStats } = useQuery({
-    queryKey: ['api-demo.edpos.vn/api/purchase-orders/supplier-stats'],
+    queryKey: ['https://api-demo.edpos.vn/api/purchase-orders/supplier-stats'],
     queryFn: async () => {
-      const response = await apiRequest('GET', 'api-demo.edpos.vn/api/purchase-orders/supplier-stats');
+      const response = await apiRequest('GET', 'https://api-demo.edpos.vn/api/purchase-orders/supplier-stats');
       return response.json();
     },
   });
 
   const deleteSupplierMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest('DELETE', `api-demo.edpos.vn/api/suppliers/${id}`);
+      const response = await apiRequest('DELETE', `https://api-demo.edpos.vn/api/suppliers/${id}`);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['api-demo.edpos.vn/api/suppliers'] });
+      queryClient.invalidateQueries({ queryKey: ['https://api-demo.edpos.vn/api/suppliers'] });
       toast({
         title: t('suppliers.deleteSuccess'),
         description: t('suppliers.deleteSuccessDesc'),

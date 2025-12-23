@@ -44,17 +44,17 @@ export function SupplierReport() {
   const [debtTo, setDebtTo] = useState<string>("");
 
   const { data: suppliers } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/suppliers"],
+    queryKey: ["https://api-demo.edpos.vn/api/suppliers"],
   });
 
   const { data: purchaseReceipts } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/purchase-receipts"],
+    queryKey: ["https://api-demo.edpos.vn/api/purchase-receipts"],
     enabled: concernType === "purchase" || concernType === "purchaseBySupplier",
   });
 
   // Sử dụng purchase receipts làm nguồn dữ liệu cho debt report
   const { data: supplierDebts } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/purchase-receipts"],
+    queryKey: ["https://api-demo.edpos.vn/api/purchase-receipts"],
     enabled: concernType === "debt",
   });
 

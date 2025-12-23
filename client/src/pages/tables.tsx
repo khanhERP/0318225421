@@ -34,7 +34,7 @@ export default function TablesPage({ onLogout }: TablesPageProps) {
         const isCustomDomain = !host.includes('replit.dev');
 
         // For custom domains, use the Replit deployment proxy
-        const wsUrl = `api-demo.edpos.vn/ws`;
+        const wsUrl = `https://api-demo.edpos.vn/ws`;
 
         console.log(`📡 Tables: Connecting to WebSocket at ${wsUrl}`);
         ws = new WebSocket(wsUrl);
@@ -69,8 +69,8 @@ export default function TablesPage({ onLogout }: TablesPageProps) {
 
               // Clear cache and force refresh
               queryClient.clear();
-              queryClient.invalidateQueries({ queryKey: ["api-demo.edpos.vn/api/tables"] });
-              queryClient.invalidateQueries({ queryKey: ["api-demo.edpos.vn/api/orders"] });
+              queryClient.invalidateQueries({ queryKey: ["https://api-demo.edpos.vn/api/tables"] });
+              queryClient.invalidateQueries({ queryKey: ["https://api-demo.edpos.vn/api/orders"] });
 
               // Dispatch custom events for TableGrid component
               window.dispatchEvent(
@@ -117,8 +117,8 @@ export default function TablesPage({ onLogout }: TablesPageProps) {
 
       // Force data refresh for any e-invoice related events
       queryClient.clear();
-      queryClient.invalidateQueries({ queryKey: ["api-demo.edpos.vn/api/tables"] });
-      queryClient.invalidateQueries({ queryKey: ["api-demo.edpos.vn/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://api-demo.edpos.vn/api/tables"] });
+      queryClient.invalidateQueries({ queryKey: ["https://api-demo.edpos.vn/api/orders"] });
 
       // Dispatch refresh event for TableGrid
       window.dispatchEvent(

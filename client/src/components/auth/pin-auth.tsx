@@ -48,10 +48,10 @@ export function PinAuth({ onAuthSuccess }: PinAuthProps) {
 
   // Fetch store settings để lấy PIN
   const { data: storeData } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/store-settings"],
+    queryKey: ["https://api-demo.edpos.vn/api/store-settings"],
     queryFn: async () => {
       try {
-        const response = await apiRequest("GET", "api-demo.edpos.vn/api/store-settings");
+        const response = await apiRequest("GET", "https://api-demo.edpos.vn/api/store-settings");
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
@@ -98,7 +98,7 @@ export function PinAuth({ onAuthSuccess }: PinAuthProps) {
       });
 
       // Gọi API đăng nhập bằng PIN
-      const response = await fetch("api-demo.edpos.vn/api/auth/login-pin", {
+      const response = await fetch("https://api-demo.edpos.vn/api/auth/login-pin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

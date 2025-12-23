@@ -79,10 +79,10 @@ export function FinancialReport() {
 
   // Query orders and transactions for financial calculations
   const { data: orders = [] } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/orders"],
+    queryKey: ["https://api-demo.edpos.vn/api/orders"],
     queryFn: async () => {
       try {
-        const response = await fetch("api-demo.edpos.vn/api/orders");
+        const response = await fetch("https://api-demo.edpos.vn/api/orders");
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
         return Array.isArray(data) ? data : [];
@@ -94,10 +94,10 @@ export function FinancialReport() {
   });
 
   const { data: transactions = [] } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/transactions"],
+    queryKey: ["https://api-demo.edpos.vn/api/transactions"],
     queryFn: async () => {
       try {
-        const response = await fetch("api-demo.edpos.vn/api/transactions");
+        const response = await fetch("https://api-demo.edpos.vn/api/transactions");
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
         return Array.isArray(data) ? data : [];
@@ -109,10 +109,10 @@ export function FinancialReport() {
   });
 
   const { data: invoices = [] } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/invoices"],
+    queryKey: ["https://api-demo.edpos.vn/api/invoices"],
     queryFn: async () => {
       try {
-        const response = await fetch("api-demo.edpos.vn/api/invoices");
+        const response = await fetch("https://api-demo.edpos.vn/api/invoices");
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
         return Array.isArray(data) ? data : [];

@@ -38,7 +38,7 @@ export function ExpenseProductsReport() {
     message: string;
     data: ExpenseProduct[];
   }>({
-    queryKey: ["api-demo.edpos.vn/api/purchase-receipts/expense-products"],
+    queryKey: ["https://api-demo.edpos.vn/api/purchase-receipts/expense-products"],
   });
 
   const expenseProducts = response?.data || [];

@@ -16,7 +16,7 @@ export async function apiRequest(
 ) {
   // Log payment method tracking for order status updates
   if (
-    url.includes("api-demo.edpos.vn/api/orders/") &&
+    url.includes("https://api-demo.edpos.vn/api/orders/") &&
     url.includes("/status") &&
     method === "PUT"
   ) {
@@ -52,7 +52,7 @@ export async function apiRequest(
 
     // Additional logging for payment method requests
     if (
-      url.includes("api-demo.edpos.vn/api/orders/") &&
+      url.includes("https://api-demo.edpos.vn/api/orders/") &&
       url.includes("/status") &&
       method === "PUT"
     ) {

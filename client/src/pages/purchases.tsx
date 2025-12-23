@@ -84,7 +84,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
     isLoading: isOrdersLoading,
   } = useQuery<{ data: PurchaseOrder[]; success: boolean; message: string }>({
     queryKey: [
-      "api-demo.edpos.vn/api/purchase-receipts",
+      "https://api-demo.edpos.vn/api/purchase-receipts",
       {
         startDate,
         endDate,
@@ -116,7 +116,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
         console.log("🔍 Adding PO number search:", poNumberFilter.trim());
       }
 
-      const url = `api-demo.edpos.vn/api/purchase-receipts${params.toString() ? `?${params.toString()}` : ""}`;
+      const url = `https://api-demo.edpos.vn/api/purchase-receipts${params.toString() ? `?${params.toString()}` : ""}`;
       console.log("🔍 Fetching purchase receipts with filters:", url);
 
       const response = await fetch(url);
@@ -152,14 +152,14 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
 
   // Fetch suppliers for filtering
   const { data: suppliers = [] } = useQuery<Supplier[]>({
-    queryKey: ["api-demo.edpos.vn/api/suppliers"],
+    queryKey: ["https://api-demo.edpos.vn/api/suppliers"],
   });
 
   // Fetch payment methods
   const { data: paymentMethodsData } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/payment-methods"],
+    queryKey: ["https://api-demo.edpos.vn/api/payment-methods"],
     queryFn: async () => {
-      const response = await fetch("api-demo.edpos.vn/api/payment-methods");
+      const response = await fetch("https://api-demo.edpos.vn/api/payment-methods");
       return response.json();
     },
   });
@@ -261,7 +261,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
   // Bulk delete mutation
   const bulkDeleteMutation = useMutation({
     mutationFn: async (orderIds: number[]) => {
-      return apiRequest("POST", "api-demo.edpos.vn/api/purchase-receipts/bulk-delete", {
+      return apiRequest("POST", "https://api-demo.edpos.vn/api/purchase-receipts/bulk-delete", {
         orderIds,
       });
     },
@@ -278,7 +278,7 @@ export default function PurchasesPage({ onLogout }: PurchasesPageProps) {
       setSelectedOrders(new Set());
 
       // Refetch purchase receipts
-      queryClient.invalidateQueries({ queryKey: ["api-demo.edpos.vn/api/purchase-receipts"] });
+      queryClient.invalidateQueries({ queryKey: ["https://api-demo.edpos.vn/api/purchase-receipts"] });
 
       // Close dialog
       setShowDeleteDialog(false);

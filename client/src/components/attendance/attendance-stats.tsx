@@ -15,11 +15,11 @@ export function AttendanceStats() {
   );
 
   const { data: employees } = useQuery({
-    queryKey: ['api-demo.edpos.vn/api/employees'],
+    queryKey: ['https://api-demo.edpos.vn/api/employees'],
   });
 
   const { data: attendanceRecords } = useQuery({
-    queryKey: ['api-demo.edpos.vn/api/attendance'],
+    queryKey: ['https://api-demo.edpos.vn/api/attendance'],
   });
 
   const getMonthlyStats = () => {

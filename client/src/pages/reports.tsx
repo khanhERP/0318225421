@@ -52,7 +52,7 @@ export default function ReportsPage({ onLogout }: ReportsPageProps) {
 
   // Fetch store settings to check business type
   const { data: storeSettings } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/store-settings"],
+    queryKey: ["https://api-demo.edpos.vn/api/store-settings"],
   });
 
   useEffect(() => {

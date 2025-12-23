@@ -32,12 +32,12 @@ export function SplitOrderModal({
 
   // Fetch table info to get correct table number
   const { data: tablesData } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/tables"],
+    queryKey: ["https://api-demo.edpos.vn/api/tables"],
   });
 
   // Fetch products to get correct tax rates
   const { data: productsData } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/products"],
+    queryKey: ["https://api-demo.edpos.vn/api/products"],
   });
 
   const getTableNumber = () => {

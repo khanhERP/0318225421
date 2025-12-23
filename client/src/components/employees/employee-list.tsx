@@ -19,7 +19,7 @@ export function EmployeeList() {
   const { t } = useTranslation();
 
   const { data: employeesData, isLoading } = useQuery<Employee[]>({
-    queryKey: ['api-demo.edpos.vn/api/employees'],
+    queryKey: ['https://api-demo.edpos.vn/api/employees'],
   });
 
   // Sort employees by ID descending (newest first)
@@ -27,11 +27,11 @@ export function EmployeeList() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest('DELETE', `api-demo.edpos.vn/api/employees/${id}`);
+      const response = await apiRequest('DELETE', `https://api-demo.edpos.vn/api/employees/${id}`);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['api-demo.edpos.vn/api/employees'] });
+      queryClient.invalidateQueries({ queryKey: ['https://api-demo.edpos.vn/api/employees'] });
       toast({
         title: t('common.success'),
         description: t('employees.deleteSuccess'),

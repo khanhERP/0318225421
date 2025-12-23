@@ -30,15 +30,15 @@ export function AttendanceList({
 }: AttendanceListProps) {
   const { t } = useTranslation();
   const { data: employees } = useQuery({
-    queryKey: ['api-demo.edpos.vn/api/employees'],
+    queryKey: ['https://api-demo.edpos.vn/api/employees'],
   });
 
   const { data: attendanceRecords, isLoading } = useQuery({
     queryKey: useRange 
-      ? ['api-demo.edpos.vn/api/attendance', 'range', dateRange?.startDate, dateRange?.endDate]
-      : ['api-demo.edpos.vn/api/attendance', selectedDate],
+      ? ['https://api-demo.edpos.vn/api/attendance', 'range', dateRange?.startDate, dateRange?.endDate]
+      : ['https://api-demo.edpos.vn/api/attendance', selectedDate],
     queryFn: async () => {
-      let url = 'api-demo.edpos.vn/api/attendance';
+      let url = 'https://api-demo.edpos.vn/api/attendance';
       if (useRange && dateRange?.startDate && dateRange?.endDate) {
         url += `?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`;
       } else {

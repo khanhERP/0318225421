@@ -107,9 +107,9 @@ export function SalesChartReport() {
 
   // Query store settings for priceIncludesTax
   const { data: storeSettings } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/store-settings"],
+    queryKey: ["https://api-demo.edpos.vn/api/store-settings"],
     queryFn: async () => {
-      const response = await fetch("api-demo.edpos.vn/api/store-settings");
+      const response = await fetch("https://api-demo.edpos.vn/api/store-settings");
       if (!response.ok) {
         throw new Error("Failed to fetch store settings");
       }
@@ -125,7 +125,7 @@ export function SalesChartReport() {
     error: ordersError,
   } = useQuery({
     queryKey: [
-      "api-demo.edpos.vn/api/orders/date-range",
+      "https://api-demo.edpos.vn/api/orders/date-range",
       startDate,
       endDate,
       startTime,
@@ -167,7 +167,7 @@ export function SalesChartReport() {
           selectedFloor !== "all" ? `/${selectedFloor}` : "/all";
 
         const response = await fetch(
-          `api-demo.edpos.vn/api/orders/date-range/${startDateTimeISO}/${endDateTimeISO}${floorFilter}`,
+          `https://api-demo.edpos.vn/api/orders/date-range/${startDateTimeISO}/${endDateTimeISO}${floorFilter}`,
         );
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -226,10 +226,10 @@ export function SalesChartReport() {
 
   // Query order items for all orders
   const { data: orderItems = [], isLoading: orderItemsLoading } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/order-items"],
+    queryKey: ["https://api-demo.edpos.vn/api/order-items"],
     queryFn: async () => {
       try {
-        const response = await fetch("api-demo.edpos.vn/api/order-items");
+        const response = await fetch("https://api-demo.edpos.vn/api/order-items");
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -255,7 +255,7 @@ export function SalesChartReport() {
     isLoading: tablesLoading,
     error: tablesError,
   } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/tables"],
+    queryKey: ["https://api-demo.edpos.vn/api/tables"],
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
@@ -263,13 +263,13 @@ export function SalesChartReport() {
   const isLoading = ordersLoading || orderItemsLoading;
 
   const { data: employees } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/employees"],
+    queryKey: ["https://api-demo.edpos.vn/api/employees"],
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: products } = useQuery({
     queryKey: [
-      "api-demo.edpos.vn/api/products",
+      "https://api-demo.edpos.vn/api/products",
       selectedCategory,
       productType,
       productSearch,
@@ -278,7 +278,7 @@ export function SalesChartReport() {
     ],
     queryFn: async () => {
       const response = await fetch(
-        `api-demo.edpos.vn/api/products/${selectedCategory}/${productType}/${productSearch || ""}`,
+        `https://api-demo.edpos.vn/api/products/${selectedCategory}/${productType}/${productSearch || ""}`,
       );
       if (!response.ok) throw new Error("Failed to fetch products");
       return response.json();
@@ -287,13 +287,13 @@ export function SalesChartReport() {
   });
 
   const { data: categories } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/categories"],
+    queryKey: ["https://api-demo.edpos.vn/api/categories"],
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: customers } = useQuery({
     queryKey: [
-      "api-demo.edpos.vn/api/customers",
+      "https://api-demo.edpos.vn/api/customers",
       customerSearch,
       customerStatus,
       startDate,
@@ -301,7 +301,7 @@ export function SalesChartReport() {
     ],
     queryFn: async () => {
       const response = await fetch(
-        `api-demo.edpos.vn/api/customers/${customerSearch || "all"}/${customerStatus}`,
+        `https://api-demo.edpos.vn/api/customers/${customerSearch || "all"}/${customerStatus}`,
         {
           method: "GET",
           headers: {
@@ -316,9 +316,9 @@ export function SalesChartReport() {
   });
 
   const { data: generalSettings } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/general-settings"],
+    queryKey: ["https://api-demo.edpos.vn/api/general-settings"],
     queryFn: async () => {
-      const response = await fetch("api-demo.edpos.vn/api/general-settings/ST-002");
+      const response = await fetch("https://api-demo.edpos.vn/api/general-settings/ST-002");
       if (!response.ok) throw new Error("Failed to fetch general settings");
       return response.json();
     },
@@ -329,7 +329,7 @@ export function SalesChartReport() {
   const { data: productAnalysisData, isLoading: productAnalysisLoading } =
     useQuery({
       queryKey: [
-        "api-demo.edpos.vn/api/product-analysis",
+        "https://api-demo.edpos.vn/api/product-analysis",
         startDate,
         endDate,
         startTime,
@@ -363,7 +363,7 @@ export function SalesChartReport() {
           });
 
           const response = await fetch(
-            `api-demo.edpos.vn/api/product-analysis/${encodeURIComponent(startDateTimeLocal)}/${encodeURIComponent(endDateTimeLocal)}${floorFilter}?${params}`,
+            `https://api-demo.edpos.vn/api/product-analysis/${encodeURIComponent(startDateTimeLocal)}/${encodeURIComponent(endDateTimeLocal)}${floorFilter}?${params}`,
             {
               method: "GET",
               headers: {
@@ -403,7 +403,7 @@ export function SalesChartReport() {
     });
 
   const { data: transactions } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/transactions"],
+    queryKey: ["https://api-demo.edpos.vn/api/transactions"],
     staleTime: 5 * 60 * 1000,
   });
 

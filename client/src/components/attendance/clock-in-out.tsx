@@ -47,22 +47,22 @@ export function ClockInOut() {
   const { t } = useTranslation();
 
   const { data: employees } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/employees"],
+    queryKey: ["https://api-demo.edpos.vn/api/employees"],
   });
 
   const { data: todayAttendance, refetch: refetchTodayAttendance } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/attendance/today", selectedEmployeeId],
+    queryKey: ["https://api-demo.edpos.vn/api/attendance/today", selectedEmployeeId],
     enabled: !!selectedEmployeeId,
   });
 
   const clockInMutation = useMutation({
     mutationFn: () =>
-      apiRequest("POST", "api-demo.edpos.vn/api/attendance/clock-in", {
+      apiRequest("POST", "https://api-demo.edpos.vn/api/attendance/clock-in", {
         employeeId: selectedEmployeeId,
         notes,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["api-demo.edpos.vn/api/attendance"] });
+      queryClient.invalidateQueries({ queryKey: ["https://api-demo.edpos.vn/api/attendance"] });
       refetchTodayAttendance();
       setNotes("");
       toast({
@@ -83,11 +83,11 @@ export function ClockInOut() {
     mutationFn: () =>
       apiRequest(
         "POST",
-        `api-demo.edpos.vn/api/attendance/clock-out/${(todayAttendance as AttendanceRecord)?.id}`,
+        `https://api-demo.edpos.vn/api/attendance/clock-out/${(todayAttendance as AttendanceRecord)?.id}`,
         {},
       ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["api-demo.edpos.vn/api/attendance"] });
+      queryClient.invalidateQueries({ queryKey: ["https://api-demo.edpos.vn/api/attendance"] });
       refetchTodayAttendance();
       toast({
         title: t("common.success"),
@@ -107,11 +107,11 @@ export function ClockInOut() {
     mutationFn: () =>
       apiRequest(
         "POST",
-        `api-demo.edpos.vn/api/attendance/break-start/${(todayAttendance as AttendanceRecord)?.id}`,
+        `https://api-demo.edpos.vn/api/attendance/break-start/${(todayAttendance as AttendanceRecord)?.id}`,
         {},
       ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["api-demo.edpos.vn/api/attendance"] });
+      queryClient.invalidateQueries({ queryKey: ["https://api-demo.edpos.vn/api/attendance"] });
       refetchTodayAttendance();
       toast({
         title: t("common.success"),
@@ -131,11 +131,11 @@ export function ClockInOut() {
     mutationFn: () =>
       apiRequest(
         "POST",
-        `api-demo.edpos.vn/api/attendance/break-end/${(todayAttendance as AttendanceRecord)?.id}`,
+        `https://api-demo.edpos.vn/api/attendance/break-end/${(todayAttendance as AttendanceRecord)?.id}`,
         {},
       ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["api-demo.edpos.vn/api/attendance"] });
+      queryClient.invalidateQueries({ queryKey: ["https://api-demo.edpos.vn/api/attendance"] });
       refetchTodayAttendance();
       toast({
         title: t("common.success"),

@@ -39,10 +39,10 @@ function Router({ onLogout }: { onLogout: () => void }) {
     // Assuming you have a function to get your auth token
     const getAuthToken = () => localStorage.getItem("authToken");
     const { data: storeSettings } = useQuery<StoreSettings>({
-      queryKey: ["api-demo.edpos.vn/api/store-settings"],
+      queryKey: ["https://api-demo.edpos.vn/api/store-settings"],
       queryFn: async () => {
         const token = getAuthToken();
-        const response = await fetch("api-demo.edpos.vn/api/store-settings", {
+        const response = await fetch("https://api-demo.edpos.vn/api/store-settings", {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`, // Set the token in the Authorization header

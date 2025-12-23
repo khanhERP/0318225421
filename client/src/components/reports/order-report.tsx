@@ -61,11 +61,11 @@ export function OrderReport() {
 
   // Query orders by date range
   const { data: orders = [] } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/orders/date-range", startDate, endDate, "all"],
+    queryKey: ["https://api-demo.edpos.vn/api/orders/date-range", startDate, endDate, "all"],
     queryFn: async () => {
       try {
         const response = await fetch(
-          `api-demo.edpos.vn/api/orders/date-range/${startDate}/${endDate}/all`,
+          `https://api-demo.edpos.vn/api/orders/date-range/${startDate}/${endDate}/all`,
         );
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -81,11 +81,11 @@ export function OrderReport() {
 
   // Query transactions by date range
   const { data: transactions = [] } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/transactions", startDate, endDate],
+    queryKey: ["https://api-demo.edpos.vn/api/transactions", startDate, endDate],
     queryFn: async () => {
       try {
         const response = await fetch(
-          `api-demo.edpos.vn/api/transactions/${startDate}/${endDate}`,
+          `https://api-demo.edpos.vn/api/transactions/${startDate}/${endDate}`,
         );
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -100,15 +100,15 @@ export function OrderReport() {
   });
 
   const { data: products = [] } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/products"],
+    queryKey: ["https://api-demo.edpos.vn/api/products"],
   });
 
   const { data: categories = [] } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/categories"],
+    queryKey: ["https://api-demo.edpos.vn/api/categories"],
   });
 
   const { data: employees = [] } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/employees"],
+    queryKey: ["https://api-demo.edpos.vn/api/employees"],
   });
 
   const getFilteredData = () => {

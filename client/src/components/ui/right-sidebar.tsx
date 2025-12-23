@@ -40,9 +40,9 @@ export function RightSidebar() {
 
   // Query store settings to get business type
   const { data: storeSettings } = useQuery({
-    queryKey: ["api-demo.edpos.vn/api/store-settings"],
+    queryKey: ["https://api-demo.edpos.vn/api/store-settings"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "api-demo.edpos.vn/api/store-settings");
+      const response = await apiRequest("GET", "https://api-demo.edpos.vn/api/store-settings");
       return response.json();
     },
   });

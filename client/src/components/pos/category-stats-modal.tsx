@@ -20,14 +20,14 @@ export function CategoryStatsModal({ isOpen, onClose }: CategoryStatsModalProps)
 
   // Fetch categories
   const { data: categoriesData } = useQuery<any[]>({
-    queryKey: ["api-demo.edpos.vn/api/categories"],
+    queryKey: ["https://api-demo.edpos.vn/api/categories"],
   });
 
   // Fetch products
   const { data: productsData } = useQuery<any[]>({
-    queryKey: ["api-demo.edpos.vn/api/products", { includeInactive: true }],
+    queryKey: ["https://api-demo.edpos.vn/api/products", { includeInactive: true }],
     queryFn: async () => {
-      const response = await fetch("api-demo.edpos.vn/api/products?includeInactive=true");
+      const response = await fetch("https://api-demo.edpos.vn/api/products?includeInactive=true");
       if (!response.ok) throw new Error("Failed to fetch products");
       return response.json();
     },

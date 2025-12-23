@@ -40,7 +40,7 @@ export default function CustomersPage({ onLogout }: CustomersPageProps) {
 
   // Fetch customers
   const { data: customersData, isLoading: customersLoading } = useQuery<Customer[]>({
-    queryKey: ["api-demo.edpos.vn/api/customers"],
+    queryKey: ["https://api-demo.edpos.vn/api/customers"],
   });
 
   const handleEditCustomer = (customer: Customer) => {
@@ -52,7 +52,7 @@ export default function CustomersPage({ onLogout }: CustomersPageProps) {
     if (!confirm(t("customers.confirmDelete"))) return;
 
     try {
-      const response = await fetch(`api-demo.edpos.vn/api/customers/${customerId}`, {
+      const response = await fetch(`https://api-demo.edpos.vn/api/customers/${customerId}`, {
         method: "DELETE",
       });
 
@@ -60,7 +60,7 @@ export default function CustomersPage({ onLogout }: CustomersPageProps) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      await queryClient.refetchQueries({ queryKey: ["api-demo.edpos.vn/api/customers"] });
+      await queryClient.refetchQueries({ queryKey: ["https://api-demo.edpos.vn/api/customers"] });
 
       toast({
         title: t("common.success"),
