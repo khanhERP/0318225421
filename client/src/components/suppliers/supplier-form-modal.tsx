@@ -40,18 +40,18 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormMod
 
   // Fetch store settings to get storeCode
   const { data: storeSettings } = useQuery({
-    queryKey: ['https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/store-settings'],
+    queryKey: ['api-demo.edpos.vn/api/store-settings'],
     queryFn: async () => {
-      const response = await apiRequest('GET', 'https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/store-settings');
+      const response = await apiRequest('GET', 'api-demo.edpos.vn/api/store-settings');
       return response.json();
     },
   });
 
   // Fetch all suppliers to generate next code
   const { data: suppliers } = useQuery({
-    queryKey: ['https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/suppliers'],
+    queryKey: ['api-demo.edpos.vn/api/suppliers'],
     queryFn: async () => {
-      const response = await apiRequest('GET', 'https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/suppliers');
+      const response = await apiRequest('GET', 'api-demo.edpos.vn/api/suppliers');
       return response.json();
     },
   });
@@ -116,11 +116,11 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormMod
         ...data,
         storeCode: storeSettings?.storeCode || null,
       };
-      const response = await apiRequest('POST', 'https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/suppliers', dataWithStoreCode);
+      const response = await apiRequest('POST', 'api-demo.edpos.vn/api/suppliers', dataWithStoreCode);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/suppliers'] });
+      queryClient.invalidateQueries({ queryKey: ['api-demo.edpos.vn/api/suppliers'] });
       toast({
         title: t("common.successTitle"),
         description: t("suppliers.createSuccess"),
@@ -138,11 +138,11 @@ export function SupplierFormModal({ isOpen, onClose, supplier }: SupplierFormMod
 
   const updateMutation = useMutation({
     mutationFn: async (data: Partial<InsertSupplier>) => {
-      const response = await apiRequest('PUT', `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/suppliers/${supplier!.id}`, data);
+      const response = await apiRequest('PUT', `api-demo.edpos.vn/api/suppliers/${supplier!.id}`, data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/suppliers'] });
+      queryClient.invalidateQueries({ queryKey: ['api-demo.edpos.vn/api/suppliers'] });
       toast({
         title: t("common.successTitle"),
         description: t("suppliers.updateSuccess"),

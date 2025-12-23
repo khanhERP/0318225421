@@ -94,7 +94,7 @@ export function TableManagement() {
   const [previewReceipt, setPreviewReceipt] = useState<any>(null);
 
   const { data: tables, isLoading } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/tables"],
+    queryKey: ["api-demo.edpos.vn/api/tables"],
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
     refetchOnWindowFocus: false,
@@ -117,9 +117,9 @@ export function TableManagement() {
 
   const createTableMutation = useMutation({
     mutationFn: (data: TableFormData) =>
-      apiRequest("POST", "https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/tables", data),
+      apiRequest("POST", "api-demo.edpos.vn/api/tables", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/tables"] });
+      queryClient.invalidateQueries({ queryKey: ["api-demo.edpos.vn/api/tables"] });
       toast({
         title: t("common.success"),
         description: t("tables.tableCreateSuccess"),
@@ -137,9 +137,9 @@ export function TableManagement() {
 
   const updateTableMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: TableFormData }) =>
-      apiRequest("PUT", `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/tables/${id}`, data),
+      apiRequest("PUT", `api-demo.edpos.vn/api/tables/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/tables"] });
+      queryClient.invalidateQueries({ queryKey: ["api-demo.edpos.vn/api/tables"] });
       toast({
         title: t("common.success"),
         description: t("tables.tableUpdateSuccess"),
@@ -156,9 +156,9 @@ export function TableManagement() {
   });
 
   const deleteTableMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/tables/${id}`, {}),
+    mutationFn: (id: number) => apiRequest("DELETE", `api-demo.edpos.vn/api/tables/${id}`, {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/tables"] });
+      queryClient.invalidateQueries({ queryKey: ["api-demo.edpos.vn/api/tables"] });
       toast({
         title: t("common.success"),
         description: t("tables.tableDeleteSuccess"),

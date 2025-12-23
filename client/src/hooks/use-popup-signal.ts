@@ -8,7 +8,7 @@ export function usePopupSignal() {
     // Connect WebSocket to same port as main application with /ws path
     const isSecure = window.location.protocol === 'https:';
     const wsProtocol = isSecure ? 'wss:' : 'ws:';
-    const wsUrl = `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/ws`;
+    const wsUrl = `api-demo.edpos.vn/ws`;
 
     console.log('Connecting to WebSocket:', wsUrl);
 
@@ -63,7 +63,7 @@ export function usePopupSignal() {
   }, []);
 
   const sendPopupClose = (success: boolean) => {
-    fetch('https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/popup/close', {
+    fetch('api-demo.edpos.vn/api/popup/close', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

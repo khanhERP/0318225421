@@ -63,9 +63,9 @@ export function InvoiceManagementModal({
 
   // Fetch invoices list
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/invoices"],
+    queryKey: ["api-demo.edpos.vn/api/invoices"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/invoices");
+      const response = await apiRequest("GET", "api-demo.edpos.vn/api/invoices");
       return response.json();
     },
     enabled: isOpen,
@@ -73,10 +73,10 @@ export function InvoiceManagementModal({
 
   // Fetch invoice items for selected invoice
   const { data: invoiceItems = [] } = useQuery<InvoiceItem[]>({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/invoice-items", selectedInvoice?.id],
+    queryKey: ["api-demo.edpos.vn/api/invoice-items", selectedInvoice?.id],
     queryFn: async () => {
       if (!selectedInvoice?.id) return [];
-      const response = await apiRequest("GET", `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/invoice-items/${selectedInvoice.id}`);
+      const response = await apiRequest("GET", `api-demo.edpos.vn/api/invoice-items/${selectedInvoice.id}`);
       return response.json();
     },
     enabled: !!selectedInvoice?.id,
