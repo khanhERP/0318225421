@@ -137,7 +137,6 @@ export default function IncomeVoucherModal({
             const today = new Date();
             const dateStr = today.toISOString().split("T")[0].replace(/-/g, "");
             const timeStr = Date.now().toString().slice(-3);
-            
             setFormData({
               voucherNumber: `PT${dateStr}${timeStr}`,
               date: new Date().toISOString().split("T")[0],

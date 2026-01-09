@@ -543,7 +543,10 @@ export function ShoppingCart({
       // Remove all non-digit characters from customer phone
       const cleanPhone = (customer.phone || "").replace(/\D/g, "");
       // Check if cleaned phone STARTS WITH search term (exact match from beginning)
-      return ( cleanPhone.startsWith(searchLower) ||customer.address?.toLowerCase().includes(searchLower));
+      return (
+        cleanPhone.startsWith(searchLower) ||
+        customer.address?.toLowerCase().includes(searchLower)
+      );
     }
 
     // Otherwise search by name or address (case insensitive)

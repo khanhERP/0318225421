@@ -1344,23 +1344,20 @@ export function ReceiptModal({
                               minute: "2-digit",
                             })
                       : receipt.createdAt
-                    ? new Date(receipt.createdAt).toLocaleString(
-                        "vi-VN",
-                        {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        },
-                      )
-                    : new Date().toLocaleString("vi-VN", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                        ? new Date(receipt.createdAt).toLocaleString("vi-VN", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                        : new Date().toLocaleString("vi-VN", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
                   </td>
                 </tr>
                 {storeSettings?.businessType === "laundry" ? (
