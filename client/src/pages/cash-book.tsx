@@ -185,14 +185,14 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
   // Query orders (thu - income from sales)
   const { data: orders = [] } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders", startDate, endDate],
+    queryKey: ["https://api-laundry-web.edpos.vn/api/orders", startDate, endDate],
     queryFn: async () => {
       try {
         const params = new URLSearchParams();
         if (startDate) params.append("startDate", `${startDate} 00:00:00`);
         if (endDate) params.append("endDate", `${endDate} 23:59:59`);
 
-        const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders?${params.toString()}`);
+        const response = await fetch(`https://api-laundry-web.edpos.vn/api/orders?${params.toString()}`);
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
@@ -206,7 +206,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
   // Query purchase receipts (chi - expenses from purchases)
   const { data: purchaseReceipts = [] } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/purchase-receipts", startDate, endDate],
+    queryKey: ["https://api-laundry-web.edpos.vn/api/purchase-receipts", startDate, endDate],
     queryFn: async () => {
       try {
         const params = new URLSearchParams();
@@ -214,7 +214,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
         if (endDate) params.append("endDate", `${endDate} 23:59:59`);
 
         const response = await fetch(
-          `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/purchase-receipts?${params.toString()}`,
+          `https://api-laundry-web.edpos.vn/api/purchase-receipts?${params.toString()}`,
         );
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -229,7 +229,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
   // Query income vouchers (thu - manual income entries)
   const { data: incomeVouchers = [] } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers", startDate, endDate],
+    queryKey: ["https://api-laundry-web.edpos.vn/api/income-vouchers", startDate, endDate],
     queryFn: async () => {
       try {
         const params = new URLSearchParams();
@@ -237,7 +237,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
         if (endDate) params.append("endDate", `${endDate} 23:59:59`);
 
         const response = await fetch(
-          `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers?${params.toString()}`,
+          `https://api-laundry-web.edpos.vn/api/income-vouchers?${params.toString()}`,
         );
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -252,7 +252,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
   // Query expense vouchers (chi - manual expense entries)
   const { data: expenseVouchers = [] } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers", startDate, endDate],
+    queryKey: ["https://api-laundry-web.edpos.vn/api/expense-vouchers", startDate, endDate],
     queryFn: async () => {
       try {
         const params = new URLSearchParams();
@@ -260,7 +260,7 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
         if (endDate) params.append("endDate", `${endDate} 23:59:59`);
 
         const response = await fetch(
-          `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/expense-vouchers?${params.toString()}`,
+          `https://api-laundry-web.edpos.vn/api/expense-vouchers?${params.toString()}`,
         );
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -275,10 +275,10 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
 
   // Query suppliers for name mapping
   const { data: suppliers = [] } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/suppliers"],
+    queryKey: ["https://api-laundry-web.edpos.vn/api/suppliers"],
     queryFn: async () => {
       try {
-        const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/suppliers");
+        const response = await fetch("https://api-laundry-web.edpos.vn/api/suppliers");
         if (!response.ok)
           throw new Error(`HTTP error! status: ${response.status}`);
         const data = await response.json();
@@ -293,9 +293,9 @@ export default function CashBookPage({ onLogout }: CashBookPageProps) {
   // Load payment methods from localStorage (same as settings page)
   // Query payment methods from API
   const { data: paymentMethodsData } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods"],
+    queryKey: ["https://api-laundry-web.edpos.vn/api/payment-methods"],
     queryFn: async () => {
-      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods");
+      const response = await fetch("https://api-laundry-web.edpos.vn/api/payment-methods");
       return response.json();
     },
   });
