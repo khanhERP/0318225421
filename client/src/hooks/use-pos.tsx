@@ -44,7 +44,7 @@ export function usePOS() {
       // Get storeCode from user session/auth
       let storeCode = null;
       try {
-        const authResponse = await fetch("https://api-laundry-web.edpos.vn/api/auth/me");
+        const authResponse = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/auth/me");
         if (authResponse.ok) {
           const userData = await authResponse.json();
           storeCode = userData.storeCode;
@@ -94,7 +94,7 @@ export function usePOS() {
         notes: null,
       }));
 
-      const response = await fetch("https://api-laundry-web.edpos.vn/api/orders", {
+      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ order: orderData, items }),
@@ -132,8 +132,8 @@ export function usePOS() {
 
       setLastReceipt(receipt);
       updateActiveOrderCart([]);
-      queryClient.invalidateQueries({ queryKey: ["https://api-laundry-web.edpos.vn/api/products"] });
-      queryClient.invalidateQueries({ queryKey: ["https://api-laundry-web.edpos.vn/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/products"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders"] });
 
       // Dispatch events for real-time updates
       if (typeof window !== "undefined") {
@@ -209,7 +209,7 @@ export function usePOS() {
 
     try {
       // Fetch product details
-      const response = await fetch(`https://api-laundry-web.edpos.vn/api/products/${productId}`);
+      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/products/${productId}`);
       if (!response.ok) {
         throw new Error("Failed to fetch product");
       }

@@ -74,9 +74,9 @@ export default function IncomeVoucherModal({
   // Load payment methods from localStorage (same as expense voucher)
   // Query payment methods from API
   const { data: paymentMethodsData } = useQuery({
-    queryKey: ["https://api-laundry-web.edpos.vn/api/payment-methods"],
+    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods"],
     queryFn: async () => {
-      const response = await fetch("https://api-laundry-web.edpos.vn/api/payment-methods");
+      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/payment-methods");
       return response.json();
     },
   });
@@ -118,7 +118,7 @@ export default function IncomeVoucherModal({
       // Generate voucher number for new voucher with format PT-YYYYMMDD0001
       const generateVoucherNumber = async () => {
         try {
-          const response = await fetch("https://api-laundry-web.edpos.vn/api/income-vouchers/next-voucher-number");
+          const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers/next-voucher-number");
           if (response.ok) {
             const data = await response.json();
             setFormData({
@@ -176,7 +176,7 @@ export default function IncomeVoucherModal({
 
   const createVoucherMutation = useMutation({
     mutationFn: async (data: IncomeVoucher) => {
-      const response = await fetch("https://api-laundry-web.edpos.vn/api/income-vouchers", {
+      const response = await fetch("https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -189,8 +189,8 @@ export default function IncomeVoucherModal({
         title: "Thành công",
         description: "Đã tạo phiếu thu mới",
       });
-      queryClient.invalidateQueries({ queryKey: ["https://api-laundry-web.edpos.vn/api/income-vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["https://api-laundry-web.edpos.vn/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders"] });
 
       // Reset form to initial state
       const today = new Date();
@@ -224,7 +224,7 @@ export default function IncomeVoucherModal({
   const updateVoucherMutation = useMutation({
     mutationFn: async (data: IncomeVoucher) => {
       console.log("Updating income voucher with data:", data);
-      const response = await fetch(`https://api-laundry-web.edpos.vn/api/income-vouchers/${data.id}`, {
+      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers/${data.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -245,8 +245,8 @@ export default function IncomeVoucherModal({
         title: "Thành công",
         description: `Đã cập nhật phiếu thu ${formData.voucherNumber} thành công`,
       });
-      queryClient.invalidateQueries({ queryKey: ["https://api-laundry-web.edpos.vn/api/income-vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["https://api-laundry-web.edpos.vn/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders"] });
       setIsEditing(false);
       onClose();
     },
@@ -264,7 +264,7 @@ export default function IncomeVoucherModal({
 
   const deleteVoucherMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`https://api-laundry-web.edpos.vn/api/income-vouchers/${id}`, {
+      const response = await fetch(`https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers/${id}`, {
         method: "DELETE",
       });
       if (!response.ok) throw new Error("Failed to delete income voucher");
@@ -275,8 +275,8 @@ export default function IncomeVoucherModal({
         title: "Thành công",
         description: "Đã xóa phiếu thu",
       });
-      queryClient.invalidateQueries({ queryKey: ["https://api-laundry-web.edpos.vn/api/income-vouchers"] });
-      queryClient.invalidateQueries({ queryKey: ["https://api-laundry-web.edpos.vn/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/income-vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders"] });
       setShowDeleteDialog(false);
       onClose();
     },
