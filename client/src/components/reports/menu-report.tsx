@@ -237,10 +237,10 @@ function MenuReport() {
 
   // Query categories
   const { data: categories = [] } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/categories"],
+    queryKey: ["https://api-laundry-web.edpos.vn/api/categories"],
     queryFn: async () => {
       try {
-        const response = await apiRequest("GET", "https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/categories");
+        const response = await apiRequest("GET", "https://api-laundry-web.edpos.vn/api/categories");
         if (!response.ok) throw new Error("Failed to fetch categories");
         const data = await response.json();
         return Array.isArray(data) ? data : [];
@@ -254,7 +254,7 @@ function MenuReport() {
 
   // Query products - filter by search term
   const { data: products = [] } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/products", selectedCategory, productType, productSearch],
+    queryKey: ["https://api-laundry-web.edpos.vn/api/products", selectedCategory, productType, productSearch],
     queryFn: async () => {
       try {
         const searchParam = productSearch
@@ -262,7 +262,7 @@ function MenuReport() {
           : "";
         const response = await apiRequest(
           "GET",
-          `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/products/${selectedCategory}/${productType}/${searchParam}`,
+          `https://api-laundry-web.edpos.vn/api/products/${selectedCategory}/${productType}/${searchParam}`,
         );
         if (!response.ok) throw new Error("Failed to fetch products");
         const data = await response.json();
@@ -284,7 +284,7 @@ function MenuReport() {
     refetch,
   } = useQuery({
     queryKey: [
-      "https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/menu-analysis",
+      "https://api-laundry-web.edpos.vn/api/menu-analysis",
       startDate,
       endDate,
       selectedCategory,
@@ -302,7 +302,7 @@ function MenuReport() {
 
         const response = await apiRequest(
           "GET",
-          `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/menu-analysis?${params.toString()}`,
+          `https://api-laundry-web.edpos.vn/api/menu-analysis?${params.toString()}`,
         );
         if (!response.ok) {
           console.error(
@@ -401,9 +401,9 @@ function MenuReport() {
 
   const handleRefresh = () => {
     // Refresh both orders and order items data
-    queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders/date-range"] });
+    queryClient.invalidateQueries({ queryKey: ["https://api-laundry-web.edpos.vn/api/orders/date-range"] });
     queryClient.invalidateQueries({
-      queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/order-items/date-range"],
+      queryKey: ["https://api-laundry-web.edpos.vn/api/order-items/date-range"],
     });
   };
 

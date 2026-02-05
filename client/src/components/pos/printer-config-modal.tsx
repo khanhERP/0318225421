@@ -83,9 +83,9 @@ export function PrinterConfigModal({
 
   // Fetch printer configurations
   const { data: printerConfigs = [], isLoading } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/printer-configs"],
+    queryKey: ["https://api-laundry-web.edpos.vn/api/printer-configs"],
     queryFn: async () => {
-      const response = await apiRequest("GET", "https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/printer-configs");
+      const response = await apiRequest("GET", "https://api-laundry-web.edpos.vn/api/printer-configs");
       return response.json();
     },
     enabled: isOpen,
@@ -98,15 +98,15 @@ export function PrinterConfigModal({
     mutationFn: async (configData: any) => {
       const response = await apiRequest(
         "POST",
-        "https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/printer-configs",
+        "https://api-laundry-web.edpos.vn/api/printer-configs",
         configData,
       );
       return response.json();
     },
     onSuccess: () => {
       // Force refetch data
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/printer-configs"] });
-      queryClient.refetchQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/printer-configs"] });
+      queryClient.invalidateQueries({ queryKey: ["https://api-laundry-web.edpos.vn/api/printer-configs"] });
+      queryClient.refetchQueries({ queryKey: ["https://api-laundry-web.edpos.vn/api/printer-configs"] });
       toast({ title: "Thành công", description: "Đã thêm cấu hình máy in" });
       resetForm();
     },
@@ -124,15 +124,15 @@ export function PrinterConfigModal({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
       const response = await apiRequest(
         "PUT",
-        `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/printer-configs/${id}`,
+        `https://api-laundry-web.edpos.vn/api/printer-configs/${id}`,
         data,
       );
       return response.json();
     },
     onSuccess: () => {
       // Force refetch data
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/printer-configs"] });
-      queryClient.refetchQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/printer-configs"] });
+      queryClient.invalidateQueries({ queryKey: ["https://api-laundry-web.edpos.vn/api/printer-configs"] });
+      queryClient.refetchQueries({ queryKey: ["https://api-laundry-web.edpos.vn/api/printer-configs"] });
       toast({
         title: "Thành công",
         description: "Đã cập nhật cấu hình máy in",
@@ -151,12 +151,12 @@ export function PrinterConfigModal({
   // Delete printer config mutation
   const deleteConfigMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/printer-configs/${id}`);
+      await apiRequest("DELETE", `https://api-laundry-web.edpos.vn/api/printer-configs/${id}`);
     },
     onSuccess: () => {
       // Force refetch data
-      queryClient.invalidateQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/printer-configs"] });
-      queryClient.refetchQueries({ queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/printer-configs"] });
+      queryClient.invalidateQueries({ queryKey: ["https://api-laundry-web.edpos.vn/api/printer-configs"] });
+      queryClient.refetchQueries({ queryKey: ["https://api-laundry-web.edpos.vn/api/printer-configs"] });
       toast({ title: "Thành công", description: "Đã xóa cấu hình máy in" });
     },
     onError: () => {
@@ -173,7 +173,7 @@ export function PrinterConfigModal({
     mutationFn: async (id: number) => {
       const response = await apiRequest(
         "POST",
-        `https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/printer-configs/${id}/test`,
+        `https://api-laundry-web.edpos.vn/api/printer-configs/${id}/test`,
       );
       return response.json();
     },

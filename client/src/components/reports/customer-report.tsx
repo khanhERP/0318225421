@@ -61,23 +61,23 @@ export function CustomerReport() {
   const [debtTo, setDebtTo] = useState("");
 
   const { data: orders } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/orders"],
+    queryKey: ["https://api-laundry-web.edpos.vn/api/orders"],
   });
 
   const { data: products } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/products"],
+    queryKey: ["https://api-laundry-web.edpos.vn/api/products"],
   });
 
   const { data: categories } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/categories"],
+    queryKey: ["https://api-laundry-web.edpos.vn/api/categories"],
   });
 
   const { data: customers } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customers"],
+    queryKey: ["https://api-laundry-web.edpos.vn/api/customers"],
   });
 
   const { data: customerDebts } = useQuery({
-    queryKey: ["https://870b3a74-08b9-4ccf-b28f-dc7e4de678a7-00-2rac59553o6xa.sisko.replit.dev/api/customer-debts"],
+    queryKey: ["https://api-laundry-web.edpos.vn/api/customer-debts"],
     enabled: concernType === "debt",
   });
 
